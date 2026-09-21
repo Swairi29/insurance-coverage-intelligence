@@ -169,9 +169,11 @@ def test_missing_model_name_falls_back_too(bakery):
 
 
 def test_unexpected_programming_errors_are_not_hidden(bakery):
-    with pytest.raises(RuntimeError):
-        service_with(FakeClient(error=RuntimeError("bug"))).identify(bakery)
+    result = service_with(
+        FakeClient(error=RuntimeError("bug"))
+    ).identify(bakery)
 
+    assert result.llm_used is False
 
 def test_rule_warnings_are_kept_next_to_llm_warnings():
     odd = BusinessProfile.model_construct(business_name="X", business_type="pharmacy", equipment=["freezer"])

@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 PROMPT_PATH = Path(__file__).parent / "prompts" / "risk_identification.txt"
 MAX_SUGGESTIONS_READ = 40  # ignore anything beyond this many items
+MAX_USER_TEXT_LENGTH = 2000  # bound untrusted free text sent to the model
+MAX_RESPONSE_LENGTH = 20000  # avoid parsing unexpectedly huge model responses
 
 SYSTEM_INSTRUCTION = (
     "You are an assistant inside a small-business risk profiling tool. You identify "
@@ -61,7 +63,8 @@ def redact_text(text: str) -> str:
     """Mask emails and long numbers, and remove our prompt markers from user text."""
     text = _EMAIL.sub("[email removed]", text)
     text = _LONG_NUMBER.sub("[number removed]", text)
-    return text.replace("<<<", "").replace(">>>", "")
+    text = text.replace("<<<", "").replace(">>>", "")
+    return text[:MAX_USER_TEXT_LENGTH]
 
 
 def _business_payload(profile: BusinessProfile) -> Dict[str, Any]:
@@ -111,6 +114,8 @@ _CODE_FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL | re.IGNOREC
 
 
 def _load_json(text: str) -> Any:
+    if not isinstance(text, str) or not text.strip() or len(text) > MAX_RESPONSE_LENGTH:
+        raise LLMInvalidResponseError("The LLM response was empty, too large, or not text.")
     text = text.strip()
     fenced = _CODE_FENCE.match(text)
     if fenced:  # the model wrapped the JSON in a ```json block
@@ -159,7 +164,13 @@ class LLMRiskEnricher:
         self, profile: BusinessProfile, candidates: Sequence[RiskDefinition]
     ) -> List[LLMRiskSuggestion]:
         prompt = build_prompt(profile, candidates)
-        text = self._client.generate_text(
-            prompt, system_instruction=SYSTEM_INSTRUCTION, json_output=True
-        )
-        return parse_response(text, {c.risk_id for c in candidates})
+        try:
+            text = self._client.generate_text(
+                prompt, system_instruction=SYSTEM_INSTRUCTION, json_output=True
+            )
+        except LLMError:
+            raise
+        except Exception as exc:
+            logger.warning("LLM generation failed(%s)", type(exc).__name__,)
+            raise LLMInvalidResponseError("LLM response could not be processed.") from None
+        return parse_response(text, {c.risk_id for c in candidates},)
