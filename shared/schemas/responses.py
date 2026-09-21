@@ -27,6 +27,7 @@ class WarningCode(str, Enum):
     MISSING_FIELD = "missing_field"  # an optional field was not provided
     LIMITED_INPUT = "limited_input"  # very little detail; risks are mostly assumed from business type
     LLM_UNAVAILABLE = "llm_unavailable"  # the LLM could not be used; result is rule-based only
+    UNSUPPORTED_BUSINESS_TYPE = "unsupported_business_type"  # only general risks were checked
 
 
 class ProfileWarning(BaseModel):

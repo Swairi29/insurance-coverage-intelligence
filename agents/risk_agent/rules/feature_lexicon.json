@@ -1,0 +1,37 @@
+{
+  "physical_premises": ["premises", "shop", "store", "outlet", "kitchen", "showroom", "storefront", "dining area", "dine in", "counter"],
+  "single_location": ["single location", "one location", "single outlet", "one outlet", "only outlet", "one branch", "single branch", "only branch", "one shop", "single shop"],
+  "customer_footfall": ["walk in", "dine in", "dining area", "dining room", "seating", "footfall", "foot traffic", "customer visit"],
+  "flood_prone_area": ["flood", "flood prone", "flooding", "low lying", "near river", "riverside", "near canal"],
+
+  "stock_on_premises": ["stock", "inventory", "stockroom", "stock room", "storeroom", "store room", "warehouse", "merchandise", "goods"],
+  "perishable_stock": ["perishable", "fresh produce", "fresh food", "fresh ingredient", "dairy", "meat", "seafood", "vegetable", "fruit", "chilled", "frozen"],
+  "combustible_materials": ["flour", "cooking oil", "frying oil", "edible oil", "packaging", "cardboard", "carton", "paper", "textile", "fabric", "clothing", "clothes", "aerosol", "gas cylinder", "lpg", "firewood", "wood fired", "charcoal"],
+  "uses_common_allergens": ["wheat", "gluten", "flour", "milk", "dairy", "egg", "butter", "cheese", "peanut", "almond", "cashew", "tree nut", "sesame", "soy", "seafood", "shellfish", "prawn"],
+  "sells_physical_goods": ["goods", "merchandise", "clothing", "clothes", "apparel", "electronics", "toy", "furniture", "book", "gift", "accessory", "accessories", "grocery", "groceries", "cosmetic", "stationery", "hardware", "jewellery", "jewelry", "shoe", "souvenir"],
+  "resells_third_party_products": ["resell", "reseller", "resale", "third party", "distributor", "stockist", "brand"],
+  "imported_goods": ["imported", "import", "importing", "overseas supplier", "foreign supplier", "international supplier", "overseas"],
+  "relies_on_few_suppliers": ["single supplier", "one supplier", "sole supplier", "only supplier", "main supplier", "few suppliers", "one distributor", "single distributor"],
+
+  "cooking_equipment": ["oven", "stove", "cooker", "fryer", "deep fryer", "grill", "griddle", "tandoor", "burner", "hot plate", "steamer", "wok", "cooking range", "baking equipment", "rice cooker", "microwave", "toaster"],
+  "gas_supply": ["gas stove", "gas burner", "gas oven", "gas cooker", "gas range", "gas fryer", "gas grill", "gas cylinder", "gas line", "gas supply", "natural gas", "lpg"],
+  "refrigeration": ["refrigerator", "refrigeration", "refrigerated", "fridge", "freezer", "chiller", "cold room", "cool room", "cold storage", "walk in cooler", "display fridge", "cold display"],
+  "electrical_equipment": ["electric", "electrical", "mixer", "blender", "microwave", "toaster", "coffee machine", "espresso machine", "air conditioner", "air conditioning", "computer", "laptop", "food processor", "display cabinet"],
+  "production_equipment": ["mixer", "dough mixer", "dough sheeter", "sheeter", "dough divider", "proofer", "slicer", "grinder", "blender", "food processor", "packaging machine", "sealing machine"],
+  "pos_system": ["pos", "point of sale", "cash register", "till", "card reader", "card machine", "billing system", "barcode scanner", "checkout terminal"],
+  "valuable_equipment": ["computer", "laptop", "tablet", "espresso machine", "coffee machine", "cash register", "pos", "television", "camera"],
+
+  "has_employees": ["employee", "staff", "worker", "waiter", "waitress", "cashier", "sales assistant", "team member"],
+  "hazardous_work_tasks": ["knife", "knives", "slicer", "fryer", "deep fryer", "grill", "hot oil", "lifting", "heavy lifting", "ladder", "meat grinder", "cleaver", "forklift"],
+  "cash_handling": ["cash payment", "cash sale", "cash register", "cash on delivery", "cash box", "cash handling", "handles cash", "cash counter", "cash desk", "cash drawer", "cash only"],
+
+  "prepares_food": ["bake", "baking", "baked", "cook", "cooking", "cooked", "kitchen", "food preparation", "prepare food", "catering", "barista"],
+  "sells_food": ["food", "bread", "cake", "pastry", "pastries", "snack", "meal", "beverage", "drink", "grocery", "groceries", "coffee", "dessert", "sandwich", "confectionery"],
+
+  "online_orders": ["online order", "online store", "online shop", "online sale", "website order", "web shop", "e commerce", "ecommerce", "order online", "social media order", "whatsapp order", "instagram order", "facebook order", "delivery app"],
+  "delivery_channel": ["delivery", "deliveries", "deliver", "delivered", "delivering", "courier", "shipping", "shipment", "dispatch"],
+  "card_payments": ["card payment", "credit card", "debit card", "card machine", "card reader", "card terminal", "visa", "mastercard", "contactless", "online payment", "pay by card", "payment gateway"],
+  "stores_customer_data": ["customer database", "customer data", "customer detail", "customer record", "customer list", "customer information", "customer contact", "customer account", "email list", "crm", "reservation", "online booking"],
+  "loyalty_program": ["loyalty", "loyalty program", "loyalty card", "membership", "member card", "reward program", "reward card"],
+  "cloud_systems": ["cloud", "saas", "software", "website", "mobile app", "online system", "e commerce platform", "shopify", "booking system"]
+}
