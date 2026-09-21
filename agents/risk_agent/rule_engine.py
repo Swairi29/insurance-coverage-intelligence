@@ -43,13 +43,13 @@ def identify_risks(
 
     `taxonomy` can be replaced in tests to try a small custom list of risks.
     """
-    business_type = _as_business_type(getattr(profile, "business_type", None))
+    business_type = as_business_type(getattr(profile, "business_type", None))
+    candidates = candidate_risks(business_type, taxonomy)
     warnings: List[ProfileWarning] = []
 
     if business_type is None:
-        # Unknown business type: we cannot assume anything about it. Report only
-        # the general risks that apply to every business AND are backed by evidence.
-        candidates = [r for r in taxonomy if r.applies_to >= ALL_TYPES]
+        # Unknown business type: we cannot assume anything about it. Only the
+        # general risks that apply to every business AND are backed by evidence are reported.
         warnings.append(
             ProfileWarning(
                 code=WarningCode.UNSUPPORTED_BUSINESS_TYPE,
@@ -58,8 +58,6 @@ def identify_risks(
                 "backed by the details provided are reported.",
             )
         )
-    else:
-        candidates = [r for r in taxonomy if business_type in r.applies_to]
 
     features = extract_features(profile)
 
@@ -76,11 +74,25 @@ def identify_risks(
     return RuleResult(risks=ordered, warnings=warnings)
 
 
-def _as_business_type(value) -> Optional[BusinessType]:
+def as_business_type(value) -> Optional[BusinessType]:
+    """Return the supported BusinessType for `value`, or None if it is unknown."""
     try:
         return BusinessType(value)
     except (ValueError, TypeError):
         return None
+
+
+def candidate_risks(
+    business_type: Optional[BusinessType], taxonomy: Sequence[RiskDefinition] = RISK_TAXONOMY
+) -> List[RiskDefinition]:
+    """The taxonomy risks that may be reported for this business type.
+
+    For an unknown type (None) these are only the general risks that apply to
+    every supported business type.
+    """
+    if business_type is None:
+        return [r for r in taxonomy if r.applies_to >= ALL_TYPES]
+    return [r for r in taxonomy if business_type in r.applies_to]
 
 
 def _evaluate(
