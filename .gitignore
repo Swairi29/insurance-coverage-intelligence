@@ -38,12 +38,20 @@ coverage.xml
 .pytype/
 
 # --- Project data (real policy documents must never be committed) ---
+# Deny by default inside sample_policies, then re-include the shareable corpora.
 data/sample_policies/*
 !data/sample_policies/.gitkeep
 !data/sample_policies/README.md
+!data/sample_policies/synthetic/
+!data/sample_policies/adversarial/
+data/sample_policies/real/
 data/processed/*
 !data/processed/.gitkeep
+
+# --- Generated / runtime artefacts ---
+data/index/
 data/uploads/
+data/app.db
 
 # --- Frontend ---
 node_modules/
