@@ -180,3 +180,42 @@ class BusinessProfile(_InputModel):
     def _null_means_empty(cls, value):
         # `"operations": null` behaves the same as leaving it out.
         return {} if value is None else value
+
+class FlexibleScenario(_InputModel):
+    """Free-text scenario for flexible insurance risk profiling."""
+
+    scenario: str = Field(
+        min_length=10,
+        max_length=5000
+    )
+
+    insurance_type: Optional[str] = Field(
+        default=None,
+        max_length=100
+    )
+
+    country: Optional[str] = Field(
+        default=None,
+        max_length=80
+    )
+
+    @field_validator("scenario", mode="before")
+    @classmethod
+    def clean_scenario(cls, value):
+        if not isinstance(value, str):
+            return value
+
+        cleaned = _clean_multi_line(value)
+
+        if not cleaned:
+            return None
+
+        return cleaned
+
+    @field_validator("insurance_type", "country", mode="before")
+    @classmethod
+    def clean_optional_text(cls, value):
+        if isinstance(value, str):
+            return _clean_single_line(value) or None
+
+        return value

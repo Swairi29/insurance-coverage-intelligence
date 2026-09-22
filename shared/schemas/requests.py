@@ -12,6 +12,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from shared.models.business import BusinessProfile
+from shared.models.business import FlexibleScenario
 
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9_\-]+$")
 
@@ -19,6 +20,21 @@ _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9_\-]+$")
 def _new_request_id() -> str:
     return str(uuid4())
 
+class FlexibleRiskProfileRequest(BaseModel):
+    """Request body for free-text insurance scenario analysis."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True
+    )
+
+    request_id: str = Field(
+        default_factory=_new_request_id,
+        min_length=1,
+        max_length=64
+    )
+
+    scenario: FlexibleScenario
 
 class RiskProfileRequest(BaseModel):
     """Body of `POST /api/v1/risk-profile` (Risk Profiling Agent)."""
@@ -42,3 +58,13 @@ class RiskProfileRequest(BaseModel):
         if not _REQUEST_ID_PATTERN.match(value):
             raise ValueError("request_id may only contain letters, digits, '-' and '_'.")
         return value
+
+from pydantic import BaseModel, Field
+
+
+class ScenarioRiskRequest(BaseModel):
+    scenario: str = Field(
+        ...,
+        min_length=10,
+        max_length=4000,
+    )
