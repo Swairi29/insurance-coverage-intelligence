@@ -9,6 +9,7 @@ from agents.risk_agent.scenario_llm import (
 )
 from shared.models.scenario_risk import ScenarioRisk
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,7 +31,11 @@ class ScenarioRiskService:
     def __init__(self, extractor: ScenarioRiskExtractor):
         self._extractor = extractor
 
-    def identify(self, scenario: str) -> ScenarioIdentificationResult:
+    def identify(
+        self,
+        scenario: str,
+    ) -> ScenarioIdentificationResult:
+
         if not isinstance(scenario, str) or not scenario.strip():
             return ScenarioIdentificationResult(
                 risks=[],
@@ -47,24 +52,27 @@ class ScenarioRiskService:
                 llm_used=True,
             )
 
-        except ScenarioLLMError:
-            logger.warning("Scenario risk identification failed")
+        except ScenarioLLMError as error:
+            logger.exception("Scenario LLM error: %s", error)
 
             return ScenarioIdentificationResult(
                 risks=[],
                 warnings=[
-                    "Risk identification could not be completed."
+                    f"LLM processing error: {str(error)}"
                 ],
                 llm_used=False,
             )
 
-        except Exception:
-            logger.exception("Unexpected scenario service failure")
+        except Exception as error:
+            logger.exception(
+                "Unexpected scenario service error: %s",
+                error,
+            )
 
             return ScenarioIdentificationResult(
                 risks=[],
                 warnings=[
-                    "An unexpected error occurred during risk identification."
+                    f"{type(error).__name__}: {str(error)}"
                 ],
                 llm_used=False,
             )
