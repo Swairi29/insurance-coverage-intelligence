@@ -32,6 +32,21 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = Field(default=30.0, gt=0)
     llm_max_retries: int = Field(default=2, ge=0, le=5)
 
+    # --- Documents & retrieval (Agent 2) ---
+    upload_dir: str = "./data/uploads"
+    processed_dir: str = "./data/processed"
+    vector_store_dir: str = "./data/index"  # reserved for a future semantic-search pass
+    chunk_size: int = Field(default=800, gt=0)
+    chunk_overlap: int = Field(default=120, ge=0)
+    retrieval_top_k: int = Field(default=8, gt=0)
+    max_upload_mb: int = Field(default=25, gt=0)
+
+    # --- Security ---
+    # Shared secret required in the `X-API-Key` header for inter-agent calls.
+    internal_api_key: Optional[SecretStr] = None
+    # Fernet key used to encrypt uploaded policy PDFs at rest.
+    document_encryption_key: Optional[SecretStr] = None
+
     @property
     def llm_is_configured(self) -> bool:
         """True when both an API key and a model name are available."""
