@@ -18,6 +18,7 @@ pymupdf>=1.24
 scikit-learn>=1.4
 rank-bm25>=0.2
 chromadb>=0.5
+pytesseract>=0.3
 
 # --- Security ---
 pyjwt>=2.8
@@ -33,5 +34,6 @@ httpx>=0.27
 pandas>=2.2
 matplotlib>=3.8
 
-# OCR (optional, add later): pytesseract, pdf2image
-# also requires installing the Tesseract program separately
+# Note: pytesseract also requires installing the Tesseract OCR program
+# separately (it is not something `pip install` can provide). Page
+# rasterization uses PyMuPDF itself, so pdf2image/poppler are not needed.

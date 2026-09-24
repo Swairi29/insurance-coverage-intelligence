@@ -182,6 +182,31 @@ def test_retrieve_evidence_extra_field_is_rejected():
 
 # --- internal errors never leak details -----------------------------------------------------
 
+def test_retrieval_service_defaults_to_tfidf_backend():
+    from agents.policy_agent.retriever import TfidfRetriever
+
+    service = policy_api._build_retrieval_service()
+    assert isinstance(service._retriever, TfidfRetriever)
+
+
+def test_retrieval_service_uses_semantic_backend_when_configured(monkeypatch):
+    monkeypatch.setenv("RETRIEVAL_BACKEND", "semantic")
+    get_settings.cache_clear()
+
+    created = []
+
+    class FakeSemanticRetriever:
+        def __init__(self):
+            created.append(self)
+
+    monkeypatch.setattr(policy_api, "SemanticRetriever", FakeSemanticRetriever)
+
+    service = policy_api._build_retrieval_service()
+
+    assert len(created) == 1
+    assert service._retriever is created[0]
+
+
 def test_upload_internal_error_does_not_expose_details(monkeypatch):
     def raise_internal_error(self, business_id, filename, pdf_bytes):
         raise RuntimeError("Database password leaked")
@@ -195,6 +220,30 @@ def test_upload_internal_error_does_not_expose_details(monkeypatch):
     body = response.json()
     assert body["detail"] == "Policy upload could not be processed."
     assert "Database password leaked" not in response.text
+
+
+def test_app_reloads_previously_ingested_policies_on_startup():
+    upload_response = upload(
+        pdf_bytes=make_pdf_bytes(["This policy covers fire and burning damage."])
+    )
+    policy_id = upload_response.json()["policy_id"]
+
+    # Simulate a process restart: wipe the in-memory index, then start a fresh
+    # app instance (running its lifespan startup hook) against the same files.
+    service_module._CHUNK_INDEX.clear()
+    with TestClient(app) as restarted_client:
+        response = restarted_client.post(
+            "/api/v1/retrieve-policy-evidence",
+            json={
+                "business_id": "B001",
+                "policy_ids": [policy_id],
+                "risks": [risk_payload()],
+            },
+            headers=HEADERS,
+        )
+
+    assert response.status_code == 200
+    assert len(response.json()["results"][0]["evidence"]) > 0
 
 
 def test_retrieve_internal_error_does_not_expose_details(monkeypatch):

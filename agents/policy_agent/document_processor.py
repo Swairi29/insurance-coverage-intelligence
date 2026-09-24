@@ -13,20 +13,35 @@ Pipeline, in plain steps:
    chunk for instruction-like phrasing (`scan_for_prompt_injection`) without
    ever blocking ingestion - a policy PDF is always data, never an instruction.
 
+If a page has little or no extractable text - a sign it may be a scanned
+image rather than a real text layer - `extract_pages` renders that page to an
+image (using PyMuPDF itself) and runs OCR on it via `pytesseract`. OCR needs
+the separate Tesseract program installed on the machine; if it is missing or
+fails, that page is logged and left as-is rather than failing the upload.
+
 Chunks never cross a page boundary, so `PolicyChunk.page` always stays accurate.
 """
 
+import logging
 import re
 from typing import List, Optional, Tuple
 
 import fitz
+import pytesseract
+from PIL import Image
 
 from shared.config.settings import get_settings
 from shared.models.policy import PolicyChunk
 from shared.utils.security import scan_for_prompt_injection
 
+logger = logging.getLogger(__name__)
+
 # Control characters except tab (\x09), newline (\x0a) and carriage return (\x0d).
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+# Below this many non-whitespace characters, a page is treated as possibly
+# scanned (no real text layer) and OCR is attempted as a fallback.
+MIN_TEXT_LENGTH_BEFORE_OCR = 20
 
 _MAX_HEADING_LENGTH = 100
 
@@ -40,13 +55,48 @@ _SECTION_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 
-def extract_pages(pdf_bytes: bytes) -> List[Tuple[int, str]]:
-    """Return `(page_number, raw_text)` for every page, page numbers starting at 1."""
+def extract_pages(
+    pdf_bytes: bytes, *, ocr_enabled: Optional[bool] = None
+) -> List[Tuple[int, str]]:
+    """Return `(page_number, raw_text)` for every page, page numbers starting at 1.
+
+    A page with little or no extractable text falls back to OCR when
+    `ocr_enabled` (or `settings.ocr_enabled` if not given) is true.
+    """
+    if ocr_enabled is None:
+        ocr_enabled = get_settings().ocr_enabled
+
     pages: List[Tuple[int, str]] = []
     with fitz.open(stream=pdf_bytes, filetype="pdf") as document:
         for index, page in enumerate(document, start=1):
-            pages.append((index, page.get_text()))
+            text = page.get_text()
+            if ocr_enabled and len(text.strip()) < MIN_TEXT_LENGTH_BEFORE_OCR:
+                text = _text_with_ocr_fallback(page, text)
+            pages.append((index, text))
     return pages
+
+
+def _text_with_ocr_fallback(page: "fitz.Page", fallback_text: str) -> str:
+    """Try OCR on a page that looks like it has no real text layer.
+
+    Returns the OCR result if it produced something usable, otherwise the
+    original (likely empty) text. Never raises - a missing or failing
+    Tesseract installation is logged and treated the same as "no text found".
+    """
+    try:
+        tesseract_cmd = get_settings().tesseract_cmd
+        if tesseract_cmd:
+            pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+        pixmap = page.get_pixmap(dpi=200)
+        image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
+        ocr_text = pytesseract.image_to_string(image)
+    except Exception:
+        logger.warning(
+            "OCR could not be run on a page with little extractable text "
+            "(Tesseract may not be installed); leaving it as-is."
+        )
+        return fallback_text
+    return ocr_text if ocr_text.strip() else fallback_text
 
 
 def clean_text(text: str) -> str:
