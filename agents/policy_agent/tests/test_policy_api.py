@@ -182,6 +182,31 @@ def test_retrieve_evidence_extra_field_is_rejected():
 
 # --- internal errors never leak details -----------------------------------------------------
 
+def test_retrieval_service_defaults_to_tfidf_backend():
+    from agents.policy_agent.retriever import TfidfRetriever
+
+    service = policy_api._build_retrieval_service()
+    assert isinstance(service._retriever, TfidfRetriever)
+
+
+def test_retrieval_service_uses_semantic_backend_when_configured(monkeypatch):
+    monkeypatch.setenv("RETRIEVAL_BACKEND", "semantic")
+    get_settings.cache_clear()
+
+    created = []
+
+    class FakeSemanticRetriever:
+        def __init__(self):
+            created.append(self)
+
+    monkeypatch.setattr(policy_api, "SemanticRetriever", FakeSemanticRetriever)
+
+    service = policy_api._build_retrieval_service()
+
+    assert len(created) == 1
+    assert service._retriever is created[0]
+
+
 def test_upload_internal_error_does_not_expose_details(monkeypatch):
     def raise_internal_error(self, business_id, filename, pdf_bytes):
         raise RuntimeError("Database password leaked")

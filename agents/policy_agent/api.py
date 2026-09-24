@@ -10,12 +10,14 @@ from typing import List
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
+from agents.policy_agent.retriever import SemanticRetriever
 from agents.policy_agent.service import (
     FileTooLargeError,
     InvalidPdfError,
     PolicyIngestionService,
     PolicyRetrievalService,
 )
+from shared.config.settings import get_settings
 from shared.models.policy import PolicyStatus
 from shared.schemas.requests import PolicyEvidenceRequest
 from shared.schemas.responses import PolicyEvidenceResponse, PolicyUploadResponse
@@ -67,6 +69,13 @@ async def upload_policy(
     return PolicyUploadResponse(**document.model_dump(), warnings=warnings)
 
 
+def _build_retrieval_service() -> PolicyRetrievalService:
+    """Build the retrieval service using whichever backend is configured."""
+    if get_settings().retrieval_backend == "semantic":
+        return PolicyRetrievalService(retriever=SemanticRetriever())
+    return PolicyRetrievalService()
+
+
 @router.post(
     "/api/v1/retrieve-policy-evidence",
     response_model=PolicyEvidenceResponse,
@@ -75,7 +84,7 @@ def retrieve_policy_evidence(request: PolicyEvidenceRequest) -> PolicyEvidenceRe
     """Find the policy evidence relevant to each requested risk."""
 
     try:
-        results = PolicyRetrievalService().retrieve(
+        results = _build_retrieval_service().retrieve(
             business_id=request.business_id,
             policy_ids=request.policy_ids,
             risks=request.risks,

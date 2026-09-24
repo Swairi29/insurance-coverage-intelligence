@@ -8,7 +8,7 @@ Only the LLM settings exist so far. Other teams can add their own fields to
 """
 
 from functools import lru_cache
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     ocr_enabled: bool = True
     # Full path to tesseract.exe, only needed if it is not already on PATH.
     tesseract_cmd: Optional[str] = None
+    # "tfidf" (default, keyword-based) or "semantic" (embedding-based, ChromaDB).
+    retrieval_backend: Literal["tfidf", "semantic"] = "tfidf"
 
     # --- Security ---
     # Shared secret required in the `X-API-Key` header for inter-agent calls.

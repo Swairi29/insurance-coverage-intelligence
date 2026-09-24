@@ -25,6 +25,7 @@ def test_defaults_when_nothing_is_set():
     assert settings.document_encryption_key is None
     assert settings.ocr_enabled is True
     assert settings.tesseract_cmd is None
+    assert settings.retrieval_backend == "tfidf"
 
 
 def test_reads_document_and_retrieval_settings_from_environment(monkeypatch):
@@ -67,6 +68,18 @@ def test_tesseract_cmd_can_be_set(monkeypatch):
     monkeypatch.setenv("TESSERACT_CMD", r"C:\Program Files\Tesseract-OCR\tesseract.exe")
     settings = Settings()
     assert settings.tesseract_cmd == r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+
+def test_retrieval_backend_can_be_set_to_semantic(monkeypatch):
+    monkeypatch.setenv("RETRIEVAL_BACKEND", "semantic")
+    settings = Settings()
+    assert settings.retrieval_backend == "semantic"
+
+
+def test_retrieval_backend_rejects_unknown_values(monkeypatch):
+    monkeypatch.setenv("RETRIEVAL_BACKEND", "bm25")
+    with pytest.raises(ValidationError):
+        Settings()
 
 
 @pytest.mark.parametrize(
