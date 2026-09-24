@@ -36,6 +36,7 @@ class PolicyDocument(BaseModel):
     status: PolicyStatus
     page_count: int = Field(ge=0)
     chunk_count: int = Field(default=0, ge=0)
+    flagged_chunk_count: int = Field(default=0, ge=0)
     uploaded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

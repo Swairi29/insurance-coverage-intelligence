@@ -95,6 +95,7 @@ class PolicyIngestionService:
             status=PolicyStatus.READY,
             page_count=page_count,
             chunk_count=len(chunks),
+            flagged_chunk_count=sum(1 for chunk in chunks if chunk.flagged),
         )
 
     def _validate(self, pdf_bytes: bytes) -> None:

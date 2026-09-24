@@ -12,6 +12,7 @@ from typing import Any, Iterable, List, Mapping, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from shared.models.business import BusinessType
+from shared.models.policy import PolicyDocument, RiskEvidenceResult
 from shared.models.risk import IdentifiedRisk
 
 # Version of the response format. Bump it when a field changes, so consumers can react.
@@ -119,3 +120,18 @@ def _safe_message(err: Mapping[str, Any]) -> str:
     message = str(err.get("msg") or "Invalid value.")
     message = message.removeprefix("Value error, ")  # Pydantic prefixes our own validator messages
     return message[:_MAX_MESSAGE_LENGTH]
+
+
+# --- Policy Intelligence (Agent 2) ----------------------------------------------------
+
+class PolicyUploadResponse(PolicyDocument):
+    """Result of `POST /api/v1/policies`: the stored document plus any warnings."""
+
+    warnings: List[str] = Field(default_factory=list)
+
+
+class PolicyEvidenceResponse(BaseModel):
+    """Result of `POST /api/v1/retrieve-policy-evidence`."""
+
+    business_id: str = Field(min_length=1, max_length=64)
+    results: List[RiskEvidenceResult] = Field(default_factory=list)
