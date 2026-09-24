@@ -14,6 +14,7 @@ from agents.policy_agent.service import (
     InvalidPdfError,
     PolicyIngestionService,
     PolicyRetrievalService,
+    load_index_from_disk,
 )
 from shared.config.settings import get_settings
 from shared.models.policy import PolicyStatus
@@ -175,3 +176,50 @@ def test_retrieve_never_crosses_a_business_boundary():
     )
 
     assert results[0].evidence == []
+
+
+# --- load_index_from_disk ----------------------------------------------------------------
+
+def test_load_index_from_disk_restores_a_previously_ingested_policy():
+    pdf_bytes = make_pdf(["This policy covers fire and burning damage."])
+    document = PolicyIngestionService().ingest("B001", "fire_policy.pdf", pdf_bytes)
+
+    # Simulate a restart: wipe the in-memory index, but leave the files on disk.
+    service_module._CHUNK_INDEX.clear()
+    assert service_module._CHUNK_INDEX == {}
+
+    loaded = load_index_from_disk()
+
+    assert loaded == 1
+    restored = service_module._CHUNK_INDEX["B001"][document.policy_id]
+    assert len(restored) == document.chunk_count
+    assert restored[0].text  # the actual chunk content came back, not just an empty shell
+
+
+def test_load_index_from_disk_with_nothing_persisted_yet_returns_zero():
+    assert load_index_from_disk() == 0
+    assert service_module._CHUNK_INDEX == {}
+
+
+def test_load_index_from_disk_skips_a_corrupted_file(tmp_path):
+    business_dir = Path(get_settings().processed_dir) / "B001"
+    business_dir.mkdir(parents=True, exist_ok=True)
+    (business_dir / "POL-broken.json").write_text("{ not valid json", encoding="utf-8")
+
+    loaded = load_index_from_disk()
+
+    assert loaded == 0
+    assert "B001" not in service_module._CHUNK_INDEX
+
+
+def test_retrieval_works_after_a_simulated_restart():
+    pdf_bytes = make_pdf(["This policy covers fire, burning and smoke damage."])
+    document = PolicyIngestionService().ingest("B001", "fire_policy.pdf", pdf_bytes)
+
+    service_module._CHUNK_INDEX.clear()  # simulate the process restarting
+    load_index_from_disk()
+
+    results = PolicyRetrievalService().retrieve(
+        business_id="B001", policy_ids=[document.policy_id], risks=[risk()]
+    )
+    assert len(results[0].evidence) > 0

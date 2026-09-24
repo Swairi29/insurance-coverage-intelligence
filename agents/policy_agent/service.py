@@ -19,6 +19,8 @@ import uuid
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from pydantic import ValidationError
+
 from agents.policy_agent.document_processor import build_chunks
 from agents.policy_agent.retriever import Retriever, TfidfRetriever, build_query
 from shared.config.settings import Settings, get_settings
@@ -55,6 +57,42 @@ _CHUNK_INDEX: Dict[str, Dict[str, List[PolicyChunk]]] = {}
 
 def _new_policy_id() -> str:
     return f"POL-{uuid.uuid4().hex[:12]}"
+
+
+def load_index_from_disk(settings: Optional[Settings] = None) -> int:
+    """Reload previously persisted chunks from `processed_dir` into `_CHUNK_INDEX`.
+
+    Intended to run once at process startup, so a restart does not silently
+    make previously uploaded policies unavailable for retrieval - the chunk
+    JSON files written by `_persist_chunks` are the durable record this reads
+    back. A missing or corrupted file is skipped with a warning, not a
+    startup failure.
+
+    Returns the number of policies loaded.
+    """
+    settings = settings or get_settings()
+    root = Path(settings.processed_dir)
+    if not root.is_dir():
+        return 0
+
+    loaded = 0
+    for business_dir in root.iterdir():
+        if not business_dir.is_dir():
+            continue
+        business_id = business_dir.name
+        for policy_file in business_dir.glob("*.json"):
+            policy_id = policy_file.stem
+            try:
+                payload = json.loads(policy_file.read_text(encoding="utf-8"))
+                chunks = [PolicyChunk.model_validate(item) for item in payload]
+            except (json.JSONDecodeError, ValidationError, OSError):
+                logger.warning("Skipping unreadable processed chunk file: %s", policy_file)
+                continue
+            _CHUNK_INDEX.setdefault(business_id, {})[policy_id] = chunks
+            loaded += 1
+
+    logger.info("Reloaded %d policy/policies from disk into the chunk index", loaded)
+    return loaded
 
 
 class PolicyIngestionService:

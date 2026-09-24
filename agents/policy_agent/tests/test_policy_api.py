@@ -197,6 +197,30 @@ def test_upload_internal_error_does_not_expose_details(monkeypatch):
     assert "Database password leaked" not in response.text
 
 
+def test_app_reloads_previously_ingested_policies_on_startup():
+    upload_response = upload(
+        pdf_bytes=make_pdf_bytes(["This policy covers fire and burning damage."])
+    )
+    policy_id = upload_response.json()["policy_id"]
+
+    # Simulate a process restart: wipe the in-memory index, then start a fresh
+    # app instance (running its lifespan startup hook) against the same files.
+    service_module._CHUNK_INDEX.clear()
+    with TestClient(app) as restarted_client:
+        response = restarted_client.post(
+            "/api/v1/retrieve-policy-evidence",
+            json={
+                "business_id": "B001",
+                "policy_ids": [policy_id],
+                "risks": [risk_payload()],
+            },
+            headers=HEADERS,
+        )
+
+    assert response.status_code == 200
+    assert len(response.json()["results"][0]["evidence"]) > 0
+
+
 def test_retrieve_internal_error_does_not_expose_details(monkeypatch):
     def raise_internal_error(self, **kwargs):
         raise RuntimeError("Database password leaked")
