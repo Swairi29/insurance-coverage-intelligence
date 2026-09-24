@@ -143,6 +143,46 @@ def test_ocr_setting_is_read_from_settings_when_not_overridden(monkeypatch):
     assert called == []
 
 
+def test_tesseract_cmd_setting_is_applied_before_ocr_runs(monkeypatch):
+    import pytesseract as pytesseract_module
+
+    from shared.config.settings import get_settings
+
+    original_cmd = pytesseract_module.pytesseract.tesseract_cmd
+    monkeypatch.setattr(
+        "agents.policy_agent.document_processor.pytesseract.image_to_string",
+        lambda image: "ocr text",
+    )
+    monkeypatch.setenv("TESSERACT_CMD", r"C:\Fake\tesseract.exe")
+    get_settings.cache_clear()
+
+    try:
+        extract_pages(make_blank_pdf())
+        assert pytesseract_module.pytesseract.tesseract_cmd == r"C:\Fake\tesseract.exe"
+    finally:
+        pytesseract_module.pytesseract.tesseract_cmd = original_cmd
+
+
+def test_no_tesseract_cmd_setting_leaves_the_default_lookup_alone(monkeypatch):
+    import pytesseract as pytesseract_module
+
+    from shared.config.settings import get_settings
+
+    original_cmd = pytesseract_module.pytesseract.tesseract_cmd
+    monkeypatch.setattr(
+        "agents.policy_agent.document_processor.pytesseract.image_to_string",
+        lambda image: "ocr text",
+    )
+    monkeypatch.delenv("TESSERACT_CMD", raising=False)
+    get_settings.cache_clear()
+
+    try:
+        extract_pages(make_blank_pdf())
+        assert pytesseract_module.pytesseract.tesseract_cmd == original_cmd
+    finally:
+        pytesseract_module.pytesseract.tesseract_cmd = original_cmd
+
+
 # --- clean_text -------------------------------------------------------------------------
 
 def test_clean_text_collapses_horizontal_whitespace():

@@ -24,6 +24,7 @@ def test_defaults_when_nothing_is_set():
     assert settings.internal_api_key is None
     assert settings.document_encryption_key is None
     assert settings.ocr_enabled is True
+    assert settings.tesseract_cmd is None
 
 
 def test_reads_document_and_retrieval_settings_from_environment(monkeypatch):
@@ -60,6 +61,12 @@ def test_ocr_can_be_disabled(monkeypatch):
     monkeypatch.setenv("OCR_ENABLED", "false")
     settings = Settings()
     assert settings.ocr_enabled is False
+
+
+def test_tesseract_cmd_can_be_set(monkeypatch):
+    monkeypatch.setenv("TESSERACT_CMD", r"C:\Program Files\Tesseract-OCR\tesseract.exe")
+    settings = Settings()
+    assert settings.tesseract_cmd == r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 
 @pytest.mark.parametrize(

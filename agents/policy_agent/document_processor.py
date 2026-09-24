@@ -84,6 +84,9 @@ def _text_with_ocr_fallback(page: "fitz.Page", fallback_text: str) -> str:
     Tesseract installation is logged and treated the same as "no text found".
     """
     try:
+        tesseract_cmd = get_settings().tesseract_cmd
+        if tesseract_cmd:
+            pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
         pixmap = page.get_pixmap(dpi=200)
         image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
         ocr_text = pytesseract.image_to_string(image)

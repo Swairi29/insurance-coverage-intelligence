@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     # OCR needs the separate Tesseract program installed on the machine; this
     # lets a deployment without it turn OCR off instead of failing per page.
     ocr_enabled: bool = True
+    # Full path to tesseract.exe, only needed if it is not already on PATH.
+    tesseract_cmd: Optional[str] = None
 
     # --- Security ---
     # Shared secret required in the `X-API-Key` header for inter-agent calls.
