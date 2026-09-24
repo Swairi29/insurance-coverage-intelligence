@@ -1,0 +1,9 @@
+{
+  "property": ["theft", "burglary", "vandalism", "flood", "storm", "water damage", "stock damage", "goods in transit"],
+  "fire": ["fire", "burning", "flame", "smoke damage", "explosion", "ignition"],
+  "equipment": ["breakdown", "machinery failure", "malfunction", "repair cost", "spoilage", "refrigeration failure"],
+  "employee": ["injury", "workplace accident", "theft by staff", "fraud", "dishonesty", "compensation"],
+  "business_interruption": ["closure", "loss of income", "trading interruption", "power outage", "supply chain", "disruption"],
+  "liability": ["injury to third party", "negligence", "bodily injury", "property damage claim", "public liability", "product liability"],
+  "cyber": ["data breach", "hacking", "ransomware", "payment fraud", "system outage", "cyber attack"]
+}
