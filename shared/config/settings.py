@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     chunk_overlap: int = Field(default=120, ge=0)
     retrieval_top_k: int = Field(default=8, gt=0)
     max_upload_mb: int = Field(default=25, gt=0)
+    # OCR needs the separate Tesseract program installed on the machine; this
+    # lets a deployment without it turn OCR off instead of failing per page.
+    ocr_enabled: bool = True
 
     # --- Security ---
     # Shared secret required in the `X-API-Key` header for inter-agent calls.

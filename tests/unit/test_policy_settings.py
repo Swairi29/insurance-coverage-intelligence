@@ -23,6 +23,7 @@ def test_defaults_when_nothing_is_set():
     assert settings.max_upload_mb == 25
     assert settings.internal_api_key is None
     assert settings.document_encryption_key is None
+    assert settings.ocr_enabled is True
 
 
 def test_reads_document_and_retrieval_settings_from_environment(monkeypatch):
@@ -53,6 +54,12 @@ def test_empty_internal_api_key_counts_as_missing(monkeypatch):
     monkeypatch.setenv("INTERNAL_API_KEY", "")
     settings = Settings()
     assert settings.internal_api_key is None
+
+
+def test_ocr_can_be_disabled(monkeypatch):
+    monkeypatch.setenv("OCR_ENABLED", "false")
+    settings = Settings()
+    assert settings.ocr_enabled is False
 
 
 @pytest.mark.parametrize(

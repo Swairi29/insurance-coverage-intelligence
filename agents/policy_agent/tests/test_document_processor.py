@@ -53,6 +53,96 @@ def test_extract_pages_handles_a_single_page():
     assert pages[0][0] == 1
 
 
+def make_blank_pdf():
+    """A PDF page with no text layer at all - the OCR fallback should try it."""
+    doc = fitz.open()
+    doc.new_page()
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+# --- OCR fallback -------------------------------------------------------------------------
+
+def test_page_with_real_text_does_not_trigger_ocr(monkeypatch):
+    called = []
+    monkeypatch.setattr(
+        "agents.policy_agent.document_processor.pytesseract.image_to_string",
+        lambda image: called.append(True) or "should not be used",
+    )
+    pdf_bytes = make_pdf([["This page already has plenty of real extractable text content."]])
+
+    pages = extract_pages(pdf_bytes)
+
+    assert called == []
+    assert "real extractable text" in pages[0][1]
+
+
+def test_blank_page_falls_back_to_ocr(monkeypatch):
+    monkeypatch.setattr(
+        "agents.policy_agent.document_processor.pytesseract.image_to_string",
+        lambda image: "Text recovered via OCR from a scanned page.",
+    )
+
+    pages = extract_pages(make_blank_pdf())
+
+    assert "Text recovered via OCR" in pages[0][1]
+
+
+def test_ocr_can_be_disabled_per_call(monkeypatch):
+    called = []
+    monkeypatch.setattr(
+        "agents.policy_agent.document_processor.pytesseract.image_to_string",
+        lambda image: called.append(True) or "ocr text",
+    )
+
+    pages = extract_pages(make_blank_pdf(), ocr_enabled=False)
+
+    assert called == []
+    assert pages[0][1] == ""
+
+
+def test_ocr_failure_is_handled_gracefully_without_crashing(monkeypatch):
+    def raise_tesseract_missing(image):
+        raise RuntimeError("tesseract is not installed")
+
+    monkeypatch.setattr(
+        "agents.policy_agent.document_processor.pytesseract.image_to_string",
+        raise_tesseract_missing,
+    )
+
+    pages = extract_pages(make_blank_pdf())  # must not raise
+
+    assert pages[0][1] == ""
+
+
+def test_ocr_result_that_is_still_blank_falls_back_to_original_text(monkeypatch):
+    monkeypatch.setattr(
+        "agents.policy_agent.document_processor.pytesseract.image_to_string",
+        lambda image: "   ",
+    )
+
+    pages = extract_pages(make_blank_pdf())
+
+    assert pages[0][1] == ""
+
+
+def test_ocr_setting_is_read_from_settings_when_not_overridden(monkeypatch):
+    from shared.config.settings import get_settings
+
+    called = []
+    monkeypatch.setattr(
+        "agents.policy_agent.document_processor.pytesseract.image_to_string",
+        lambda image: called.append(True) or "ocr text",
+    )
+    monkeypatch.setenv("OCR_ENABLED", "false")
+    get_settings.cache_clear()
+
+    extract_pages(make_blank_pdf())
+
+    assert called == []
+
+
 # --- clean_text -------------------------------------------------------------------------
 
 def test_clean_text_collapses_horizontal_whitespace():
