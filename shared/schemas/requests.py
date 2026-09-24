@@ -6,13 +6,14 @@ exists so far.
 """
 
 import re
-from typing import Optional
+from typing import List, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from shared.models.business import BusinessProfile
 from shared.models.business import FlexibleScenario
+from shared.models.risk import IdentifiedRisk
 
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9_\-]+$")
 
@@ -68,3 +69,15 @@ class ScenarioRiskRequest(BaseModel):
         min_length=10,
         max_length=4000,
     )
+
+
+class PolicyEvidenceRequest(BaseModel):
+    """Body of `POST /api/v1/retrieve-policy-evidence` (Policy Intelligence Agent)."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    business_id: str = Field(min_length=1, max_length=64)
+    # Matches the plan's "5 policies per analysis" limit.
+    policy_ids: List[str] = Field(min_length=1, max_length=5)
+    risks: List[IdentifiedRisk] = Field(min_length=1, max_length=50)
+    top_k: Optional[int] = Field(default=None, ge=1, le=50)
