@@ -1,0 +1,91 @@
+{
+  "request_id": "fixture-all-covered",
+  "business_id": "B001",
+  "business_type": "bakery",
+  "risks": [
+    {
+      "risk_id": "FIRE_COOKING",
+      "name": "Fire from cooking and baking equipment",
+      "category": "fire",
+      "reason": "The bakery uses gas ovens and fryers every day, which can start a fire.",
+      "source": "rule",
+      "confidence": 0.9,
+      "evidence": [
+        {
+          "field": "equipment",
+          "value": "gas oven"
+        },
+        {
+          "field": "equipment",
+          "value": "deep fryer"
+        }
+      ]
+    },
+    {
+      "risk_id": "PROP_THEFT",
+      "name": "Theft, burglary and vandalism",
+      "category": "property",
+      "reason": "The shop keeps cash, stock and equipment on the premises overnight.",
+      "source": "rule",
+      "confidence": 0.7,
+      "evidence": [
+        {
+          "field": "assets",
+          "value": "cash register"
+        },
+        {
+          "field": "assets",
+          "value": "stock"
+        }
+      ]
+    }
+  ],
+  "assessments": [
+    {
+      "risk_id": "FIRE_COOKING",
+      "risk_name": "Fire from cooking and baking equipment",
+      "status": "covered",
+      "potential_gap": false,
+      "reason": "Section 1 covers fire damage, including fire from cooking or baking equipment.",
+      "evidence": [
+        {
+          "chunk_id": "P001-p3-c1",
+          "policy_id": "P001",
+          "section": "Section 1 - Fire and Allied Perils",
+          "page": 3,
+          "text": "The insurer will indemnify the insured against physical loss of or damage to the property described in the schedule caused by fire, including fire arising from cooking or baking equipment used at the premises.",
+          "score": 0.81
+        }
+      ],
+      "confidence": 0.88,
+      "method": "rules",
+      "matched_signals": [
+        "fire",
+        "cooking",
+        "baking equipment"
+      ]
+    },
+    {
+      "risk_id": "PROP_THEFT",
+      "risk_name": "Theft, burglary and vandalism",
+      "status": "covered",
+      "potential_gap": false,
+      "reason": "Section 3 covers theft of contents from the premises.",
+      "evidence": [
+        {
+          "chunk_id": "P001-p7-c2",
+          "policy_id": "P001",
+          "section": "Section 3 - Burglary",
+          "page": 7,
+          "text": "The insurer will indemnify the insured for loss of or damage to contents at the premises caused by theft or attempted theft, up to the sum insured shown in the schedule.",
+          "score": 0.77
+        }
+      ],
+      "confidence": 0.8,
+      "method": "rules",
+      "matched_signals": [
+        "theft"
+      ]
+    }
+  ]
+}

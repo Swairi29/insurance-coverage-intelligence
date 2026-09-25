@@ -1,0 +1,44 @@
+{
+  "findings": [
+    {
+      "risk_id": "FIRE_COOKING",
+      "explanation": "Your policy includes fire damage caused by cooking or baking equipment (Section 1, page 3). You are definitely fully insured for any fire.",
+      "recommendation": "Ask your broker to confirm the sum insured and excess are enough to replace your ovens and premises.",
+      "cited_chunk_ids": [
+        "P001-p3-c1"
+      ]
+    },
+    {
+      "risk_id": "EQP_BREAKDOWN",
+      "explanation": "Your bakery relies on ovens and mixers, so a breakdown could stop production. No policy wording about equipment or machinery breakdown was found in the documents analysed, so this is a potential gap.",
+      "recommendation": "Ask your broker about equipment or machinery breakdown cover for your ovens and mixers.",
+      "cited_chunk_ids": [
+        "P001-p99-c9"
+      ]
+    },
+    {
+      "risk_id": "PROP_THEFT",
+      "explanation": "Your policy pays for stolen contents only when a thief breaks in by force (Section 3, page 7). Theft without signs of a forced break-in depends on conditions in your schedule.",
+      "recommendation": "Check your locks and alarms meet what your insurer requires and ask your broker about theft without forced entry.",
+      "cited_chunk_ids": [
+        "P001-p7-c2"
+      ]
+    },
+    {
+      "risk_id": "PROP_WEATHER",
+      "explanation": "Flood damage is covered by your policy, so heavy rain at your premises should not be a concern.",
+      "recommendation": "Ask your broker whether a flood extension can be added to your policy and what it would cost.",
+      "cited_chunk_ids": [
+        "P001-p5-c1"
+      ]
+    },
+    {
+      "risk_id": "BI_PREMISES_CLOSURE",
+      "explanation": "An extension mentions <b>loss of gross profit</b> if your business is interrupted, but only where your schedule says so (Section 6, page 11).",
+      "recommendation": "Ask your broker whether business interruption cover is shown in your schedule and for how long it pays.",
+      "cited_chunk_ids": [
+        "P001-p11-c3"
+      ]
+    }
+  ]
+}

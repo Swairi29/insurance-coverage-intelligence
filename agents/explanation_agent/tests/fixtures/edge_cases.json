@@ -1,0 +1,310 @@
+[
+  {
+    "name": "assessment_without_risk",
+    "description": "EQP_BREAKDOWN is assessed but missing from risks; it still becomes a finding with category null.",
+    "request": {
+      "request_id": "edge-assessment-without-risk",
+      "business_id": "B001",
+      "business_type": "bakery",
+      "risks": [
+        {
+          "risk_id": "FIRE_COOKING",
+          "name": "Fire from cooking and baking equipment",
+          "category": "fire",
+          "reason": "The bakery uses gas ovens and fryers every day, which can start a fire.",
+          "source": "rule",
+          "confidence": 0.9,
+          "evidence": [
+            {
+              "field": "equipment",
+              "value": "gas oven"
+            },
+            {
+              "field": "equipment",
+              "value": "deep fryer"
+            }
+          ]
+        }
+      ],
+      "assessments": [
+        {
+          "risk_id": "FIRE_COOKING",
+          "risk_name": "Fire from cooking and baking equipment",
+          "status": "covered",
+          "potential_gap": false,
+          "reason": "Section 1 covers fire damage, including fire from cooking or baking equipment.",
+          "evidence": [
+            {
+              "chunk_id": "P001-p3-c1",
+              "policy_id": "P001",
+              "section": "Section 1 - Fire and Allied Perils",
+              "page": 3,
+              "text": "The insurer will indemnify the insured against physical loss of or damage to the property described in the schedule caused by fire, including fire arising from cooking or baking equipment used at the premises.",
+              "score": 0.81
+            }
+          ],
+          "confidence": 0.88,
+          "method": "rules",
+          "matched_signals": [
+            "fire",
+            "cooking",
+            "baking equipment"
+          ]
+        },
+        {
+          "risk_id": "EQP_BREAKDOWN",
+          "risk_name": "Equipment breakdown",
+          "status": "not_found",
+          "potential_gap": true,
+          "reason": "No policy wording about equipment or machinery breakdown was retrieved.",
+          "evidence": [],
+          "confidence": 0.6,
+          "method": "rules",
+          "matched_signals": []
+        }
+      ]
+    }
+  },
+  {
+    "name": "risk_without_assessment",
+    "description": "EQP_BREAKDOWN is a risk with no assessment; no finding, one warning.",
+    "request": {
+      "request_id": "edge-risk-without-assessment",
+      "business_id": "B001",
+      "business_type": "bakery",
+      "risks": [
+        {
+          "risk_id": "FIRE_COOKING",
+          "name": "Fire from cooking and baking equipment",
+          "category": "fire",
+          "reason": "The bakery uses gas ovens and fryers every day, which can start a fire.",
+          "source": "rule",
+          "confidence": 0.9,
+          "evidence": [
+            {
+              "field": "equipment",
+              "value": "gas oven"
+            },
+            {
+              "field": "equipment",
+              "value": "deep fryer"
+            }
+          ]
+        },
+        {
+          "risk_id": "EQP_BREAKDOWN",
+          "name": "Equipment breakdown",
+          "category": "equipment",
+          "reason": "Production depends on ovens and mixers; a breakdown stops baking.",
+          "source": "rule",
+          "confidence": 0.85,
+          "evidence": [
+            {
+              "field": "equipment",
+              "value": "gas oven"
+            },
+            {
+              "field": "equipment",
+              "value": "industrial mixer"
+            }
+          ]
+        }
+      ],
+      "assessments": [
+        {
+          "risk_id": "FIRE_COOKING",
+          "risk_name": "Fire from cooking and baking equipment",
+          "status": "covered",
+          "potential_gap": false,
+          "reason": "Section 1 covers fire damage, including fire from cooking or baking equipment.",
+          "evidence": [
+            {
+              "chunk_id": "P001-p3-c1",
+              "policy_id": "P001",
+              "section": "Section 1 - Fire and Allied Perils",
+              "page": 3,
+              "text": "The insurer will indemnify the insured against physical loss of or damage to the property described in the schedule caused by fire, including fire arising from cooking or baking equipment used at the premises.",
+              "score": 0.81
+            }
+          ],
+          "confidence": 0.88,
+          "method": "rules",
+          "matched_signals": [
+            "fire",
+            "cooking",
+            "baking equipment"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "html_in_clause",
+    "description": "Clause text contains HTML/script tags that must stay inert text.",
+    "request": {
+      "request_id": "edge-html-in-clause",
+      "business_id": "B001",
+      "business_type": "bakery",
+      "risks": [
+        {
+          "risk_id": "PROP_THEFT",
+          "name": "Theft, burglary and vandalism",
+          "category": "property",
+          "reason": "The shop keeps cash, stock and equipment on the premises overnight.",
+          "source": "rule",
+          "confidence": 0.7,
+          "evidence": [
+            {
+              "field": "assets",
+              "value": "cash register"
+            },
+            {
+              "field": "assets",
+              "value": "stock"
+            }
+          ]
+        }
+      ],
+      "assessments": [
+        {
+          "risk_id": "PROP_THEFT",
+          "risk_name": "Theft, burglary and vandalism",
+          "status": "conditional",
+          "potential_gap": false,
+          "reason": "Theft is covered only when it follows forcible and violent entry into the premises.",
+          "evidence": [
+            {
+              "chunk_id": "P001-p7-c2",
+              "policy_id": "P001",
+              "section": "Section 3 - Burglary",
+              "page": 7,
+              "text": "Theft is covered only after forcible entry. <script>alert(1)</script> <b>See the schedule</b> for conditions.",
+              "score": 0.77
+            }
+          ],
+          "confidence": 0.79,
+          "method": "rules",
+          "matched_signals": [
+            "theft",
+            "forcible and violent entry"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "long_clause",
+    "description": "Clause text of about 3,900 characters; must be truncated in prompts and excerpts.",
+    "request": {
+      "request_id": "edge-long-clause",
+      "business_id": "B001",
+      "business_type": "bakery",
+      "risks": [
+        {
+          "risk_id": "BI_PREMISES_CLOSURE",
+          "name": "Forced closure after premises damage",
+          "category": "business_interruption",
+          "reason": "If the premises are damaged, the bakery cannot trade and loses income.",
+          "source": "rule",
+          "confidence": 0.7,
+          "evidence": [
+            {
+              "field": "operations",
+              "value": "single location"
+            }
+          ]
+        }
+      ],
+      "assessments": [
+        {
+          "risk_id": "BI_PREMISES_CLOSURE",
+          "risk_name": "Forced closure after premises damage",
+          "status": "unclear",
+          "potential_gap": true,
+          "reason": "An extension mentions loss of gross profit, but only where stated in the schedule, which was not provided.",
+          "evidence": [
+            {
+              "chunk_id": "P001-p11-c3",
+              "policy_id": "P001",
+              "section": "Section 6 - Extensions",
+              "page": 11,
+              "text": "Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss of gross profit following interruption of the business at the premises during the indemnity period. Where stated in the schedule, the insurer may consider loss",
+              "score": 0.63
+            }
+          ],
+          "confidence": 0.55,
+          "method": "rules",
+          "matched_signals": [
+            "gross profit",
+            "interruption"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "section_missing",
+    "description": "Evidence with section null; wording must fall back to the page only.",
+    "request": {
+      "request_id": "edge-section-missing",
+      "business_id": "B001",
+      "business_type": "bakery",
+      "risks": [
+        {
+          "risk_id": "PROP_THEFT",
+          "name": "Theft, burglary and vandalism",
+          "category": "property",
+          "reason": "The shop keeps cash, stock and equipment on the premises overnight.",
+          "source": "rule",
+          "confidence": 0.7,
+          "evidence": [
+            {
+              "field": "assets",
+              "value": "cash register"
+            },
+            {
+              "field": "assets",
+              "value": "stock"
+            }
+          ]
+        }
+      ],
+      "assessments": [
+        {
+          "risk_id": "PROP_THEFT",
+          "risk_name": "Theft, burglary and vandalism",
+          "status": "conditional",
+          "potential_gap": false,
+          "reason": "Theft is covered only when it follows forcible and violent entry into the premises.",
+          "evidence": [
+            {
+              "chunk_id": "P001-p7-c2",
+              "policy_id": "P001",
+              "section": null,
+              "page": 7,
+              "text": "The insurer will indemnify the insured for loss of contents by theft only where the theft follows forcible and violent entry into or exit from the premises. Theft without signs of forcible entry is subject to the conditions stated in the schedule.",
+              "score": 0.77
+            }
+          ],
+          "confidence": 0.79,
+          "method": "rules",
+          "matched_signals": [
+            "theft",
+            "forcible and violent entry"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "empty",
+    "description": "No risks and no assessments; valid response with zero findings.",
+    "request": {
+      "request_id": "edge-empty",
+      "business_id": "B001",
+      "business_type": "bakery",
+      "risks": [],
+      "assessments": []
+    }
+  }
+]

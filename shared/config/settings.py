@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     # "tfidf" (default, keyword-based) or "semantic" (embedding-based, ChromaDB).
     retrieval_backend: Literal["tfidf", "semantic"] = "tfidf"
 
+    # --- Explanation & Recommendation (Agent 4) ---
+    # False = the report uses standard template wording only, and no LLM is called.
+    explanation_use_llm: bool = True
+
     # --- Security ---
     # Shared secret required in the `X-API-Key` header for inter-agent calls.
     internal_api_key: Optional[SecretStr] = None
