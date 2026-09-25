@@ -4,9 +4,19 @@ from fastapi.testclient import TestClient
 
 from agents.risk_agent.main import app
 from agents.risk_agent import api as risk_api
+from shared.config.settings import get_settings
+
+API_KEY = "test-key"
+
+client = TestClient(app, headers={"X-API-Key": API_KEY})
 
 
-client = TestClient(app)
+@pytest.fixture(autouse=True)
+def _api_key(monkeypatch):
+    monkeypatch.setenv("INTERNAL_API_KEY", API_KEY)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture
@@ -59,6 +69,13 @@ def test_valid_risk_profile_request(valid_payload):
     assert "metadata" in body
     assert body["business_name"] == "Sunrise Bakery"
     assert body["business_type"] == "bakery"
+
+
+def test_missing_api_key_is_rejected(valid_payload):
+    response = TestClient(app).post("/api/v1/risk-profile", json=valid_payload)
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Missing or invalid API key."}
 
 
 def test_missing_business_field():

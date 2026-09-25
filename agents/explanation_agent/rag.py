@@ -52,7 +52,9 @@ Rules:
    No markdown, no HTML, no links, no other keys."""
 
 
-def load_prompt_template(version: str = PROMPT_VERSION) -> Template:
+def load_prompt_template(version: Optional[str] = None) -> Template:
+    # Looked up at call time so the evaluation can switch versions.
+    version = version or PROMPT_VERSION
     return Template((PROMPTS_DIR / f"{version}.txt").read_text(encoding="utf-8"))
 
 
@@ -60,7 +62,7 @@ def build_prompt(
     pairs: Sequence[FindingPair],
     business_type: Optional[BusinessType],
     *,
-    version: str = PROMPT_VERSION,
+    version: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Set[str]]]:
     """User prompt for one batch of findings, plus the chunk IDs each finding may cite."""
     findings, allowed = build_findings_block(pairs)
@@ -77,3 +79,67 @@ def build_prompt(
         findings=findings,
     )
     return prompt, allowed
+
+
+def generate_llm_items(
+    pairs: Sequence[FindingPair],
+    business_type: Optional[BusinessType],
+    client: TextGenerator,
+    *,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+) -> Tuple[Dict[str, dict], List[str]]:
+    """Ask the LLM to explain `pairs`, batch by batch. Never raises.
+
+    Returns `({risk_id: item}, problems)`. Items are validated and cleaned:
+    `{"explanation", "recommendation", "cited_chunk_ids"}`. Problems are short
+    codes such as "EQP_BREAKDOWN: V4" or "batch 2: llm_error" - never LLM text.
+    """
+    batch_size = max(1, batch_size)
+    accepted: Dict[str, dict] = {}
+    problems: List[str] = []
+
+    for number, start in enumerate(range(0, len(pairs), batch_size), start=1):
+        batch = pairs[start : start + batch_size]
+        started = time.perf_counter()
+        try:
+            items, batch_problems = _generate_batch(batch, business_type, client)
+        except ExplanationLLMError:
+            items, batch_problems = {}, [f"batch {number}: llm_error"]
+        except Exception as exc:  # a bug here must not break the report
+            # Type only: the message or traceback could contain policy or LLM text.
+            logger.error("Unexpected error in explanation batch %d (%s).", number, type(exc).__name__)
+            items, batch_problems = {}, [f"batch {number}: error"]
+
+        accepted.update(items)
+        problems.extend(batch_problems)
+        logger.info(
+            "Explanation batch %d: %d/%d LLM items accepted in %d ms.",
+            number, len(items), len(batch), int((time.perf_counter() - started) * 1000),
+        )
+
+    return accepted, problems
+
+
+def _generate_batch(
+    batch: Sequence[FindingPair],
+    business_type: Optional[BusinessType],
+    client: TextGenerator,
+) -> Tuple[Dict[str, dict], List[str]]:
+    prompt, allowed = build_prompt(batch, business_type)
+    data = generate_json(client, prompt, SYSTEM_INSTRUCTION)
+
+    items, problems = validate_envelope(data, set(allowed))
+    accepted: Dict[str, dict] = {}
+    assessments = {pair.assessment.risk_id: pair.assessment for pair in batch}
+
+    for risk_id, item in items.items():
+        result = validate_item(item, assessments[risk_id], allowed[risk_id])
+        if not result.ok:
+            problems.extend(f"{risk_id}: {code}" for code in result.problems)
+            continue
+        accepted[risk_id] = {
+            "explanation": item["explanation"].strip(),
+            "recommendation": item["recommendation"].strip(),
+            "cited_chunk_ids": list(dict.fromkeys(item.get("cited_chunk_ids") or [])),
+        }
+    return accepted, problems

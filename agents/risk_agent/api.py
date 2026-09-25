@@ -3,7 +3,7 @@
 
 import time
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from agents.risk_agent.service import RiskIdentificationService
 from agents.risk_agent.taxonomy import TAXONOMY_VERSION
@@ -13,8 +13,9 @@ from shared.schemas.responses import (
     ProfileStatus,
     RiskProfileResponse,
 )
+from shared.utils.security import require_internal_api_key
 
-router = APIRouter(tags=["Risk Profiling"])
+router = APIRouter(tags=["Risk Profiling"], dependencies=[Depends(require_internal_api_key)])
 
 
 @router.post(
