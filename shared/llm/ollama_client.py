@@ -72,13 +72,16 @@ class OllamaClient:
                 "temperature": 0.0,
             }
 
-            if json_output:
-                options["format"] = "json"
-
             response = self._client.chat(
                 model=self._model,
                 messages=messages,
                 options=options,
+                # JSON mode is a top-level chat() argument; inside `options`
+                # Ollama ignores it.
+                format="json" if json_output else None,
+                # Reasoning models (e.g. qwen3) otherwise "think" first, which
+                # is much slower on CPU and not needed for these tasks.
+                think=False,
             )
 
             text = response["message"]["content"]
