@@ -6,11 +6,13 @@ common validation-error response exist so far.
 """
 
 import re
+from datetime import datetime
 from enum import Enum
 from typing import Any, Iterable, List, Mapping, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from shared.models.analysis import Finding, ReportSummary
 from shared.models.business import BusinessType
 from shared.models.policy import PolicyDocument, RiskEvidenceResult
 from shared.models.risk import IdentifiedRisk
@@ -170,3 +172,29 @@ class CoverageAnalysisResponse(BaseModel):
     )
 
     metadata: CoverageMetadata
+
+
+# --- Explanation & Recommendation (Agent 4) ---
+
+
+class ExplanationMetadata(BaseModel):
+    llm_used: bool
+    llm_provider: Optional[str] = None  # "ollama" | "gemini"
+    llm_model: Optional[str] = None
+    llm_findings: int = Field(ge=0)
+    template_findings: int = Field(ge=0)
+    processing_ms: Optional[int] = Field(default=None, ge=0)
+
+
+class ExplanationResponse(BaseModel):
+    """Result of `POST /api/v1/generate-report`."""
+
+    schema_version: str = SCHEMA_VERSION
+    request_id: str
+    business_id: str
+    generated_at: datetime
+    summary: ReportSummary
+    findings: List[Finding] = Field(default_factory=list)
+    disclaimer: str
+    warnings: List[str] = Field(default_factory=list)
+    metadata: ExplanationMetadata
