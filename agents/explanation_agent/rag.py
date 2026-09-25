@@ -52,7 +52,9 @@ Rules:
    No markdown, no HTML, no links, no other keys."""
 
 
-def load_prompt_template(version: str = PROMPT_VERSION) -> Template:
+def load_prompt_template(version: Optional[str] = None) -> Template:
+    # Looked up at call time so the evaluation can switch versions.
+    version = version or PROMPT_VERSION
     return Template((PROMPTS_DIR / f"{version}.txt").read_text(encoding="utf-8"))
 
 
@@ -60,7 +62,7 @@ def build_prompt(
     pairs: Sequence[FindingPair],
     business_type: Optional[BusinessType],
     *,
-    version: str = PROMPT_VERSION,
+    version: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Set[str]]]:
     """User prompt for one batch of findings, plus the chunk IDs each finding may cite."""
     findings, allowed = build_findings_block(pairs)
