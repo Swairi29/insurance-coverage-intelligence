@@ -100,6 +100,11 @@ def verification_required_for(status: CoverageStatus) -> bool:
     return status is not CoverageStatus.COVERED
 
 
+def business_label(business_type: Optional[BusinessType]) -> str:
+    """E.g. "a bakery"; used in template wording and the LLM prompt."""
+    return _BUSINESS_LABEL.get(business_type, "a business like yours")
+
+
 # --- explanation ---------------------------------------------------------------------------
 
 
@@ -113,8 +118,7 @@ def template_explanation(
     sentences = []
 
     if status is CoverageStatus.NOT_FOUND:
-        business = _BUSINESS_LABEL.get(business_type, "a business like yours")
-        sentences.append(f"This is a relevant risk for {business}.")
+        sentences.append(f"This is a relevant risk for {business_label(business_type)}.")
         if risk is not None:
             sentences.append(f"Why it matters: {_clip(risk.reason)}")
         sentences.append(
