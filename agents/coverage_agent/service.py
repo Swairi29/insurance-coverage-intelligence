@@ -1,187 +1,226 @@
 # Agent 3 coverage assessment and gap detection logic (Member 3)
 
-"""Coverage assessment and gap detection service."""
+"""Business logic for Coverage & Gap Analysis Agent."""
 
 from __future__ import annotations
 
-import logging
 import time
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Optional
 
-from agents.coverage_agent.interpreter import (
-    CoverageInterpreter,
-    LLMInvalidResponseError,
-    TextGenerator,
-)
-from agents.coverage_agent.rules import RuleDecision, decide_coverage
-
-from shared.config.settings import Settings, get_settings
-from shared.llm.gemini_client import (
-    GeminiClient,
-    LLMAPIError,
-    LLMConfigError,
-    LLMError,
-    LLMTimeoutError,
-)
 from shared.models.coverage import (
     AnalysisMethod,
     CoverageAssessment,
     CoverageStatus,
 )
-from shared.models.policy import RiskEvidenceResult
+from shared.models.policy import EvidenceClause, RiskEvidenceResult
 from shared.models.risk import IdentifiedRisk
-from shared.schemas.responses import (
-    CoverageAnalysisResponse,
-    CoverageMetadata,
+
+from agents.coverage_agent.interpreter import (
+    CoverageInterpreter,
+    LLMInvalidResponseError,
+)
+from agents.coverage_agent.rules import (
+    decide_from_evidence,
+    potential_gap_for_status,
 )
 
-logger = logging.getLogger(__name__)
 
-
-@dataclass(frozen=True)
+@dataclass
 class CoverageServiceResult:
-    """Internal service result."""
+    """Result returned by the coverage analysis service."""
 
-    assessments: List[CoverageAssessment]
-    warnings: List[str]
+    assessments: list[CoverageAssessment]
+    warnings: list[str]
     llm_used: bool
     llm_model: Optional[str]
     processing_ms: int
 
 
 class CoverageAnalysisService:
-    """Coordinates deterministic rules and optional LLM interpretation."""
+    """Coordinates evidence validation and semantic interpretation."""
 
     def __init__(
         self,
-        llm_client: Optional[TextGenerator] = None,
         *,
+        interpreter: CoverageInterpreter | None = None,
         use_llm: bool = True,
-        settings: Optional[Settings] = None,
-    ):
-        self._llm_client = llm_client
-        self._use_llm = use_llm
-        self._settings = settings
+    ) -> None:
+        self.interpreter = interpreter
+        self.use_llm = use_llm
 
     def analyse(
         self,
-        risks: List[IdentifiedRisk],
-        evidence_results: List[RiskEvidenceResult],
+        *,
+        risks: list[IdentifiedRisk],
+        evidence_results: list[RiskEvidenceResult],
     ) -> CoverageServiceResult:
 
-        start = time.perf_counter()
+        started = time.perf_counter()
 
-        evidence_by_risk: Dict[str, RiskEvidenceResult] = {
-            item.risk_id: item
-            for item in evidence_results
+        warnings: list[str] = []
+        assessments: list[CoverageAssessment] = []
+
+        evidence_by_risk: dict[str, list[EvidenceClause]] = {
+            result.risk_id: result.evidence
+            for result in evidence_results
         }
 
-        assessments: List[CoverageAssessment] = []
-        warnings: List[str] = []
-
         llm_used = False
-        llm_model: Optional[str] = None
+        llm_model: str | None = None
 
         for risk in risks:
 
-            result = evidence_by_risk.get(
-                risk.risk_id
+            evidence = evidence_by_risk.get(
+                risk.risk_id,
+                [],
             )
 
-            evidence = (
-                result.evidence
-                if result is not None
-                else []
-            )
+            # ---------------------------------------------------------
+            # Step 1: deterministic evidence sufficiency check
+            # ---------------------------------------------------------
 
-            # --------------------------------------------
-            # STEP 1: deterministic analysis
-            # --------------------------------------------
+            deterministic = decide_from_evidence(evidence)
 
-            decision: RuleDecision = decide_coverage(
-                evidence
-            )
-
-            status = decision.status
-            reason = decision.reason
-            confidence = decision.confidence
-            method = AnalysisMethod.RULES
-            matched_signals = decision.matched_signals
-
-            # --------------------------------------------
-            # STEP 2: LLM only for ambiguous cases
-            # --------------------------------------------
-
-            if (
-                status is CoverageStatus.UNCLEAR
-                and evidence
-                and self._use_llm
-            ):
-                try:
-
-                    interpreter = CoverageInterpreter(
-                        self._get_llm_client()
+            if not evidence:
+                assessments.append(
+                    CoverageAssessment(
+                        risk_id=risk.risk_id,
+                        risk_name=risk.name,
+                        status=CoverageStatus.NOT_FOUND,
+                        potential_gap=True,
+                        reason=deterministic.reason,
+                        evidence=[],
+                        confidence=deterministic.confidence,
+                        method=AnalysisMethod.RULES,
+                        matched_signals=[],
                     )
-
-                    interpretation = interpreter.interpret(
-                        risk.name,
-                        evidence,
-                    )
-
-                    status = interpretation.status
-                    reason = interpretation.reason
-                    confidence = interpretation.confidence
-
-                    method = AnalysisMethod.RULES_AND_LLM
-
-                    llm_used = True
-                    llm_model = (
-                        self._get_settings().llm_model
-                    )
-
-                except LLMError as exc:
-
-                    logger.warning(
-                        "Coverage LLM failed: %s",
-                        type(exc).__name__,
-                    )
-
-                    warnings.append(
-                        f"LLM interpretation was unavailable "
-                        f"for risk '{risk.risk_id}'. "
-                        f"The deterministic assessment was retained."
-                    )
-
-            # --------------------------------------------
-            # STEP 3: determine possible gap
-            # --------------------------------------------
-
-            potential_gap = status in {
-                CoverageStatus.EXCLUDED,
-                CoverageStatus.NOT_FOUND,
-                CoverageStatus.UNCLEAR,
-            }
-
-            # CONDITIONAL is not automatically a gap.
-            # Agent 4 can explain that conditions require review.
-
-            assessments.append(
-                CoverageAssessment(
-                    risk_id=risk.risk_id,
-                    risk_name=risk.name,
-                    status=status,
-                    potential_gap=potential_gap,
-                    reason=reason,
-                    evidence=evidence,
-                    confidence=confidence,
-                    method=method,
-                    matched_signals=matched_signals,
                 )
-            )
+
+                continue
+
+            # ---------------------------------------------------------
+            # Step 2: semantic interpretation
+            # ---------------------------------------------------------
+
+            if not self.use_llm or self.interpreter is None:
+                assessments.append(
+                    CoverageAssessment(
+                        risk_id=risk.risk_id,
+                        risk_name=risk.name,
+                        status=CoverageStatus.UNCLEAR,
+                        potential_gap=True,
+                        reason=(
+                            "Relevant policy evidence was retrieved, "
+                            "but semantic interpretation is unavailable."
+                        ),
+                        evidence=evidence,
+                        confidence=0.40,
+                        method=AnalysisMethod.RULES,
+                        matched_signals=[],
+                    )
+                )
+
+                warnings.append(
+                    f"LLM interpretation was unavailable for risk "
+                    f"'{risk.risk_id}'."
+                )
+
+                continue
+
+            try:
+                interpretation_result = self.interpreter.interpret(
+                    risk_name=risk.name,
+                    risk_category=risk.category,
+                    risk_reason=risk.reason,
+                    evidence=evidence,
+                )
+
+                interpretation = interpretation_result.interpretation
+
+                llm_used = True
+                llm_model = interpretation_result.model
+
+                # -----------------------------------------------------
+                # Step 3: evidence grounding validation
+                # -----------------------------------------------------
+
+                referenced_ids = set(
+                    interpretation.evidence_chunk_ids
+                )
+
+                if not referenced_ids:
+                    raise LLMInvalidResponseError(
+                        "LLM did not identify supporting evidence."
+                    )
+
+                # Only evidence supplied by Agent 2 is allowed.
+                evidence_by_id = {
+                    item.chunk_id: item
+                    for item in evidence
+                }
+
+                referenced_evidence = [
+                    evidence_by_id[chunk_id]
+                    for chunk_id in interpretation.evidence_chunk_ids
+                ]
+
+                # -----------------------------------------------------
+                # Step 4: construct final assessment
+                # -----------------------------------------------------
+
+                final_status = interpretation.status
+
+                # NOT_FOUND should not normally be returned when
+                # evidence exists. Treat it as uncertainty instead.
+                if final_status == CoverageStatus.NOT_FOUND:
+                    final_status = CoverageStatus.UNCLEAR
+
+                assessments.append(
+                    CoverageAssessment(
+                        risk_id=risk.risk_id,
+                        risk_name=risk.name,
+                        status=final_status,
+                        potential_gap=potential_gap_for_status(
+                            final_status
+                        ),
+                        reason=interpretation.reason,
+                        evidence=referenced_evidence,
+                        confidence=interpretation.confidence,
+                        method=AnalysisMethod.RULES_AND_LLM,
+                        matched_signals=[],
+                    )
+                )
+
+            except Exception as exc:
+                # -----------------------------------------------------
+                # Step 5: safe fallback
+                # -----------------------------------------------------
+
+                warnings.append(
+                    f"LLM interpretation failed for risk "
+                    f"'{risk.risk_id}': {exc}"
+                )
+
+                assessments.append(
+                    CoverageAssessment(
+                        risk_id=risk.risk_id,
+                        risk_name=risk.name,
+                        status=CoverageStatus.UNCLEAR,
+                        potential_gap=True,
+                        reason=(
+                            "Relevant policy evidence was retrieved, "
+                            "but it could not be safely interpreted."
+                        ),
+                        evidence=evidence,
+                        confidence=0.30,
+                        method=AnalysisMethod.RULES,
+                        matched_signals=[],
+                    )
+                )
 
         processing_ms = int(
-            (time.perf_counter() - start) * 1000
+            (time.perf_counter() - started) * 1000
         )
 
         return CoverageServiceResult(
@@ -191,19 +230,3 @@ class CoverageAnalysisService:
             llm_model=llm_model,
             processing_ms=processing_ms,
         )
-
-    def _get_settings(self) -> Settings:
-
-        if self._settings is None:
-            self._settings = get_settings()
-
-        return self._settings
-
-    def _get_llm_client(self) -> TextGenerator:
-
-        if self._llm_client is None:
-            self._llm_client = GeminiClient(
-                self._get_settings()
-            )
-
-        return self._llm_client
