@@ -9,6 +9,7 @@ python-multipart>=0.0.9
 
 # --- LLM ---
 google-genai>=2.24,<3
+ollama>=0.4
 
 # --- NLP (Agent 1) ---
 spacy>=3.7
