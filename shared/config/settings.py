@@ -23,15 +23,26 @@ class Settings(BaseSettings):
         env_ignore_empty=True,
     )
 
-    # --- LLM (Google Gemini via `google-genai`) ---
-    # SecretStr hides the key in logs, repr() and tracebacks.
+    # --- LLM provider ---
+    # "gemini" uses the Google Gemini API.
+    # "ollama" uses a locally hosted Ollama model.
+    llm_provider: Literal["gemini", "ollama"] = "gemini"
+
+    # --- Google Gemini ---
+    # SecretStr hides the API key in logs, repr() and tracebacks.
     gemini_api_key: Optional[SecretStr] = None
     llm_model: Optional[str] = None
+
+    # --- Local Ollama ---
+    ollama_model: str = "qwen3:8b"
+    ollama_host: str = "http://localhost:11434"
+
+    # --- Shared LLM generation settings ---
     llm_max_tokens: int = Field(default=4096, gt=0)
     llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
     llm_timeout_seconds: float = Field(default=30.0, gt=0)
     llm_max_retries: int = Field(default=2, ge=0, le=5)
-
+   
     # --- Documents & retrieval (Agent 2) ---
     upload_dir: str = "./data/uploads"
     processed_dir: str = "./data/processed"
@@ -56,8 +67,19 @@ class Settings(BaseSettings):
 
     @property
     def llm_is_configured(self) -> bool:
-        """True when both an API key and a model name are available."""
-        key = self.gemini_api_key.get_secret_value().strip() if self.gemini_api_key else ""
+        """True when the selected LLM provider is configured."""
+        if self.llm_provider == "ollama":
+            return bool(
+                self.ollama_model.strip()
+                and self.ollama_host.strip()
+            )
+
+        key = (
+            self.gemini_api_key.get_secret_value().strip()
+            if self.gemini_api_key
+            else ""
+        )
+
         return bool(key and (self.llm_model or "").strip())
 
 
