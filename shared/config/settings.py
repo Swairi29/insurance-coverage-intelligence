@@ -63,11 +63,26 @@ class Settings(BaseSettings):
     # False = the report uses standard template wording only, and no LLM is called.
     explanation_use_llm: bool = True
 
+    # --- Orchestration gateway ---
+    risk_agent_url: str = "http://localhost:8001"
+    policy_agent_url: str = "http://localhost:8002"
+    coverage_agent_url: str = "http://localhost:8003"
+    explanation_agent_url: str = "http://localhost:8004"
+    # Per-call timeout for Agents 1-3, and a longer one for Agent 4, because a
+    # local model on CPU can take minutes to write a large report.
+    request_timeout_seconds: float = Field(default=60.0, gt=0)
+    explanation_timeout_seconds: float = Field(default=300.0, gt=0)
+    # SQLite file for users, uploaded policies and analysis runs.
+    database_path: str = "./data/app.db"
+
     # --- Security ---
     # Shared secret required in the `X-API-Key` header for inter-agent calls.
     internal_api_key: Optional[SecretStr] = None
-    # Fernet key used to encrypt uploaded policy PDFs at rest.
+    # Fernet key used to encrypt uploaded policy PDFs (and stored analysis results) at rest.
     document_encryption_key: Optional[SecretStr] = None
+    # Signs the gateway's login tokens (JWT, HS256). Without it, login is refused.
+    jwt_secret_key: Optional[SecretStr] = None
+    jwt_expiry_minutes: int = Field(default=60, gt=0, le=24 * 60)
 
     @property
     def llm_is_configured(self) -> bool:

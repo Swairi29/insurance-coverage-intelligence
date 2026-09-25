@@ -198,3 +198,58 @@ class ExplanationResponse(BaseModel):
     disclaimer: str
     warnings: List[str] = Field(default_factory=list)
     metadata: ExplanationMetadata
+
+
+# --- Orchestration gateway (consumed by the frontend) ---
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int = Field(gt=0)  # seconds
+
+
+class UserResponse(BaseModel):
+    user_id: str
+    email: str
+    business_id: str
+    created_at: datetime
+
+
+class AnalysisStatus(str, Enum):
+    COMPLETE = "complete"  # every agent answered
+    PARTIAL = "partial"  # coverage results are present but the written report is not; see `warnings`
+
+
+class AnalysisResponse(BaseModel):
+    """Result of `POST /api/v1/analyses` (and `GET /api/v1/analyses/{request_id}`)."""
+
+    schema_version: str = SCHEMA_VERSION
+    request_id: str
+    business_id: str
+    status: AnalysisStatus
+    created_at: datetime
+    risk_profile: RiskProfileResponse  # Agent 1
+    coverage: CoverageAnalysisResponse  # Agent 3 (Coverage Results page)
+    report: Optional[ExplanationResponse] = None  # Agent 4 (Report page); None when status is partial
+    warnings: List[str] = Field(default_factory=list)
+    stage_ms: dict[str, int] = Field(default_factory=dict)
+
+
+class AnalysisSummary(BaseModel):
+    """One row of `GET /api/v1/analyses`."""
+
+    request_id: str
+    status: AnalysisStatus
+    created_at: datetime
+    total_findings: int = Field(ge=0)
+    potential_gaps: int = Field(ge=0)
+
+
+class GatewayError(BaseModel):
+    """Error body of the gateway. Never contains agent output or the caller's input."""
+
+    error: str
+    message: str
+    stage: Optional[str] = None
+    request_id: Optional[str] = None
