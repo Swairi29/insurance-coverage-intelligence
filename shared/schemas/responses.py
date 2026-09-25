@@ -15,6 +15,9 @@ from shared.models.business import BusinessType
 from shared.models.policy import PolicyDocument, RiskEvidenceResult
 from shared.models.risk import IdentifiedRisk
 
+from shared.models.coverage import CoverageAssessment
+
+
 # Version of the response format. Bump it when a field changes, so consumers can react.
 SCHEMA_VERSION = "1.0"
 
@@ -135,3 +138,35 @@ class PolicyEvidenceResponse(BaseModel):
 
     business_id: str = Field(min_length=1, max_length=64)
     results: List[RiskEvidenceResult] = Field(default_factory=list)
+
+
+
+
+# --- Coverage % Gap detection (Agent 3) ----------------------------------------------------
+
+
+class CoverageMetadata(BaseModel):
+    """Metadata about Agent 3 processing."""
+
+    llm_used: bool
+    llm_model: Optional[str] = None
+    processing_ms: Optional[int] = Field(default=None, ge=0)
+
+
+class CoverageAnalysisResponse(BaseModel):
+    """Result returned by Agent 3."""
+
+    schema_version: str = SCHEMA_VERSION
+
+    request_id: str
+    business_id: str
+
+    assessments: List[CoverageAssessment] = Field(
+        default_factory=list
+    )
+
+    warnings: List[str] = Field(
+        default_factory=list
+    )
+
+    metadata: CoverageMetadata
