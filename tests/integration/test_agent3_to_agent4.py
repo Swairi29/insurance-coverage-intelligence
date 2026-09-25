@@ -163,7 +163,7 @@ def _api_key(monkeypatch):
 
 def run_agent1() -> RiskProfileResponse:
     response = TestClient(risk_app).post(
-        "/api/v1/risk-profile", json={"request_id": REQUEST_ID, "business": BUSINESS}
+        "/api/v1/risk-profile", json={"request_id": REQUEST_ID, "business": BUSINESS}, headers=HEADERS
     )
     assert response.status_code == 200, response.text
     return RiskProfileResponse.model_validate(response.json())

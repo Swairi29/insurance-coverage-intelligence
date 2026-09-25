@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from agents.risk_agent.scenario_llm import ScenarioRiskExtractor
 from agents.risk_agent.scenario_service import ScenarioRiskService
@@ -9,12 +9,14 @@ from shared.llm.gemini_client import GeminiClient
 from shared.llm.ollama_client import OllamaClient
 from shared.schemas.requests import ScenarioRiskRequest
 from shared.schemas.scenario_responses import ScenarioRiskResponse
+from shared.utils.security import require_internal_api_key
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/v1",
     tags=["Scenario Risk Identification"],
+    dependencies=[Depends(require_internal_api_key)],
 )
 
 

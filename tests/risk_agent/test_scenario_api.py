@@ -1,3 +1,4 @@
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -8,7 +9,18 @@ from agents.risk_agent.scenario_api import (
 from agents.risk_agent.scenario_service import (
     ScenarioIdentificationResult,
 )
+from shared.config.settings import get_settings
 from shared.models.scenario_risk import ScenarioRisk
+
+API_KEY = "test-key"
+
+
+@pytest.fixture(autouse=True)
+def _api_key(monkeypatch):
+    monkeypatch.setenv("INTERNAL_API_KEY", API_KEY)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 class FakeScenarioService:
@@ -41,7 +53,7 @@ def test_scenario_endpoint(monkeypatch):
         lambda: FakeScenarioService(),
     )
 
-    client = TestClient(app)
+    client = TestClient(app, headers={"X-API-Key": API_KEY})
 
     response = client.post(
         "/api/v1/scenario-risk-profile",
@@ -60,7 +72,7 @@ def test_scenario_endpoint(monkeypatch):
 
 
 def test_empty_scenario_is_rejected():
-    client = TestClient(app)
+    client = TestClient(app, headers={"X-API-Key": API_KEY})
 
     response = client.post(
         "/api/v1/scenario-risk-profile",
@@ -73,7 +85,7 @@ def test_empty_scenario_is_rejected():
 
 
 def test_short_scenario_is_rejected():
-    client = TestClient(app)
+    client = TestClient(app, headers={"X-API-Key": API_KEY})
 
     response = client.post(
         "/api/v1/scenario-risk-profile",
