@@ -1,0 +1,28 @@
+{
+  "version": "1.0",
+  "note": "Plain-English definitions written by the project team for Agent 4 prompts. Not legal definitions.",
+  "terms": [
+    {"term": "indemnify", "aliases": ["indemnity", "indemnified"], "definition": "To pay you back for a covered loss so you end up in about the same financial position as before it happened."},
+    {"term": "insured", "aliases": [], "definition": "The person or business the policy protects - in this report, your business."},
+    {"term": "insurer", "aliases": [], "definition": "The insurance company that pays valid claims under the policy."},
+    {"term": "premises", "aliases": [], "definition": "The building and land your business uses, as named in the policy."},
+    {"term": "schedule", "aliases": [], "definition": "The part of the policy that lists your specific details, such as what is insured, the amounts and any extra cover you chose."},
+    {"term": "excess", "aliases": [], "definition": "The amount you pay yourself towards each claim before the insurer pays the rest."},
+    {"term": "deductible", "aliases": [], "definition": "Another word for excess: the part of each claim you pay yourself."},
+    {"term": "sum insured", "aliases": [], "definition": "The maximum amount the insurer will pay for a type of loss."},
+    {"term": "exclusion", "aliases": ["excluded", "exclude"], "definition": "Something the policy says it will not pay for."},
+    {"term": "extension", "aliases": [], "definition": "Extra cover added to the basic policy, often only if it is shown in your schedule."},
+    {"term": "endorsement", "aliases": [], "definition": "A written change to the policy that adds, removes or alters cover."},
+    {"term": "peril", "aliases": ["allied perils"], "definition": "An event that can cause loss or damage, such as fire, storm or theft."},
+    {"term": "gross profit", "aliases": ["loss of profits"], "definition": "The income your business loses when it cannot trade normally, as worked out under the policy."},
+    {"term": "business interruption", "aliases": ["interruption of the business"], "definition": "Cover for lost income and extra costs while your business cannot operate after damage."},
+    {"term": "indemnity period", "aliases": [], "definition": "The longest time after a loss for which lost income will be paid."},
+    {"term": "forcible entry", "aliases": ["forcible and violent entry", "forced entry"], "definition": "Getting into the premises by force, leaving visible damage such as broken locks or windows."},
+    {"term": "period of insurance", "aliases": [], "definition": "The dates between which the policy is active."},
+    {"term": "liability", "aliases": [], "definition": "Your legal responsibility to pay for injury or damage you cause to other people or their property."},
+    {"term": "third party", "aliases": ["third parties"], "definition": "Someone other than you or the insurer, such as a customer or member of the public."},
+    {"term": "claim", "aliases": [], "definition": "A request to the insurer to pay for a loss."},
+    {"term": "condition", "aliases": [], "definition": "A rule in the policy you must follow for a claim to be paid, such as keeping locks and alarms working."},
+    {"term": "proposal form", "aliases": [], "definition": "The form you filled in when applying for insurance; wrong answers on it can affect claims."}
+  ]
+}
