@@ -15,6 +15,11 @@ from shared.models.business import BusinessProfile
 from shared.models.business import FlexibleScenario
 from shared.models.risk import IdentifiedRisk
 
+from shared.models.policy import RiskEvidenceResult
+from shared.models.risk import IdentifiedRisk
+
+
+
 _REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9_\-]+$")
 
 
@@ -81,3 +86,74 @@ class PolicyEvidenceRequest(BaseModel):
     policy_ids: List[str] = Field(min_length=1, max_length=5)
     risks: List[IdentifiedRisk] = Field(min_length=1, max_length=50)
     top_k: Optional[int] = Field(default=None, ge=1, le=50)
+
+
+
+
+#Agent 3
+
+
+class CoverageAnalysisRequest(BaseModel):
+    """Body of POST /api/v1/analyse-coverage."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+    )
+
+    request_id: str = Field(
+        default_factory=_new_request_id,
+        min_length=1,
+        max_length=64,
+    )
+
+    business_id: str = Field(
+        min_length=1,
+        max_length=64,
+    )
+
+    # Risks produced by Agent 1.
+    risks: List[IdentifiedRisk] = Field(
+        min_length=1,
+        max_length=50,
+    )
+
+    # Evidence produced by Agent 2.
+    evidence_results: List[RiskEvidenceResult] = Field(
+        default_factory=list,
+        max_length=50,
+    )
+
+    @field_validator("request_id")
+    @classmethod
+    def _check_request_id(cls, value: str) -> str:
+        if not _REQUEST_ID_PATTERN.match(value):
+            raise ValueError(
+                "request_id may only contain letters, digits, '-' and '_'."
+            )
+        return value
+
+    @field_validator("risks")
+    @classmethod
+    def _unique_risks(cls, risks: List[IdentifiedRisk]):
+        ids = [risk.risk_id for risk in risks]
+
+        if len(ids) != len(set(ids)):
+            raise ValueError("risks must not contain duplicate risk_id values.")
+
+        return risks
+
+    @field_validator("evidence_results")
+    @classmethod
+    def _unique_evidence_results(
+        cls,
+        results: List[RiskEvidenceResult],
+    ):
+        ids = [result.risk_id for result in results]
+
+        if len(ids) != len(set(ids)):
+            raise ValueError(
+                "evidence_results must not contain duplicate risk_id values."
+            )
+
+        return results
