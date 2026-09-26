@@ -452,16 +452,16 @@ Tick a step here when its PR is merged.
 
 ### Step 5 – Shared components · M1, M2, M3, M4 · one small PR each
 
-- [ ] `StatusBadge` (M3): colour and text label for each of the five statuses, a
+- [x] `StatusBadge` (M3): colour and text label for each of the five statuses, a
       "Potential gap" tag, and the `complete` / `partial` badges.
-- [ ] `ConfidenceLabel` (M1): High / Medium / Low, with the number in a tooltip.
-- [ ] `EvidenceList` (M2): accepts both `EvidenceClause` and `EvidenceCitation`, maps
+- [x] `ConfidenceLabel` (M1): High / Medium / Low, with the number in a tooltip.
+- [x] `EvidenceList` (M2): accepts both `EvidenceClause` and `EvidenceCitation`, maps
       `policy_id` to the filename, collapses long text, and warns on flagged clauses.
       Renders plain text only.
-- [ ] `AgentStatus` (M2): polls `/health/agents` every 30 s and shows the down agents.
-- [ ] `ErrorMessage` and `Disclaimer` (M4). `ErrorMessage` takes an `ApiError` and never shows
+- [x] `AgentStatus` (M2): polls `/health/agents` every 30 s and shows the down agents.
+- [x] `ErrorMessage` and `Disclaimer` (M4). `ErrorMessage` takes an `ApiError` and never shows
       raw JSON.
-- [ ] `AiLabel` (M4): one small label for "who wrote this", used by all three tabs. It shows
+- [x] `AiLabel` (M4): one small label for "who wrote this", used by all three tabs. It shows
       "AI-written" / "Template" for `generated_by`, "AI-assisted" / "Rules" for Agent 3's
       `method`, and "AI" / "Rules" / "Rules + AI" for Agent 1's `source`. A tooltip names the
       model when it is known.
