@@ -11,8 +11,11 @@ function LocationProbe() {
   return <output data-testid="location">{location.pathname + location.search}</output>;
 }
 
-/** Renders the whole app (providers, routes) at `route`, against the mock API. */
-export function renderApp(route = '/') {
+/**
+ * Renders the whole app (providers, routes) at `route`, against the mock API. `route` can
+ * carry navigation state: `{ pathname: '/app/profile', state: {...} }`.
+ */
+export function renderApp(route: string | { pathname: string; state?: unknown } = '/') {
   const client = createQueryClient();
   const user = userEvent.setup();
   const result = render(

@@ -161,7 +161,7 @@ know what to do next.
 Header: date, status badge (`complete` / `partial`), `report.summary.headline`, counts by status,
 the disclaimer (always visible, not hidden in a tooltip), and `warnings` if there are any.
 It also has an **"AI used"** line built from each agent's `metadata` (`llm_used`, `llm_model`,
-`llm_provider`), e.g. "AI used: Gemini (risk profile), qwen3:8b via Ollama (report: 12 of 14
+`llm_provider`), e.g. "AI used: Gemini (risk profile), qwen3:4b via Ollama (report: 12 of 14
 findings)", or "No AI model was used; results are rule-based" when no agent used one.
 
 The full system runs with LLMs (Gemini for Agent 1, Ollama or Gemini for Agents 3 and 4). A
@@ -374,11 +374,11 @@ Each member builds their pages from §6 using MSW. Nobody needs the backend runn
 
 | # | Item | Plan |
 |---|---|---|
-| 1 | The analysis call can take up to ~10 min and the connection could drop | Week-1 check; the History page is the fallback since the gateway saves results anyway |
+| 1 | The analysis call can take up to ~10 min and the connection could drop | **Checked in step 6 (2026-09-26): works.** Headless Chrome → Vite dev proxy (`proxyTimeout: 0`) → real gateway and Agents 1–3 → an Agent 4 stand-in that waited 570 s before sending the real template report. The request returned `200` after 570 s with a `complete` analysis (11 findings). No proxy or browser timeout was hit. The History page stays the fallback if the tab is closed, since the gateway saves results anyway. A request longer than the gateway's own `EXPLANATION_TIMEOUT_SECONDS` (600 s) still comes back as `partial`, by design |
 | 2 | Agent 3 currently returns only `unclear` / `not_found` (no interpreter yet) | Build and test with fixtures for all five statuses |
 | 3 | The gateway has no CORS, so only the dev proxy works | Fine for the demo. For a production build, serve the built files from the same origin or add CORS on the gateway (separate PR) |
 | 4 | The business profile isn't stored on the server | `sessionStorage` draft for now. Ask the team whether we want a `/profile` endpoint |
-| 5 | Members' laptops can't all run the LLM (M4's can't) | MSW + `-NoLlm` mode cover development. The LLM run in step 12 and the `--use-llm` fixtures are done on a teammate's PC |
+| 5 | Low-RAM laptops can't run the bigger local LLM | `qwen3:8b` (5.2 GB) does not fit on M4's 16 GB laptop, but `qwen3:4b` does (checked 2026-09-26: 3.2 GB in RAM on CPU, about 5–7 tokens/s, valid JSON output). Use `OLLAMA_MODEL=qwen3:4b` there and close big apps (Chrome, VS Code) during an LLM run. MSW and `-NoLlm` mode cover day-to-day development |
 | 6 | Do we need a PDF/print export of the report? | Decide in week 1. A print stylesheet (`@media print`) is the cheapest option |
 | 7 | TypeScript experience in the team | Keep types simple. `api/types.ts` is written once by M4 and everyone reviews it |
 
@@ -470,19 +470,20 @@ Tick a step here when its PR is merged.
 
 ### Step 6 – The 10-minute request check · M3 · no PR (write the result here)
 
-- [ ] Run the real gateway with a slow Agent 4 (the real LLM, or a fake that sleeps 10 min), then
+- [x] Run the real gateway with a slow Agent 4 (the real LLM, or a fake that sleeps 10 min), then
       call `POST /api/v1/analyses` through the Vite proxy from the browser.
-- [ ] Write the result in §10, risk 1. If it fails, fix the proxy settings before step 9.
+- [x] Write the result in §10, risk 1. If it fails, fix the proxy settings before step 9.
+      Result: passed (570 s, `200`, `complete`). No proxy changes were needed.
 
 ### Step 7 – Landing page and business profile · M1 · `feature/fe-profile`
 
-- [ ] `Landing.tsx`: the hero, the three capability cards and "Get started", reusing the
+- [x] `Landing.tsx`: the hero, the three capability cards and "Get started", reusing the
       InsureIntel text and colours. Then delete `frontend/assets/styles.css`.
-- [ ] `BusinessProfile.tsx` with React Hook Form. It has every field from §6 M1, with the limits
+- [x] `BusinessProfile.tsx` with React Hook Form. It has every field from §6 M1, with the limits
       from `shared/models/business.py`. The yes/no questions are three-way (Yes / No / Unknown →
       `null`). Equipment is a tag input.
-- [ ] The draft is saved to `sessionStorage` (§3.6), and "Save" leads on to the policies page.
-- [ ] A helper that maps 422 `details[].field` (`business.x.y`) onto form fields. Step 9 uses it
+- [x] The draft is saved to `sessionStorage` (§3.6), and "Save" leads on to the policies page.
+- [x] A helper that maps 422 `details[].field` (`business.x.y`) onto form fields. Step 9 uses it
       too.
 - **Done when:** there are tests for required fields, unknown → `null`, and a server 422 shown
   on the right field.
@@ -544,11 +545,12 @@ Three PRs. M4's goes first, because it contains the tab slots.
       results → history → logout. Each member checks their own pages.
 - [ ] Get a `partial` result by stopping Agent 4 during a run, and a 503 by stopping Agent 1.
 - [ ] Do the full flow once with the LLMs switched on (Gemini for Agent 1, Ollama or Gemini for
-      Agents 3 and 4). M4's PC can't run the local LLM, so a teammate whose PC can does this run,
-      using `scripts/start_agents.ps1` without `-NoLlm`. Check the slow progress screen, the
-      "AI-written" labels and the "AI used" line, and that long LLM explanations still fit the
-      layout.
-- [ ] The same teammate runs `python scripts/make_frontend_fixtures.py --use-llm` and commits
+      Agents 3 and 4), using `scripts/start_agents.ps1` without `-NoLlm`. On M4's laptop set
+      `OLLAMA_MODEL=qwen3:4b` (see §10, item 5); a report then takes several minutes, and some
+      findings may fall back to templates when Agent 4's time budget runs out. Check the slow
+      progress screen, the "AI-written" labels and the "AI used" line, and that long LLM
+      explanations still fit the layout.
+- [ ] Run `python scripts/make_frontend_fixtures.py --use-llm` with the same settings and commit
       the fixtures, so the mock API has real LLM wording from then on.
 - [ ] Log each contract mismatch as an issue for the agent's owner. Don't work around backend
       bugs in the UI.
