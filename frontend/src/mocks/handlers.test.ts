@@ -7,7 +7,7 @@
 // file would arrive named "blob" and the filename-based magic inputs would not work.
 // (Browsers are fine. Page tests override handlers with `server.use` instead.)
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { ApiError, api, configureApiClient } from '../api/client';
 import type {
   AgentsHealth,
@@ -23,14 +23,10 @@ import { DEMO_PASSWORD, demoUser } from './fixtures';
 
 let token: string | null = null;
 
+// The base URL is set to an absolute origin in src/test/setup.ts.
 beforeEach(() => {
-  vi.stubEnv('VITE_API_BASE_URL', 'http://localhost:3000'); // Node has no page origin
   token = null;
   configureApiClient({ getToken: () => token, onUnauthorized: () => {} });
-});
-
-afterEach(() => {
-  vi.unstubAllEnvs();
 });
 
 async function login(email = demoUser.email, password = DEMO_PASSWORD) {

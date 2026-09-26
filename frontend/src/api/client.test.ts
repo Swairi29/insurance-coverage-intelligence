@@ -48,6 +48,7 @@ afterEach(() => {
 
 describe('successful requests', () => {
   it('returns parsed JSON and sends the bearer token', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', ''); // as in development: relative URLs, the Vite proxy
     fetchMock.mockResolvedValue(jsonResponse(200, [{ policy_id: 'p1' }]));
 
     const result = await api.get<{ policy_id: string }[]>('/api/v1/policies');
@@ -55,6 +56,15 @@ describe('successful requests', () => {
     expect(result).toEqual([{ policy_id: 'p1' }]);
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/policies');
     expect(sentHeaders().Authorization).toBe('Bearer token-123');
+  });
+
+  it('prefixes VITE_API_BASE_URL when it is set', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'https://gateway.example');
+    fetchMock.mockResolvedValue(jsonResponse(200, []));
+
+    await api.get('/api/v1/policies');
+
+    expect(fetchMock.mock.calls[0][0]).toBe('https://gateway.example/api/v1/policies');
   });
 
   it('sends a JSON body with a content type', async () => {

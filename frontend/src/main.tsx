@@ -1,6 +1,9 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import App from './App';
+import { AppProviders } from './AppProviders';
+import { createQueryClient } from './queryClient';
 import './index.css';
 
 /** With VITE_USE_MOCKS=true (`npm run dev:mocks`) the mock API answers instead of the gateway. */
@@ -13,7 +16,11 @@ async function enableMocking(): Promise<void> {
 enableMocking().then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App />
+      <BrowserRouter>
+        <AppProviders client={createQueryClient()}>
+          <App />
+        </AppProviders>
+      </BrowserRouter>
     </StrictMode>,
   );
 });

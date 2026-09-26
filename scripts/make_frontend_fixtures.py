@@ -2,9 +2,14 @@
 
 The fixtures come from a real run of the gateway and all four agents, in-process and in
 rule/template mode, the same way tests/integration/test_orchestration_real_agents.py runs them:
-no servers, no network and no LLM call. Re-run this after a backend contract change.
+no servers and no network. Re-run this after a backend contract change.
 
-    python scripts/make_frontend_fixtures.py
+    python scripts/make_frontend_fixtures.py             # rules and templates only, no LLM
+    python scripts/make_frontend_fixtures.py --use-llm   # the LLM settings from .env
+
+`--use-llm` keeps the LLM settings from .env (Gemini for Agent 1, Ollama or Gemini for
+Agents 3 and 4), so the fixtures contain real LLM wording. Run it on a machine that can run
+the LLM; it calls the LLM provider and can take several minutes per analysis.
 
 Output:
 - user.json, policies.json, analyses.json   (GET /auth/me, /policies, /analyses)
@@ -29,16 +34,20 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 OUT = REPO / "frontend" / "src" / "mocks" / "fixtures"
 TMP = Path(tempfile.mkdtemp())
+USE_LLM = "--use-llm" in sys.argv[1:]
 
 from cryptography.fernet import Fernet  # noqa: E402
 
-# Real settings are read from .env; these override them so nothing calls an LLM
-# and nothing is written outside the temp folder.
+# Real settings are read from .env; these override them so nothing is written outside the
+# temp folder and, without --use-llm, nothing calls an LLM.
+if not USE_LLM:
+    os.environ.update({
+        "EXPLANATION_USE_LLM": "false",
+        "GEMINI_API_KEY": "",
+        "LLM_PROVIDER": "gemini",
+    })
 os.environ.update({
     "INTERNAL_API_KEY": "real-agents-key",  # the key RealAgents' pipeline sends
-    "EXPLANATION_USE_LLM": "false",
-    "GEMINI_API_KEY": "",
-    "LLM_PROVIDER": "gemini",
     "JWT_SECRET_KEY": "j" * 40,
     "DOCUMENT_ENCRYPTION_KEY": Fernet.generate_key().decode(),
     "UPLOAD_DIR": str(TMP / "uploads"),
@@ -194,8 +203,8 @@ def _all_statuses(complete: dict, policy_id: str) -> dict:
                 evidence=[{"chunk_id": c["chunk_id"], "policy_id": c["policy_id"], "section": c["section"],
                            "page": c["page"], "excerpt": c["text"][:400], "flagged": False}
                           for c in e["evidence"]])
-        if finding["risk_id"] == "LIA_FOOD_SAFETY":
-            finding["generated_by"] = "llm"
+        if not USE_LLM and finding["risk_id"] == "LIA_FOOD_SAFETY":
+            finding["generated_by"] = "llm"  # so the "AI-written" label can be tested without an LLM
 
     order = {"high": 0, "medium": 1, "low": 2}
     findings = sorted(b["report"]["findings"], key=lambda f: order[f["priority"]])
@@ -208,8 +217,9 @@ def _all_statuses(complete: dict, policy_id: str) -> dict:
         headline=f"{len(findings)} risks checked, {gaps} potential gaps: {counts['not_found']} had no "
                  f"policy wording found, {counts['excluded']} excluded and "
                  f"{counts['unclear'] + counts['conditional']} need checking.")
-    b["report"]["metadata"].update(llm_used=True, llm_provider="ollama", llm_model="qwen3:4b",
-                                   llm_findings=1, template_findings=len(findings) - 1)
+    if not USE_LLM:
+        b["report"]["metadata"].update(llm_used=True, llm_provider="ollama", llm_model="qwen3:4b",
+                                       llm_findings=1, template_findings=len(findings) - 1)
     return b
 
 
@@ -271,7 +281,10 @@ def main() -> None:
     for name, data in outputs.items():
         _write(name, data)
     shutil.rmtree(TMP, ignore_errors=True)
-    print(f"Wrote {len(outputs) + 3} fixtures to {OUT.relative_to(REPO)}")
+    report = analyses["bakery"]["report"]["metadata"]
+    print(f"Wrote {len(outputs) + 3} fixtures to {OUT.relative_to(REPO)} "
+          f"(report: {report['llm_findings']} LLM / {report['template_findings']} template findings, "
+          f"model {report['llm_model'] or 'none'})")
 
 
 if __name__ == "__main__":

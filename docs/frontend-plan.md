@@ -160,11 +160,18 @@ know what to do next.
 
 Header: date, status badge (`complete` / `partial`), `report.summary.headline`, counts by status,
 the disclaimer (always visible, not hidden in a tooltip), and `warnings` if there are any.
+It also has an **"AI used"** line built from each agent's `metadata` (`llm_used`, `llm_model`,
+`llm_provider`), e.g. "AI used: Gemini (risk profile), qwen3:8b via Ollama (report: 12 of 14
+findings)", or "No AI model was used; results are rule-based" when no agent used one.
+
+The full system runs with LLMs (Gemini for Agent 1, Ollama or Gemini for Agents 3 and 4). A
+machine without one gets rule/template results in the same format. The UI must work the same
+for both and always say which parts were written by AI.
 
 | Tab | Data | Content |
 |---|---|---|
 | **Report** (default when there is one) | `report.findings[]` | One card per finding, sorted high → medium → low priority. Shows title, status badge, "Potential gap" tag, explanation, recommendation, a "Verify with your insurer" tag when `verification_required`, a small "AI-written" / "Template" label from `generated_by`, and the evidence list |
-| **Coverage** (default when partial) | `coverage.assessments[]` | A table with columns risk, status, gap, confidence and reason. Filter by status and "gaps only". A row expands to show its evidence |
+| **Coverage** (default when partial) | `coverage.assessments[]` | A table with columns risk, status, gap, confidence, reason and method (an "AI-assisted" label when `method` is `rules+llm`, otherwise "Rules"). Filter by status and "gaps only". A row expands to show its evidence |
 | **Risk profile** | `risk_profile.risks[]` | Risks grouped by category, with reason, source (`rule` / `llm` / `rule+llm`), confidence and the input that led to them (`evidence[].field/value`), plus the profile `warnings` |
 
 ### Shared visual language
@@ -371,7 +378,7 @@ Each member builds their pages from §6 using MSW. Nobody needs the backend runn
 | 2 | Agent 3 currently returns only `unclear` / `not_found` (no interpreter yet) | Build and test with fixtures for all five statuses |
 | 3 | The gateway has no CORS, so only the dev proxy works | Fine for the demo. For a production build, serve the built files from the same origin or add CORS on the gateway (separate PR) |
 | 4 | The business profile isn't stored on the server | `sessionStorage` draft for now. Ask the team whether we want a `/profile` endpoint |
-| 5 | Members' laptops can't all run the LLM | MSW + `-NoLlm` mode cover development; only one real LLM run is needed |
+| 5 | Members' laptops can't all run the LLM (M4's can't) | MSW + `-NoLlm` mode cover development. The LLM run in step 12 and the `--use-llm` fixtures are done on a teammate's PC |
 | 6 | Do we need a PDF/print export of the report? | Decide in week 1. A print stylesheet (`@media print`) is the cheapest option |
 | 7 | TypeScript experience in the team | Keep types simple. `api/types.ts` is written once by M4 and everyone reviews it |
 
@@ -430,16 +437,16 @@ Tick a step here when its PR is merged.
 
 ### Step 4 – Auth and app shell · M4 · `feature/fe-auth`
 
-- [ ] `src/auth/`: `AuthProvider` (token in memory and `sessionStorage`), `useAuth`, and
+- [x] `src/auth/`: `AuthProvider` (token in memory and `sessionStorage`), `useAuth`, and
       `RequireAuth` (redirects to `/login?next=…`).
-- [ ] The router in `App.tsx` with every route from §4. Pages that don't exist yet are
+- [x] The router in `App.tsx` with every route from §4. Pages that don't exist yet are
       placeholders.
-- [ ] `Login.tsx` and `Register.tsx`. They handle 401, 409, 422, 429 (the button is disabled for
+- [x] `Login.tsx` and `Register.tsx`. They handle 401, 409, 422, 429 (the button is disabled for
       the `Retry-After` time) and 503. After registering, the user is logged in automatically.
-- [ ] `components/Layout/`: the nav (Dashboard, Profile, Policies, New analysis, History), the
+- [x] `components/Layout/`: the nav (Dashboard, Profile, Policies, New analysis, History), the
       user's email and Logout. Logout clears the token, the profile draft and the query cache.
-- [ ] `/app` checks the stored token with `GET /auth/me` on load.
-- [ ] A `NotFound` page.
+- [x] `/app` checks the stored token with `GET /auth/me` on load.
+- [x] A `NotFound` page.
 - **Done when:** register → login → protected page → logout works on mocks. There are tests for
   the redirect, the 401 and the 429.
 
@@ -454,6 +461,10 @@ Tick a step here when its PR is merged.
 - [ ] `AgentStatus` (M2): polls `/health/agents` every 30 s and shows the down agents.
 - [ ] `ErrorMessage` and `Disclaimer` (M4). `ErrorMessage` takes an `ApiError` and never shows
       raw JSON.
+- [ ] `AiLabel` (M4): one small label for "who wrote this", used by all three tabs. It shows
+      "AI-written" / "Template" for `generated_by`, "AI-assisted" / "Rules" for Agent 3's
+      `method`, and "AI" / "Rules" / "Rules + AI" for Agent 1's `source`. A tooltip names the
+      model when it is known.
 - **Done when:** each has a test covering its variants. M2 has a test for the flagged state and
   for text that contains HTML.
 
@@ -507,12 +518,12 @@ Three PRs. M4's goes first, because it contains the tab slots.
 
 - [ ] `feature/fe-results` (M4): `ResultsPage.tsx`, with the header (date, status badge,
       headline, counts by status), the disclaimer that is always shown, the warnings, the partial
-      banner and the tabs. The default tab is Report, or Coverage when the result is partial.
+      banner, the "AI used" line from §4 and the tabs. The default tab is Report, or Coverage when the result is partial.
       `ReportTab.tsx` shows finding cards sorted by priority, with the tags "Potential gap",
       "Verify with your insurer" and "AI-written" / "Template", and `EvidenceList`.
       404 → an "Analysis not found" state.
 - [ ] `feature/fe-coverage-tab` (M3): `CoverageTab.tsx` with the table, the status filter,
-      "gaps only" and expanding rows with evidence.
+      "gaps only", expanding rows with evidence, and `AiLabel` for `method`.
 - [ ] `feature/fe-risk-tab` (M1): `RiskProfileTab.tsx`, grouped by category, showing source,
       confidence, the input that led to each risk, and the profile warnings.
 - **Done when:** there are tests using the complete and partial fixtures, the five-status fixture
@@ -532,7 +543,13 @@ Three PRs. M4's goes first, because it contains the tab slots.
 - [ ] Walk the whole flow: register → profile → upload `data/sample_policies/...` → analysis →
       results → history → logout. Each member checks their own pages.
 - [ ] Get a `partial` result by stopping Agent 4 during a run, and a 503 by stopping Agent 1.
-- [ ] Do one run with the real LLM (Ollama).
+- [ ] Do the full flow once with the LLMs switched on (Gemini for Agent 1, Ollama or Gemini for
+      Agents 3 and 4). M4's PC can't run the local LLM, so a teammate whose PC can does this run,
+      using `scripts/start_agents.ps1` without `-NoLlm`. Check the slow progress screen, the
+      "AI-written" labels and the "AI used" line, and that long LLM explanations still fit the
+      layout.
+- [ ] The same teammate runs `python scripts/make_frontend_fixtures.py --use-llm` and commits
+      the fixtures, so the mock API has real LLM wording from then on.
 - [ ] Log each contract mismatch as an issue for the agent's owner. Don't work around backend
       bugs in the UI.
 - **Done when:** the whole flow works on the real backend and every mismatch is fixed or logged.
