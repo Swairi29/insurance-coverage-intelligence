@@ -544,13 +544,13 @@ Three PRs. M4's goes first, because it contains the tab slots.
 - [x] Walk the whole flow: register → profile → upload `data/sample_policies/...` → analysis →
       results → history → logout. Each member checks their own pages.
 - [x] Get a `partial` result by stopping Agent 4 during a run, and a 503 by stopping Agent 1.
-- [ ] Do the full flow once with the LLMs switched on (Gemini for Agent 1, Ollama or Gemini for
+- [x] Do the full flow once with the LLMs switched on (Gemini for Agent 1, Ollama or Gemini for
       Agents 3 and 4), using `scripts/start_agents.ps1` without `-NoLlm`. On M4's laptop set
       `OLLAMA_MODEL=qwen3:4b` (see §10, item 5); a report then takes several minutes, and some
       findings may fall back to templates when Agent 4's time budget runs out. Check the slow
       progress screen, the "AI-written" labels and the "AI used" line, and that long LLM
       explanations still fit the layout.
-- [ ] Run `python scripts/make_frontend_fixtures.py --use-llm` with the same settings and commit
+- [x] Run `python scripts/make_frontend_fixtures.py --use-llm` with the same settings and commit
       the fixtures, so the mock API has real LLM wording from then on.
 - [ ] Log each contract mismatch as an issue for the agent's owner. Don't work around backend
       bugs in the UI.
@@ -571,8 +571,8 @@ normal `data/app.db` was not touched), driven through the real UI in Chrome.
 | Agent 4 stopped | `partial` result, banner, Coverage tab opens, header shows "1 service down" |
 | Agent 1 stopped | 503 "A required analysis service is not available", step "Risk profiling", Try again |
 | No frontend ↔ gateway contract mismatch was found | – |
-| LLM run (Agent 4 on `qwen3:4b`) | **Not done yet.** Ollama could not load the model: only ~1.3 GB RAM was free with the app, two dev servers and the backend running ("unable to allocate CPU_REPACK buffer", 1.76 GB). Agent 4 fell back correctly: a `complete` report with 13 template findings after its 280 s budget, and the UI said "No AI model was used". Retry with more free RAM (close Chrome/VS Code and other servers) |
-| `make_frontend_fixtures.py --use-llm` | Not done yet (needs the LLM run to work first) |
+| LLM run (Agent 4 on `qwen3:4b`) | Works once enough RAM is free. First try: Ollama could not load the model with ~1.3 GB free ("unable to allocate CPU_REPACK buffer"); Agent 4 fell back to 13 template findings after its 280 s budget and the UI said "No AI model was used". Second try, with other apps closed (3.5 GB free): `complete` after 356 s, 8 of 13 findings AI-written (two batches of 4 accepted, the rest template after the time budget), header "AI used: qwen3:4b via Ollama (report: 8 of 13 findings)", AI-written labels on 8 cards, no page errors |
+| `make_frontend_fixtures.py --use-llm` | Done: the fixtures now hold real `qwen3:4b` wording (bakery 5 of 14, restaurant 8 of 18, retail shop 6 of 14 findings AI-written; the rest template after the time budget). Hand-edited findings in `analysis-all-statuses.json` are always labelled Template |
 
 Backend findings for the agents' owners (not worked around in the UI):
 
