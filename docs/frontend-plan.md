@@ -540,10 +540,10 @@ Three PRs. M4's goes first, because it contains the tab slots.
 
 ### Step 12 – Real gateway integration · all · `feature/fe-integration`
 
-- [ ] Run `scripts/start_agents.ps1 -NoLlm` and the gateway, then `npm run dev` (MSW off).
-- [ ] Walk the whole flow: register → profile → upload `data/sample_policies/...` → analysis →
+- [x] Run `scripts/start_agents.ps1 -NoLlm` and the gateway, then `npm run dev` (MSW off).
+- [x] Walk the whole flow: register → profile → upload `data/sample_policies/...` → analysis →
       results → history → logout. Each member checks their own pages.
-- [ ] Get a `partial` result by stopping Agent 4 during a run, and a 503 by stopping Agent 1.
+- [x] Get a `partial` result by stopping Agent 4 during a run, and a 503 by stopping Agent 1.
 - [ ] Do the full flow once with the LLMs switched on (Gemini for Agent 1, Ollama or Gemini for
       Agents 3 and 4), using `scripts/start_agents.ps1` without `-NoLlm`. On M4's laptop set
       `OLLAMA_MODEL=qwen3:4b` (see §10, item 5); a report then takes several minutes, and some
@@ -555,6 +555,41 @@ Three PRs. M4's goes first, because it contains the tab slots.
 - [ ] Log each contract mismatch as an issue for the agent's owner. Don't work around backend
       bugs in the UI.
 - **Done when:** the whole flow works on the real backend and every mismatch is fixed or logged.
+
+#### Step 12 results (2026-09-26)
+
+Run with the real gateway and all four real agents (on test ports with throwaway data, so the
+normal `data/app.db` was not touched), driven through the real UI in Chrome.
+
+| Check | Result |
+|---|---|
+| Register → dashboard (agent status "All services up") | Works |
+| Business profile form → saved → Policies | Works |
+| Upload a text PDF + `data/sample_policies/adversarial/TestDoc1.pdf` | Works; both Ready (TestDoc1: 5 pages, 14 sections) |
+| Analysis → results (Report / Coverage / Risk profile tabs) | Works; `complete`, 13 risks, no page errors |
+| History → open → logout (token cleared) | Works |
+| Agent 4 stopped | `partial` result, banner, Coverage tab opens, header shows "1 service down" |
+| Agent 1 stopped | 503 "A required analysis service is not available", step "Risk profiling", Try again |
+| No frontend ↔ gateway contract mismatch was found | – |
+| LLM run (Agent 4 on `qwen3:4b`) | **Not done yet.** Ollama could not load the model: only ~1.3 GB RAM was free with the app, two dev servers and the backend running ("unable to allocate CPU_REPACK buffer", 1.76 GB). Agent 4 fell back correctly: a `complete` report with 13 template findings after its 280 s budget, and the UI said "No AI model was used". Retry with more free RAM (close Chrome/VS Code and other servers) |
+| `make_frontend_fixtures.py --use-llm` | Not done yet (needs the LLM run to work first) |
+
+Backend findings for the agents' owners (not worked around in the UI):
+
+1. **Agent 2 (M2):** a PDF with very little text is stored as `ready` with `chunk_count: 0` and
+   no warning, so it silently never provides evidence. Suggest `failed`, or a `warnings` entry
+   in the upload response. (The Policies page now shows a note for such a policy.)
+2. **Agent 3 (M3):** the API builds `CoverageAnalysisService()` without an interpreter, so the
+   LLM step never runs (known issue I7). Its notes also use internal IDs, e.g.
+   "LLM interpretation was unavailable for risk 'PROP_THEFT'"; the risk name would be clearer.
+3. **Agent 4 (M4):** the flagged-clause warning names the policy by ID (`POL-…`) instead of its
+   filename, and is repeated once per finding that cites it (the UI de-duplicates it).
+4. **Agent 4 (M4):** when Ollama cannot load the model, batches 1 and 2 failed in ~3–5 s but
+   batch 3 waited 288 s before failing, so a report with zero LLM text took 5 minutes. Stopping
+   after the first "model could not be loaded" error would return the template report at once.
+5. **Agent 1 (M1):** only uses Gemini and ignores `LLM_PROVIDER=ollama`; with no
+   `GEMINI_API_KEY` it is rule-based ("The AI assistant is not configured…"). Fine, but worth
+   documenting in the README.
 
 ### Step 13 – Polish and accessibility · all · small PRs
 

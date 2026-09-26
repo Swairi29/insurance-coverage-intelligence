@@ -270,6 +270,13 @@ function PolicyItem({ policy }: { policy: PolicyDocument }) {
           {status.label}
         </span>
       </div>
+      {policy.status === 'ready' && policy.chunk_count === 0 && (
+        <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-status-conditional-bg px-3 py-2 text-xs text-status-conditional">
+          <WarningIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+          No policy text could be read from this file, so it cannot provide evidence for any risk.
+          If it is a scanned document, upload a text-based PDF instead.
+        </p>
+      )}
       {policy.flagged_chunk_count > 0 && (
         <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-status-conditional-bg px-3 py-2 text-xs text-status-conditional">
           <WarningIcon className="mt-px h-3.5 w-3.5 shrink-0" />

@@ -66,6 +66,23 @@ describe('policies page', () => {
     );
   });
 
+  it('warns when a ready policy has no readable text (found in step 12)', async () => {
+    server.use(
+      http.get('*/api/v1/policies', () =>
+        HttpResponse.json([
+          { ...policiesFixture[0], filename: 'scan.pdf', chunk_count: 0 },
+          policiesFixture[1],
+        ]),
+      ),
+    );
+    await openPolicies();
+
+    const list = await screen.findByRole('list', { name: 'Your policies' });
+    const [scan, other] = within(list).getAllByRole('listitem');
+    expect(scan).toHaveTextContent('No policy text could be read from this file');
+    expect(other).not.toHaveTextContent('No policy text could be read');
+  });
+
   it('shows the agent status in the header', async () => {
     await openPolicies();
     expect(await screen.findByText('All services up')).toBeInTheDocument();

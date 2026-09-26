@@ -22,6 +22,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // Form tests type key by key; on a busy laptop the default 5 s is too tight.
+    testTimeout: 15_000,
     css: false,
   },
 });
