@@ -149,6 +149,27 @@ def test_v5_blocked_phrases(phrase):
     assert "V5" in _problems("FIRE_COOKING", explanation=text)
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Seen in live qwen3:8b output (Step 11).
+        "Your business is protected against fire-related losses from these sources.",
+        "Verify your cooking equipment is listed in the schedule for full coverage.",
+        "You're protected here.",
+        "This gives complete protection.",
+        "Ovens are completely covered.",
+        "You are fully protected.",
+    ],
+)
+def test_v5_over_confident_claims(text):
+    assert "V5" in _problems("FIRE_COOKING", explanation=text)
+
+
+def test_v5_allows_neutral_cover_wording():
+    text = "The policy includes cover for fire from cooking equipment (Section 1, page 3)."
+    assert _problems("FIRE_COOKING", explanation=text) == []
+
+
 def test_v5_checks_recommendation_too():
     assert _problems("EQP_BREAKDOWN", recommendation="This is definitely worth asking about.") == ["V5"]
 

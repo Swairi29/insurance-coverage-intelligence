@@ -1,0 +1,19 @@
+Write plain-English explanations and recommendations for the $count insurance coverage findings below.
+The reader owns a small business: $business_type. They are not an insurance expert, so use short sentences and everyday words.
+
+For each finding write:
+- explanation: 2-3 short sentences, at most 80 words. Say what the policy wording says (or that none was found) and what that means for the business. Match the wording to the finding's status (see the rules). When evidence is shown, mention its section and page.
+- recommendation: one sentence of at most 40 words that starts with a verb such as "Ask" or "Check", about something to check or to ask the insurer or broker. Do not recommend a specific insurance product or company.
+- cited_chunk_ids: the chunk_ids of the evidence you used for this finding, or [] if it has none.
+
+Write exactly one item for each of these risk_ids: $risk_ids
+
+Insurance terms used below, with plain meanings you may use:
+$glossary
+
+Findings (each STATUS is final and must not be changed; read the status line before writing):
+
+$findings
+
+Reply with JSON only, in exactly this shape:
+{"findings": [{"risk_id": "...", "explanation": "...", "recommendation": "...", "cited_chunk_ids": ["..."]}]}

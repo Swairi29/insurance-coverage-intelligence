@@ -9,6 +9,7 @@ uses canned answers so the script itself can be checked offline.
     python tests/evaluation/eval_explanation.py --provider ollama gemini --runs 3
     python tests/evaluation/eval_explanation.py --provider fake     # offline check
     python tests/evaluation/eval_explanation.py --prompt-version report_v2
+    python tests/evaluation/eval_explanation.py --cases bakery_mixed injection   # a quick subset
 """
 
 from __future__ import annotations
@@ -303,7 +304,7 @@ def write_markdown(path: Path, summaries: Dict[str, dict], results: Sequence[Cas
         "# Agent 4 evaluation - Explanation & Recommendation",
         "",
         f"Generated {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC · prompt `{rag.PROMPT_VERSION}` · "
-        f"{runs} run(s) per case · {len(load_cases())} cases",
+        f"{runs} run(s) per case · {len({r.case for r in results})} cases",
         "",
         "## Summary",
         "",
@@ -367,10 +368,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--runs", type=int, default=1, help="repeat each case (LLM output varies)")
     parser.add_argument("--prompt-version", default=rag.PROMPT_VERSION)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    parser.add_argument("--cases", nargs="+", metavar="NAME",
+                        help="only these cases, e.g. bakery_mixed injection edge:long_clause")
     args = parser.parse_args(argv)
 
     rag.PROMPT_VERSION = args.prompt_version
     cases = load_cases()
+    if args.cases:
+        unknown = set(args.cases) - {name for name, _ in cases}
+        if unknown:
+            parser.error(f"unknown case(s): {', '.join(sorted(unknown))}")
+        cases = [(name, request) for name, request in cases if name in args.cases]
     results: List[CaseResult] = []
     summaries: Dict[str, dict] = {}
 
@@ -379,14 +387,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if client is None:
             print(f"[{provider}] not configured (check LLM_PROVIDER / OLLAMA_MODEL / GEMINI_API_KEY); skipped.")
             continue
-        print(f"[{name}] model={model}, {len(cases)} cases x {args.runs} run(s)")
+        print(f"[{name}] model={model}, {len(cases)} cases x {args.runs} run(s)", flush=True)
         provider_results = []
         for run in range(1, args.runs + 1):
             for case, request in cases:
                 result = evaluate_case(client, name, model, case, run, request)
                 provider_results.append(result)
                 print(f"  {case:<32} run {run}: {result.llm_accepted}/{result.findings} LLM, "
-                      f"{result.processing_ms} ms")
+                      f"{result.processing_ms} ms", flush=True)
         if all(r.llm_calls_failed and not r.llm_accepted for r in provider_results):
             print(f"[{name}] every LLM call failed - is the model running?")
         results.extend(provider_results)

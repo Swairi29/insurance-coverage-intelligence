@@ -33,8 +33,12 @@ MAX_RECOMMENDATION_CHARS = 600
 MISSING = "missing"
 
 _BLOCKED = re.compile(
-    r"\bdefinitely\b|\bguaranteed?\b|\bfully (covered|insured)\b|100\s?%|\bnot covered\b"
-    r"|\byou are covered for everything\b",
+    r"\bdefinitely\b|\bguaranteed?\b|\bfully (covered|insured|protected)\b|100\s?%|\bnot covered\b"
+    r"|\byou are covered for everything\b"
+    # Over-confident claims seen in live qwen3 output ("for full coverage",
+    # "Your business is protected against ..."): the report is decision support only.
+    r"|\b(full|complete|total) (coverage|cover|protection)\b|\bcompletely (covered|protected)\b"
+    r"|\b(is|are|you'?re|you are) (fully |completely )?protected\b",
 )
 # Claims of cover, not allowed when the status is not_found / excluded / unclear.
 _CLAIMS_COVER = re.compile(r"\b(is|are) covered\b|\byou'?re covered\b|\byou are covered\b")

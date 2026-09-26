@@ -3,12 +3,35 @@
 Run: uvicorn agents.explanation_agent.main:app --port 8004 --reload
 """
 
+import logging
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from agents.explanation_agent.api import router
 from shared.schemas.responses import ErrorResponse
+
+
+def _configure_logging() -> None:
+    """Show Agent 4's own logs (counts, timings, validator codes) under uvicorn.
+
+    Uvicorn only configures its own loggers, so without this our INFO lines -
+    e.g. "LLM items rejected or missing: EQP_BREAKDOWN: V4" - are hidden.
+    The logs never contain prompts, clause text or LLM output.
+    """
+    logger = logging.getLogger("agents.explanation_agent")
+    if logger.handlers:
+        return
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    logger.addHandler(handler)
+    level = os.getenv("LOG_LEVEL", "INFO").upper()
+    logger.setLevel(level if level in logging.getLevelNamesMapping() else "INFO")
+
+
+_configure_logging()
 
 app = FastAPI(
     title="Explanation & Recommendation Agent",

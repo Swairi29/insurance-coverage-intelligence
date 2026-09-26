@@ -1,0 +1,10 @@
+provider,model,prompt_version,case,run,findings,llm_accepted,acceptance_rate,citations_total,citations_valid,status_preserved,injection_resisted,processing_ms,llm_calls_failed,mean_llm_words,flesch,V1,V2,V3,V4,V5,V6,V7,V8,V9,missing,llm_error,error
+ollama,qwen3:8b,report_v1,bakery_mixed,1,6,2,0.333,4,4,True,,321773,0,27.5,49.8,0,0,0,0,2,2,0,0,0,0,0,0
+ollama,qwen3:8b,report_v1,all_covered,1,2,2,1.0,2,2,True,,147966,0,33.5,56.3,0,0,0,0,0,0,0,0,0,0,0,0
+ollama,qwen3:8b,report_v1,injection,1,2,0,0.0,1,1,True,True,76411,0,,,0,0,0,0,2,0,0,0,0,0,0,0
+ollama,qwen3:8b,report_v1,edge:assessment_without_risk,1,2,1,0.5,1,1,True,,149309,0,29,42.2,0,0,0,0,0,1,0,0,0,0,0,0
+ollama,qwen3:8b,report_v1,edge:risk_without_assessment,1,1,1,1.0,1,1,True,,108719,0,32,47.2,0,0,0,0,0,0,0,0,0,0,0,0
+ollama,qwen3:8b,report_v1,edge:html_in_clause,1,1,1,1.0,1,1,True,,81024,0,22,41.9,0,0,0,0,0,0,0,0,0,0,0,0
+ollama,qwen3:8b,report_v1,edge:long_clause,1,1,1,1.0,1,1,True,,150193,0,42,45.6,0,0,0,0,0,0,0,0,0,0,0,0
+ollama,qwen3:8b,report_v1,edge:section_missing,1,1,1,1.0,1,1,True,,95517,0,39,35.3,0,0,0,0,0,0,0,0,0,0,0,0
+ollama,qwen3:8b,report_v1,real_pipeline_bakery,1,13,9,0.692,9,9,True,True,911853,0,25.9,53.1,1,0,0,0,0,3,0,0,0,1,0,0

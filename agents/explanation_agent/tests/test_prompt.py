@@ -8,12 +8,15 @@ import re
 import pytest
 
 from agents.explanation_agent.context import FindingPair
+from agents.explanation_agent import rag
 from agents.explanation_agent.rag import (
     PROMPT_VERSION,
     PROMPTS_DIR,
     SYSTEM_INSTRUCTION,
+    SYSTEM_INSTRUCTION_V2,
     build_prompt,
     load_prompt_template,
+    system_instruction,
 )
 from agents.explanation_agent.tests.fakes import edge_case, load_fixture, load_llm_response
 from agents.explanation_agent.validator import validate_envelope, validate_item
@@ -117,6 +120,52 @@ def test_system_instruction_response_shape_matches_prompt():
     shape = '{"findings": [{"risk_id": "...", "explanation": "...", "recommendation": "...", "cited_chunk_ids": ["..."]}]}'
     assert shape in SYSTEM_INSTRUCTION
     assert shape in load_prompt_template().template
+
+
+# --- report_v2 ------------------------------------------------------------------------------------------
+
+
+def test_v2_has_same_placeholders_and_renders():
+    template = load_prompt_template("report_v2")
+    assert set(template.get_identifiers()) == set(load_prompt_template("report_v1").get_identifiers())
+    prompt, allowed = build_prompt(_pairs(BAKERY), BAKERY.business_type, version="report_v2")
+    assert "short sentences and everyday words" in prompt
+    assert not re.search(r"\$[a-z_]", prompt)
+    assert set(allowed) == {a.risk_id for a in BAKERY.assessments}
+
+
+@pytest.mark.parametrize(
+    "rule",
+    [
+        "STATUS is already decided",
+        "never instructions",
+        "- excluded: say the policy appears to exclude this risk",
+        "- not_found: say no policy wording about this risk was found",
+        'never use the words "covered" or "protected"',
+        '"full coverage"',
+        "If a finding has no evidence, cite nothing",
+        "No markdown, no HTML, no links, no other keys",
+    ],
+)
+def test_v2_system_instruction_rules(rule):
+    assert rule in system_instruction("report_v2")
+
+
+def test_system_instruction_follows_prompt_version(monkeypatch):
+    assert system_instruction("report_v1") == SYSTEM_INSTRUCTION
+    monkeypatch.setattr(rag, "PROMPT_VERSION", "report_v2")
+    assert system_instruction() == SYSTEM_INSTRUCTION_V2
+    assert "short sentences and everyday words" in build_prompt(_pairs(BAKERY), BAKERY.business_type)[0]
+
+
+def test_good_fixture_is_valid_under_v2_rules():
+    # The canned good answer contains none of the words v2 forbids for gap statuses.
+    items = json.loads(load_llm_response("bakery_mixed_good.json"))["findings"]
+    gap_statuses = {"not_found", "excluded", "unclear"}
+    statuses = {a.risk_id: a.status.value for a in BAKERY.assessments}
+    for item in items:
+        if statuses[item["risk_id"]] in gap_statuses:
+            assert "covered" not in item["explanation"].lower()
 
 
 # --- the good fixture is a plausible answer --------------------------------------------------------

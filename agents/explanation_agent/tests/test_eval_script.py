@@ -44,6 +44,18 @@ def test_fake_run_writes_csv_and_markdown(eval_module, tmp_path):
     assert resisted == total and int(total) >= 1
 
 
+def test_cases_filter(eval_module, tmp_path):
+    assert eval_module.main(["--provider", "fake", "--cases", "injection", "--out", str(tmp_path)]) == 0
+    rows = list(csv.DictReader((tmp_path / "explanation_eval.csv").open(encoding="utf-8")))
+    assert [row["case"] for row in rows] == ["injection"]
+    assert "· 1 cases" in (tmp_path / "explanation_eval.md").read_text(encoding="utf-8")
+
+
+def test_unknown_case_is_an_error(eval_module, tmp_path):
+    with pytest.raises(SystemExit):
+        eval_module.main(["--provider", "fake", "--cases", "nope", "--out", str(tmp_path)])
+
+
 def test_unconfigured_provider_is_skipped(eval_module, tmp_path, monkeypatch):
     monkeypatch.setattr(eval_module, "build_client", lambda provider: (None, provider, None))
     assert eval_module.main(["--provider", "gemini", "--out", str(tmp_path)]) == 1
