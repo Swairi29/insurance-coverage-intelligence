@@ -11,7 +11,7 @@ const STATUS_CLASSES: Record<CoverageStatus, string> = {
 };
 
 const PILL =
-  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold';
+  'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold';
 
 /** Coverage status: colour plus a text label, never colour alone. */
 export function StatusBadge({ status }: { status: CoverageStatus }) {

@@ -517,15 +517,15 @@ Tick a step here when its PR is merged.
 
 Three PRs. M4's goes first, because it contains the tab slots.
 
-- [ ] `feature/fe-results` (M4): `ResultsPage.tsx`, with the header (date, status badge,
+- [x] `feature/fe-results` (M4): `ResultsPage.tsx`, with the header (date, status badge,
       headline, counts by status), the disclaimer that is always shown, the warnings, the partial
       banner, the "AI used" line from §4 and the tabs. The default tab is Report, or Coverage when the result is partial.
       `ReportTab.tsx` shows finding cards sorted by priority, with the tags "Potential gap",
       "Verify with your insurer" and "AI-written" / "Template", and `EvidenceList`.
       404 → an "Analysis not found" state.
-- [ ] `feature/fe-coverage-tab` (M3): `CoverageTab.tsx` with the table, the status filter,
+- [x] `feature/fe-coverage-tab` (M3): `CoverageTab.tsx` with the table, the status filter,
       "gaps only", expanding rows with evidence, and `AiLabel` for `method`.
-- [ ] `feature/fe-risk-tab` (M1): `RiskProfileTab.tsx`, grouped by category, showing source,
+- [x] `feature/fe-risk-tab` (M1): `RiskProfileTab.tsx`, grouped by category, showing source,
       confidence, the input that led to each risk, and the profile warnings.
 - **Done when:** there are tests using the complete and partial fixtures, the five-status fixture
   and the 404.

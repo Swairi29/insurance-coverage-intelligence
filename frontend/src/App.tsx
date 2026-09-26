@@ -7,6 +7,7 @@ import NotFound from './pages/NotFound';
 import BusinessProfile from './pages/BusinessProfile';
 import NewAnalysis from './pages/NewAnalysis';
 import Placeholder from './pages/Placeholder';
+import ResultsPage from './pages/Results/ResultsPage';
 import Policies from './pages/Policies';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
@@ -44,7 +45,7 @@ export default function App() {
         <Route path="policies" element={<Policies />} />
         <Route path="analyses/new" element={<NewAnalysis />} />
         <Route path="analyses" element={<Placeholder title="History" step={11} />} />
-        <Route path="analyses/:requestId" element={<Placeholder title="Results" step={10} />} />
+        <Route path="analyses/:requestId" element={<ResultsPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
       <Route path="*" element={<NotFound />} />
