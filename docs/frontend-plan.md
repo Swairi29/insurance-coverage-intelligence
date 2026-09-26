@@ -552,7 +552,7 @@ Three PRs. M4's goes first, because it contains the tab slots.
       explanations still fit the layout.
 - [x] Run `python scripts/make_frontend_fixtures.py --use-llm` with the same settings and commit
       the fixtures, so the mock API has real LLM wording from then on.
-- [ ] Log each contract mismatch as an issue for the agent's owner. Don't work around backend
+- [ ] Log each contract mismatch as an issue for the agent's owner. *(No frontend–gateway mismatch was found. The 5 backend findings below are recorded here; filing them as issues is postponed, 2026-09-26.)* Don't work around backend
       bugs in the UI.
 - **Done when:** the whole flow works on the real backend and every mismatch is fixed or logged.
 
@@ -618,7 +618,7 @@ Backend findings for the agents' owners (not worked around in the UI):
 
 ### Step 14 – Docs and demo · M4 + all · `feature/fe-docs`
 
-- [ ] A frontend section in the root `README.md`: install, run on mocks, run against the
+- [x] A frontend section in the root `README.md`: install, run on mocks, run against the
       gateway, test.
-- [ ] Update `docs/architecture.md` and `docs/project-structure.md` to say the frontend is React.
-- [ ] Screenshots for the report, and a demo script that walks the flow in step 12.
+- [x] Update `docs/architecture.md` and `docs/project-structure.md` to say the frontend is React.
+- [x] Screenshots for the report, and a demo script that walks the flow in step 12.
