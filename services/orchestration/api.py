@@ -1,5 +1,5 @@
 # Orchestration gateway API consumed by the frontend
-"""The gateway the Streamlit frontend talks to (port 8000).
+"""The gateway the frontend talks to (port 8000).
 
 Run: uvicorn services.orchestration.api:app --port 8000 --reload
 
@@ -30,9 +30,11 @@ from fastapi.responses import JSONResponse
 
 from services.orchestration.auth import (
     AuthConfigError,
+    LoginLimiter,
     authenticate,
     create_access_token,
     get_current_user,
+    get_login_limiter,
     register_user,
 )
 from services.orchestration.database import Database, DuplicateEmailError, UserRecord, get_database
@@ -149,10 +151,20 @@ def register(body: RegisterRequest, db: Database = Depends(get_database)):
 
 
 @app.post("/api/v1/auth/login", response_model=TokenResponse)
-def login(body: LoginRequest, db: Database = Depends(get_database)):
+def login(body: LoginRequest, db: Database = Depends(get_database),
+          limiter: LoginLimiter = Depends(get_login_limiter)):
+    wait = limiter.retry_after(body.email)
+    if wait:
+        logger.warning("Login blocked after repeated failures.")  # no email in the log
+        response = _error(429, "too_many_attempts",
+                          "Too many failed logins. Please wait a few minutes and try again.")
+        response.headers["Retry-After"] = str(wait)
+        return response
     user = authenticate(db, body.email, body.password)
     if user is None:
+        limiter.record_failure(body.email)
         raise HTTPException(status_code=401, detail="Invalid email or password.")
+    limiter.reset(body.email)
     try:
         token, expires_in = create_access_token(user.user_id, get_settings())
     except AuthConfigError:

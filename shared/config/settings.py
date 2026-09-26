@@ -62,16 +62,23 @@ class Settings(BaseSettings):
     # --- Explanation & Recommendation (Agent 4) ---
     # False = the report uses standard template wording only, and no LLM is called.
     explanation_use_llm: bool = True
+    # Time Agent 4 may spend on LLM wording per report. No new batch starts after
+    # it, and each Ollama call is limited to it; unfinished findings get template
+    # wording. Keep it under half of EXPLANATION_TIMEOUT_SECONDS so the report
+    # always reaches the gateway before the gateway gives up.
+    explanation_llm_budget_seconds: float = Field(default=280.0, gt=0)
 
     # --- Orchestration gateway ---
-    risk_agent_url: str = "http://localhost:8001"
-    policy_agent_url: str = "http://localhost:8002"
-    coverage_agent_url: str = "http://localhost:8003"
-    explanation_agent_url: str = "http://localhost:8004"
+    # 127.0.0.1 rather than localhost: on Windows "localhost" tries IPv6 first
+    # and adds ~2 s per call, because uvicorn only listens on IPv4.
+    risk_agent_url: str = "http://127.0.0.1:8001"
+    policy_agent_url: str = "http://127.0.0.1:8002"
+    coverage_agent_url: str = "http://127.0.0.1:8003"
+    explanation_agent_url: str = "http://127.0.0.1:8004"
     # Per-call timeout for Agents 1-3, and a longer one for Agent 4, because a
     # local model on CPU can take minutes to write a large report.
     request_timeout_seconds: float = Field(default=60.0, gt=0)
-    explanation_timeout_seconds: float = Field(default=300.0, gt=0)
+    explanation_timeout_seconds: float = Field(default=600.0, gt=0)
     # SQLite file for users, uploaded policies and analysis runs.
     database_path: str = "./data/app.db"
 

@@ -123,12 +123,15 @@ def generate_llm_items(
     client: TextGenerator,
     *,
     batch_size: int = DEFAULT_BATCH_SIZE,
+    deadline: Optional[float] = None,
 ) -> Tuple[Dict[str, dict], List[str]]:
     """Ask the LLM to explain `pairs`, batch by batch. Never raises.
 
     Returns `({risk_id: item}, problems)`. Items are validated and cleaned:
     `{"explanation", "recommendation", "cited_chunk_ids"}`. Problems are short
     codes such as "EQP_BREAKDOWN: V4" or "batch 2: llm_error" - never LLM text.
+    `deadline` is a `time.perf_counter()` value: no batch starts after it, and
+    those findings are left to the templates ("batch 3: time_budget").
     """
     batch_size = max(1, batch_size)
     accepted: Dict[str, dict] = {}
@@ -136,6 +139,9 @@ def generate_llm_items(
 
     for number, start in enumerate(range(0, len(pairs), batch_size), start=1):
         batch = pairs[start : start + batch_size]
+        if deadline is not None and time.perf_counter() >= deadline:
+            problems.append(f"batch {number}: time_budget")
+            continue
         started = time.perf_counter()
         try:
             items, batch_problems = _generate_batch(batch, business_type, client)

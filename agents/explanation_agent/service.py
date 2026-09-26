@@ -47,6 +47,9 @@ FLAGGED_EXCERPT = (
     "Read page {page} of the policy document directly."
 )
 LLM_PARTIAL_WARNING ="Some findings use standard wording because the AI wording did not pass the safety checks."
+LLM_TIME_BUDGET_WARNING = (
+    "Some findings use standard wording because the AI wording took too long to generate."
+)
 
 
 class ExplanationService:
@@ -57,11 +60,13 @@ class ExplanationService:
         provider: Optional[str] = None,
         model: Optional[str] = None,
         use_llm: bool = True,
+        llm_budget_seconds: Optional[float] = None,
     ) -> None:
         self._client = client
         self._provider = provider
         self._model = model
         self._use_llm = use_llm
+        self._llm_budget_seconds = llm_budget_seconds
 
     def generate(self, request: ExplanationRequest) -> ExplanationResponse:
         started = time.perf_counter()
@@ -70,11 +75,15 @@ class ExplanationService:
         pairs = _order(_pair(request, warnings))
 
         llm_items: Dict[str, dict] = {}
+        problems: List[str] = []
         llm_attempted = bool(self._use_llm and self._client is not None and pairs)
         if llm_attempted:
-            llm_items, problems = generate_llm_items(pairs, request.business_type, self._client)
+            deadline = started + self._llm_budget_seconds if self._llm_budget_seconds else None
+            llm_items, problems = generate_llm_items(pairs, request.business_type, self._client,
+                                                     deadline=deadline)
             if problems:
                 logger.info("LLM items rejected or missing: %s", ", ".join(problems))
+        out_of_time = any(problem.endswith("time_budget") for problem in problems)
 
         findings = [_finding(pair, request.business_type, llm_items.get(pair.assessment.risk_id)) for pair in pairs]
         warnings.extend(_flagged_clause_warnings(pairs))
@@ -83,7 +92,7 @@ class ExplanationService:
         if llm_attempted and llm_count == 0:
             warnings.append(LLM_UNAVAILABLE_WARNING)
         elif llm_attempted and llm_count < len(findings):
-            warnings.append(LLM_PARTIAL_WARNING)
+            warnings.append(LLM_TIME_BUDGET_WARNING if out_of_time else LLM_PARTIAL_WARNING)
 
         processing_ms = int((time.perf_counter() - started) * 1000)
         logger.info(

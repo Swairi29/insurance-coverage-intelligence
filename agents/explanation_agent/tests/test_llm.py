@@ -136,6 +136,11 @@ def test_get_client_builds_ollama_client():
     assert (provider, model) == ("ollama", "qwen3:8b")
 
 
+def test_ollama_calls_are_limited_to_the_report_budget():
+    client, _, _ = get_client(_settings(explanation_llm_budget_seconds=123))
+    assert client._client._client.timeout.read == 123
+
+
 def test_get_client_none_when_ollama_not_configured():
     assert get_client(_settings(ollama_model="   ")) == (None, None, None)
 

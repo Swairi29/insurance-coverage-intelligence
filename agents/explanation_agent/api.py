@@ -30,6 +30,7 @@ def get_explanation_service() -> ExplanationService:
         provider=provider,
         model=model,
         use_llm=settings.explanation_use_llm,
+        llm_budget_seconds=settings.explanation_llm_budget_seconds,
     )
 
 

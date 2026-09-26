@@ -55,3 +55,14 @@ def test_empty_response_raises():
 def test_server_error_is_wrapped():
     with pytest.raises(OllamaError):
         make_client(FakeOllama(error=ConnectionError("refused"))).generate_text("p")
+
+
+def test_timeout_is_passed_to_the_http_client():
+    assert OllamaClient(model="qwen3:8b", timeout=42)._client._client.timeout.read == 42
+
+
+def test_a_timed_out_call_becomes_an_ollama_error():
+    import httpx
+
+    with pytest.raises(OllamaError):
+        make_client(FakeOllama(error=httpx.ReadTimeout("slow"))).generate_text("p")

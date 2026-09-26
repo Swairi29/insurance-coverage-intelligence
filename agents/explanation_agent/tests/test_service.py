@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import time
 
 import pytest
 
 from agents.explanation_agent.service import (
     LLM_PARTIAL_WARNING,
+    LLM_TIME_BUDGET_WARNING,
     LLM_UNAVAILABLE_WARNING,
     ExplanationService,
 )
@@ -104,6 +106,28 @@ def test_llm_failing_every_call_still_returns_full_report():
     assert all(f.generated_by is GeneratedBy.TEMPLATE for f in report.findings)
     assert LLM_UNAVAILABLE_WARNING in report.warnings
     assert report.metadata.llm_used is False and report.metadata.llm_provider == "ollama"
+
+
+class SlowLLM(FakeLLM):
+    def generate_text(self, prompt, **kwargs):
+        time.sleep(0.2)
+        return super().generate_text(prompt, **kwargs)
+
+
+def test_no_new_batch_starts_after_the_time_budget():
+    fake = SlowLLM(_batched("bakery_mixed_good.json"))
+    service = ExplanationService(client=fake, provider="ollama", model="qwen3:8b", llm_budget_seconds=0.1)
+    report = service.generate(BAKERY)
+
+    assert len(fake.calls) == 1  # batch 1 started in time; batch 2 was skipped
+    assert [f.generated_by for f in report.findings] == [GeneratedBy.LLM] * 4 + [GeneratedBy.TEMPLATE] * 2
+    assert report.warnings == [LLM_TIME_BUDGET_WARNING]
+
+
+def test_a_generous_budget_changes_nothing():
+    service, fake = _service(_batched("bakery_mixed_good.json"), llm_budget_seconds=600)
+    report = service.generate(BAKERY)
+    assert len(fake.calls) == 2 and report.metadata.llm_findings == 6 and report.warnings == []
 
 
 # --- fields decided by code ----------------------------------------------------------------------

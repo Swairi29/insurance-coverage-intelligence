@@ -59,7 +59,9 @@ def get_client(
 
     try:
         if settings.llm_provider == "ollama":
-            client: TextGenerator = OllamaClient(model=settings.ollama_model, host=settings.ollama_host)
+            # One call may not outlast the whole report budget (see ExplanationService).
+            client: TextGenerator = OllamaClient(model=settings.ollama_model, host=settings.ollama_host,
+                                                 timeout=settings.explanation_llm_budget_seconds)
             return client, "ollama", settings.ollama_model.strip()
 
         client = GeminiClient(settings=settings)

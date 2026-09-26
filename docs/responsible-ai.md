@@ -116,7 +116,8 @@ comparison is to be added after the v2 evaluation run.
 
 - Explanations are only as good as Agent 3's decisions and Agent 2's retrieved clauses; Agent 4
   cannot notice a clause that was never retrieved.
-- Local-model speed on CPU makes large reports slow; the orchestrator allows Agent 4 a longer
-  timeout.
+- Local-model speed on CPU makes large reports slow. The orchestrator allows Agent 4 a longer
+  timeout, and Agent 4 stops asking the LLM after `EXPLANATION_LLM_BUDGET_SECONDS`, so on a slow
+  machine some findings use template wording (with a warning) instead of the report being lost.
 - Readability is measured with a heuristic Flesch score, not with real users.
 - All fixture policy wording is synthetic, written by the team.

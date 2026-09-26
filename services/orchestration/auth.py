@@ -7,14 +7,19 @@
   `JWT_SECRET_KEY`), sent back as `Authorization: Bearer <token>`.
 - A wrong email and a wrong password give the same error, and an unknown
   email still costs one bcrypt check, so a caller cannot tell them apart.
+- `LoginLimiter` blocks an email after too many failed logins in a short
+  window, so passwords cannot be guessed at full speed.
 """
 
 from __future__ import annotations
 
 import logging
+import threading
+import time
+from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
-from typing import Optional, Tuple
+from typing import Callable, Deque, Dict, Optional, Tuple
 
 import bcrypt
 import jwt
@@ -67,6 +72,54 @@ def authenticate(db: Database, email: str, password: str) -> Optional[UserRecord
         verify_password(password, _dummy_hash())  # same cost as a real check
         return None
     return user if verify_password(password, user.password_hash) else None
+
+
+# --- failed-login limit ---------------------------------------------------------------
+
+
+class LoginLimiter:
+    """Counts failed logins per email in a sliding window. In memory, per gateway process.
+
+    The key is the normalised email, whether or not the account exists, so the
+    limit does not reveal which emails are registered. A successful login
+    clears the count.
+    """
+
+    def __init__(self, max_failures: int = 5, window_seconds: float = 15 * 60,
+                 clock: Callable[[], float] = time.monotonic):
+        self._max_failures = max_failures
+        self._window = window_seconds
+        self._clock = clock
+        self._failures: Dict[str, Deque[float]] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def retry_after(self, email: str) -> int:
+        """Seconds until `email` may try again; 0 if it is not blocked."""
+        with self._lock:
+            failures = self._recent(email)
+            if len(failures) < self._max_failures:
+                return 0
+            return max(1, int(failures[0] + self._window - self._clock()) + 1)
+
+    def record_failure(self, email: str) -> None:
+        with self._lock:
+            self._recent(email).append(self._clock())
+
+    def reset(self, email: str) -> None:
+        with self._lock:
+            self._failures.pop(email, None)
+
+    def _recent(self, email: str) -> Deque[float]:
+        failures = self._failures[email]
+        cutoff = self._clock() - self._window
+        while failures and failures[0] <= cutoff:
+            failures.popleft()
+        return failures
+
+
+@lru_cache
+def get_login_limiter() -> LoginLimiter:
+    return LoginLimiter()
 
 
 # --- tokens ---------------------------------------------------------------------------

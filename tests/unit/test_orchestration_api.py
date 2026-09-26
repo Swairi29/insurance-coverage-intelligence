@@ -9,6 +9,7 @@ from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
 from services.orchestration.api import NOT_SAVED_WARNING, app, get_pipeline
+from services.orchestration.auth import LoginLimiter, get_login_limiter
 from services.orchestration.database import Database, get_database
 from services.orchestration.pipeline import REPORT_FAILED_WARNING
 from shared.config.settings import get_settings
@@ -50,6 +51,8 @@ def client(monkeypatch, agents, db):
     get_settings.cache_clear()
     app.dependency_overrides[get_database] = lambda: db
     app.dependency_overrides[get_pipeline] = agents.pipeline
+    limiter = LoginLimiter()  # fresh per test; the real one lives as long as the process
+    app.dependency_overrides[get_login_limiter] = lambda: limiter
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -119,6 +122,28 @@ def test_wrong_password_and_unknown_email_look_the_same(client):
     unknown = client.post("/api/v1/auth/login", json={"email": "nobody@example.com", "password": PASSWORD})
     assert wrong.status_code == unknown.status_code == 401
     assert wrong.json() == unknown.json() == {"detail": "Invalid email or password."}
+
+
+def test_repeated_failed_logins_are_blocked(client):
+    client.post("/api/v1/auth/register", json={"email": "owner@example.com", "password": PASSWORD})
+    wrong = {"email": "owner@example.com", "password": "wrong password"}
+    assert [client.post("/api/v1/auth/login", json=wrong).status_code for _ in range(5)] == [401] * 5
+
+    blocked = client.post("/api/v1/auth/login", json={"email": "Owner@Example.com ", "password": PASSWORD})
+
+    assert blocked.status_code == 429  # even with the right password, until the window passes
+    assert blocked.json()["error"] == "too_many_attempts"
+    assert int(blocked.headers["Retry-After"]) > 0
+    # Other accounts are not affected.
+    client.post("/api/v1/auth/register", json={"email": "other@example.com", "password": PASSWORD})
+    assert client.post("/api/v1/auth/login", json={"email": "other@example.com",
+                                                   "password": PASSWORD}).status_code == 200
+
+
+def test_unknown_emails_are_limited_the_same_way(client):
+    wrong = {"email": "nobody@example.com", "password": "guess"}
+    codes = [client.post("/api/v1/auth/login", json=wrong).status_code for _ in range(6)]
+    assert codes == [401] * 5 + [429]
 
 
 def test_login_without_jwt_secret_is_503(client, monkeypatch):

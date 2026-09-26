@@ -178,3 +178,39 @@ def test_register_rejects_bad_input(email, password):
 def test_analysis_request_rejects_bad_input(extra):
     with pytest.raises(ValidationError):
         AnalysisRequest.model_validate({"business": BUSINESS} | extra)
+
+
+# --- LoginLimiter -----------------------------------------------------------------------
+
+
+class FakeClock:
+    def __init__(self):
+        self.now = 1000.0
+
+    def __call__(self):
+        return self.now
+
+
+def test_limiter_blocks_after_max_failures_and_expires():
+    from services.orchestration.auth import LoginLimiter
+
+    clock = FakeClock()
+    limiter = LoginLimiter(max_failures=3, window_seconds=60, clock=clock)
+    for _ in range(2):
+        limiter.record_failure("a@x.lk")
+    assert limiter.retry_after("a@x.lk") == 0
+    limiter.record_failure("a@x.lk")
+    assert 0 < limiter.retry_after("a@x.lk") <= 61
+
+    clock.now += 61  # the oldest failures leave the window
+    assert limiter.retry_after("a@x.lk") == 0
+
+
+def test_limiter_success_clears_the_count():
+    from services.orchestration.auth import LoginLimiter
+
+    limiter = LoginLimiter(max_failures=2, window_seconds=60, clock=FakeClock())
+    limiter.record_failure("a@x.lk")
+    limiter.reset("a@x.lk")
+    limiter.record_failure("a@x.lk")
+    assert limiter.retry_after("a@x.lk") == 0

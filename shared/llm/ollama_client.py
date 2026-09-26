@@ -33,13 +33,18 @@ class OllamaClient:
         self,
         model: str = "qwen3:8b",
         host: str = "http://localhost:11434",
+        timeout: Optional[float] = None,
     ) -> None:
+        """`timeout` (seconds) limits each call; None keeps the library default (no limit)."""
         self._model = model.strip()
 
         if not self._model:
             raise OllamaConfigError("OLLAMA_MODEL is not set.")
 
-        self._client = ollama.Client(host=host)
+        if timeout is None:
+            self._client = ollama.Client(host=host)
+        else:
+            self._client = ollama.Client(host=host, timeout=timeout)
 
     def generate_text(
         self,

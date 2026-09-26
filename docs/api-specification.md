@@ -197,6 +197,7 @@ An LLM failure is **not** an error: the report is still returned with template w
 | Variable | Default | Effect |
 |---|---|---|
 | `EXPLANATION_USE_LLM` | `true` | `false` = template wording only, no LLM calls |
+| `EXPLANATION_LLM_BUDGET_SECONDS` | `280` | Time for LLM wording per report. No batch starts after it and each Ollama call is limited to it; the remaining findings get template wording and the warning "...took too long to generate." Keep it under half of `EXPLANATION_TIMEOUT_SECONDS` |
 | `LLM_PROVIDER` | `gemini` | `gemini` or `ollama` |
 | `OLLAMA_MODEL` / `OLLAMA_HOST` | `qwen3:8b` / `http://localhost:11434` | Local model |
 | `GEMINI_API_KEY` / `LLM_MODEL` | - | Cloud model |
@@ -222,7 +223,7 @@ report = httpx.post(
     f"{EXPLANATION_AGENT_URL}/api/v1/generate-report",
     json=request.model_dump(mode="json"),
     headers={"X-API-Key": INTERNAL_API_KEY},
-    timeout=300,  # a local model on CPU can take minutes for a large report
+    timeout=600,  # a local model on CPU can take minutes for a large report
 ).json()
 ```
 
@@ -257,6 +258,10 @@ Run: `uvicorn services.orchestration.api:app --port 8000 --reload`
 **Rules**
 
 - Passwords: 8 characters minimum, 72 bytes maximum (bcrypt's limit). Emails are lower-cased.
+- After 5 failed logins for one email within 15 minutes, login for that email returns 429 until
+  the oldest failure is 15 minutes old. A successful login clears the count. Unknown emails are
+  counted the same way, so the limit does not reveal which emails exist. The count is in memory,
+  so it resets when the gateway restarts.
 - Each user owns one `business_id` (`B-` + 16 hex characters), created at registration. It is
   **never** taken from a request body: Agent 2 uses it as a folder name, and it is what keeps
   one business's policies away from another's.
@@ -299,6 +304,7 @@ report has no findings.
 | 401 | No, invalid or expired token; wrong email or password | `{"detail": ...}` |
 | 404 | A `policy_id` or `request_id` that is not the user's | `GatewayError` |
 | 409 | Email already registered | `GatewayError` |
+| 429 | 5 failed logins for one email within 15 minutes (`too_many_attempts`, with `Retry-After` seconds) | `GatewayError` |
 | 413 | Upload over `MAX_UPLOAD_MB` (checked before Agent 2 is called) | `GatewayError` |
 | 400 | Agent 2 says the file is not a valid PDF | `GatewayError` |
 | 422 | Invalid body | `ErrorResponse`, without the input values |
@@ -323,9 +329,9 @@ the run is still returned, with a warning that it was not saved.
 
 | Variable | Default | Effect |
 |---|---|---|
-| `RISK_AGENT_URL` … `EXPLANATION_AGENT_URL` | `http://localhost:8001` … `8004` | Agent base URLs |
+| `RISK_AGENT_URL` … `EXPLANATION_AGENT_URL` | `http://127.0.0.1:8001` … `8004` | Agent base URLs |
 | `REQUEST_TIMEOUT_SECONDS` | `60` | Per-call timeout for Agents 1-3 and uploads |
-| `EXPLANATION_TIMEOUT_SECONDS` | `300` | Agent 4 (a local model can take minutes) |
+| `EXPLANATION_TIMEOUT_SECONDS` | `600` | Agent 4 (a local model can take minutes; Agent 4 stops using the LLM after `EXPLANATION_LLM_BUDGET_SECONDS`, so it answers in time) |
 | `INTERNAL_API_KEY` | - | Sent as `X-API-Key` to every agent; must match theirs |
 | `JWT_SECRET_KEY` | - | Signs login tokens; at least 32 characters, or login returns 503 |
 | `JWT_EXPIRY_MINUTES` | `60` | Token lifetime |
@@ -337,4 +343,6 @@ the run is still returned, with a warning that it was not saved.
 - Agent 3's HTTP API has no interpreter yet (issue I7), so a live run only produces `unclear`
   and `not_found`. The pipeline passes Agent 3's decisions through unchanged either way.
 - Agent 2 does not log the `X-Request-ID` header yet, so its log lines cannot be matched to a run.
-- No login rate limiting yet, and registration says when an email is already taken.
+- Registration says when an email is already taken (409), which reveals that the account exists.
+- The failed-login count is per gateway process; running several gateway processes would need a
+  shared store.
