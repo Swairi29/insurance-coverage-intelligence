@@ -96,7 +96,7 @@ Authenticated calls send `Authorization: Bearer <token>`. The full field lists a
 | 422 | `{error: "validation_error", message, details: [{field, message}]}` | Show each `details[].message` next to the form field named by `field` (e.g. `business.employee_count`) |
 | 429 | `GatewayError` + `Retry-After` header | "Too many attempts, try again in N minutes"; disable the button |
 | 404 / 409 / 413 / 400 | `GatewayError` `{error, message}` | Show `message`. It is already written for users |
-| 502 / 503 / 504 | `GatewayError` with `stage` (`risk_profiling`, `policy_retrieval`, …) | "The analysis could not finish at step X. Please try again." plus a Retry button |
+| 502 / 503 / 504 | `GatewayError` with `stage` (`risk_profile`, `policy_evidence`, `coverage`, `report`, `policy_upload`) | "The analysis could not finish at step X. Please try again." plus a Retry button |
 
 The gateway never puts agent output or user input in an error body. The UI never shows raw JSON
 or stack traces either.
@@ -160,11 +160,18 @@ know what to do next.
 
 Header: date, status badge (`complete` / `partial`), `report.summary.headline`, counts by status,
 the disclaimer (always visible, not hidden in a tooltip), and `warnings` if there are any.
+It also has an **"AI used"** line built from each agent's `metadata` (`llm_used`, `llm_model`,
+`llm_provider`), e.g. "AI used: Gemini (risk profile), qwen3:4b via Ollama (report: 12 of 14
+findings)", or "No AI model was used; results are rule-based" when no agent used one.
+
+The full system runs with LLMs (Gemini for Agent 1, Ollama or Gemini for Agents 3 and 4). A
+machine without one gets rule/template results in the same format. The UI must work the same
+for both and always say which parts were written by AI.
 
 | Tab | Data | Content |
 |---|---|---|
 | **Report** (default when there is one) | `report.findings[]` | One card per finding, sorted high → medium → low priority. Shows title, status badge, "Potential gap" tag, explanation, recommendation, a "Verify with your insurer" tag when `verification_required`, a small "AI-written" / "Template" label from `generated_by`, and the evidence list |
-| **Coverage** (default when partial) | `coverage.assessments[]` | A table with columns risk, status, gap, confidence and reason. Filter by status and "gaps only". A row expands to show its evidence |
+| **Coverage** (default when partial) | `coverage.assessments[]` | A table with columns risk, status, gap, confidence, reason and method (an "AI-assisted" label when `method` is `rules+llm`, otherwise "Rules"). Filter by status and "gaps only". A row expands to show its evidence |
 | **Risk profile** | `risk_profile.risks[]` | Risks grouped by category, with reason, source (`rule` / `llm` / `rule+llm`), confidence and the input that led to them (`evidence[].field/value`), plus the profile `warnings` |
 
 ### Shared visual language
@@ -227,11 +234,13 @@ frontend/
     │       ├── CoverageTab.tsx                                                 (M3)
     │       └── RiskProfileTab.tsx                                              (M1)
     ├── mocks/                # MSW handlers + fixtures                         (everyone)
-    │   ├── handlers.ts
-    │   └── fixtures/
-    │       ├── analysis-complete.json
+    │   ├── handlers.ts       # magic inputs for every error path are listed at the top
+    │   ├── db.ts             # in-memory state, reset per test
+    │   └── fixtures/         # made by scripts/make_frontend_fixtures.py
+    │       ├── analysis-{bakery,restaurant,retail_shop}.json
     │       ├── analysis-partial.json
-    │       └── policies.json
+    │       ├── analysis-all-statuses.json
+    │       └── policies.json, analyses.json, user.json
     └── test/                 # test setup
 ```
 
@@ -320,7 +329,7 @@ Each member builds their pages from §6 using MSW. Nobody needs the backend runn
 
 ### Week 3 – Connect to the real gateway
 
-- Turn MSW off (`VITE_USE_MOCKS=false`) and run against the real gateway with all four agents.
+- Use `npm run dev` (MSW off) instead of `npm run dev:mocks`, and run against the real gateway with all four agents.
 - Fix contract mismatches. When a mismatch is in the backend, raise it with the agent's owner and
   don't work around it in the UI.
 - Test with a real LLM once (Agent 4 with Ollama) to check the slow path and the `partial` path
@@ -365,10 +374,237 @@ Each member builds their pages from §6 using MSW. Nobody needs the backend runn
 
 | # | Item | Plan |
 |---|---|---|
-| 1 | The analysis call can take up to ~10 min and the connection could drop | Week-1 check; the History page is the fallback since the gateway saves results anyway |
+| 1 | The analysis call can take up to ~10 min and the connection could drop | **Checked in step 6 (2026-09-26): works.** Headless Chrome → Vite dev proxy (`proxyTimeout: 0`) → real gateway and Agents 1–3 → an Agent 4 stand-in that waited 570 s before sending the real template report. The request returned `200` after 570 s with a `complete` analysis (11 findings). No proxy or browser timeout was hit. The History page stays the fallback if the tab is closed, since the gateway saves results anyway. A request longer than the gateway's own `EXPLANATION_TIMEOUT_SECONDS` (600 s) still comes back as `partial`, by design |
 | 2 | Agent 3 currently returns only `unclear` / `not_found` (no interpreter yet) | Build and test with fixtures for all five statuses |
 | 3 | The gateway has no CORS, so only the dev proxy works | Fine for the demo. For a production build, serve the built files from the same origin or add CORS on the gateway (separate PR) |
 | 4 | The business profile isn't stored on the server | `sessionStorage` draft for now. Ask the team whether we want a `/profile` endpoint |
-| 5 | Members' laptops can't all run the LLM | MSW + `-NoLlm` mode cover development; only one real LLM run is needed |
+| 5 | Low-RAM laptops can't run the bigger local LLM | `qwen3:8b` (5.2 GB) does not fit on M4's 16 GB laptop, but `qwen3:4b` does (checked 2026-09-26: 3.2 GB in RAM on CPU, about 5–7 tokens/s, valid JSON output). Use `OLLAMA_MODEL=qwen3:4b` there and close big apps (Chrome, VS Code) during an LLM run. MSW and `-NoLlm` mode cover day-to-day development |
 | 6 | Do we need a PDF/print export of the report? | Decide in week 1. A print stylesheet (`@media print`) is the cheapest option |
 | 7 | TypeScript experience in the team | Keep types simple. `api/types.ts` is written once by M4 and everyone reviews it |
+
+---
+
+## 11. Implementation steps
+
+We build the frontend in this order, one step at a time. Each step is one PR on its own branch
+(the name is given), follows §8 (definition of done), and is merged before the next step that
+depends on it. Steps 7–10 depend only on steps 1–6, so they can be built in parallel.
+Tick a step here when its PR is merged.
+
+### Step 1 – Project scaffold · M4 · `feature/fe-setup`
+
+- [x] Remove the Streamlit stubs from `frontend/`: `app.py`, `api_client.py`, `pages/`,
+      `components/` and `requirements.txt`. Copy the landing text into a note first, for step 7.
+      Keep `assets/styles.css` until step 7 has used its colours.
+- [x] Create a Vite React + TypeScript app in `frontend/`.
+- [x] Add Tailwind, with the status colours from §4 as tokens in `tailwind.config.ts`.
+- [x] Add ESLint + Prettier and the scripts `npm run dev`, `build`, `lint`, `typecheck` and `test`.
+- [x] Add Vitest + React Testing Library, with setup in `src/test/`.
+- [x] Add the dev proxy in `vite.config.ts` (§3.1).
+- [x] Add `frontend/node_modules` and `frontend/dist` to `.gitignore`.
+- **Done when:** `npm run dev` shows a placeholder page, and lint, typecheck and a sample test pass.
+
+### Step 2 – API types and client · M4 · `feature/fe-api-client`
+
+- [x] `src/api/types.ts`: TS copies of `BusinessProfile`, `PolicyDocument`, `AnalysisRequest`,
+      `AnalysisResponse` (with `RiskProfileResponse`, `CoverageAnalysisResponse` and
+      `ExplanationResponse` and their nested models), `AnalysisSummary`, `TokenResponse`,
+      `UserResponse`, `GatewayError` and `ErrorResponse`. The enums are string unions.
+- [x] `src/api/client.ts`: a `fetch` wrapper. It adds the base URL and the bearer token, parses
+      JSON, and throws a typed `ApiError {status, error, message, stage?, details?, retryAfter?}`
+      for every error shape in §3.3. On 401 it calls an `onUnauthorized` hook.
+- [x] Unit tests for `client.ts`, with one test per error shape (401, 422, 429 with
+      `Retry-After`, a `GatewayError` with `stage`, and a network failure).
+- **Done when:** M1, M2 and M3 have reviewed `types.ts` against their Pydantic models.
+
+### Step 3 – Mock API and fixtures · M4 + all · `feature/fe-mocks`
+
+- [x] Add MSW. Start it in `main.tsx` only when `VITE_USE_MOCKS=true`, and add `.env.example`.
+      `npm run dev:mocks` turns it on (via `.env.mocks`); `npm run dev` uses the real gateway.
+- [x] Add handlers for every endpoint in §3.2, including the error cases. The handlers are driven
+      by magic inputs, e.g. the password `wrong` → 401, and a file named `big.pdf` → 413.
+      Add a slow mode for `POST /analyses` (a 20 s delay: a business name containing "Slow").
+      The full list is at the top of `src/mocks/handlers.ts`.
+- [x] Add fixtures in `src/mocks/fixtures/`, made by `python scripts/make_frontend_fixtures.py`
+      (gateway + all four real agents in-process, no LLM):
+      - `analysis-bakery.json` (the complete run) and `analysis-partial.json`;
+      - `policies.json`;
+      - full analyses for the three business types (each has its `risk_profile`);
+      - `analysis-all-statuses.json`: hand-edited so all five statuses appear. It also has flagged
+        evidence and evidence with no section.
+      Real names and emails are replaced with made-up ones.
+- **Done when:** the app runs fully on mocks with no backend running.
+
+### Step 4 – Auth and app shell · M4 · `feature/fe-auth`
+
+- [x] `src/auth/`: `AuthProvider` (token in memory and `sessionStorage`), `useAuth`, and
+      `RequireAuth` (redirects to `/login?next=…`).
+- [x] The router in `App.tsx` with every route from §4. Pages that don't exist yet are
+      placeholders.
+- [x] `Login.tsx` and `Register.tsx`. They handle 401, 409, 422, 429 (the button is disabled for
+      the `Retry-After` time) and 503. After registering, the user is logged in automatically.
+- [x] `components/Layout/`: the nav (Dashboard, Profile, Policies, New analysis, History), the
+      user's email and Logout. Logout clears the token, the profile draft and the query cache.
+- [x] `/app` checks the stored token with `GET /auth/me` on load.
+- [x] A `NotFound` page.
+- **Done when:** register → login → protected page → logout works on mocks. There are tests for
+  the redirect, the 401 and the 429.
+
+### Step 5 – Shared components · M1, M2, M3, M4 · one small PR each
+
+- [x] `StatusBadge` (M3): colour and text label for each of the five statuses, a
+      "Potential gap" tag, and the `complete` / `partial` badges.
+- [x] `ConfidenceLabel` (M1): High / Medium / Low, with the number in a tooltip.
+- [x] `EvidenceList` (M2): accepts both `EvidenceClause` and `EvidenceCitation`, maps
+      `policy_id` to the filename, collapses long text, and warns on flagged clauses.
+      Renders plain text only.
+- [x] `AgentStatus` (M2): polls `/health/agents` every 30 s and shows the down agents.
+- [x] `ErrorMessage` and `Disclaimer` (M4). `ErrorMessage` takes an `ApiError` and never shows
+      raw JSON.
+- [x] `AiLabel` (M4): one small label for "who wrote this", used by all three tabs. It shows
+      "AI-written" / "Template" for `generated_by`, "AI-assisted" / "Rules" for Agent 3's
+      `method`, and "AI" / "Rules" / "Rules + AI" for Agent 1's `source`. A tooltip names the
+      model when it is known.
+- **Done when:** each has a test covering its variants. M2 has a test for the flagged state and
+  for text that contains HTML.
+
+### Step 6 – The 10-minute request check · M3 · no PR (write the result here)
+
+- [x] Run the real gateway with a slow Agent 4 (the real LLM, or a fake that sleeps 10 min), then
+      call `POST /api/v1/analyses` through the Vite proxy from the browser.
+- [x] Write the result in §10, risk 1. If it fails, fix the proxy settings before step 9.
+      Result: passed (570 s, `200`, `complete`). No proxy changes were needed.
+
+### Step 7 – Landing page and business profile · M1 · `feature/fe-profile`
+
+- [x] `Landing.tsx`: the hero, the three capability cards and "Get started", reusing the
+      InsureIntel text and colours. Then delete `frontend/assets/styles.css`.
+- [x] `BusinessProfile.tsx` with React Hook Form. It has every field from §6 M1, with the limits
+      from `shared/models/business.py`. The yes/no questions are three-way (Yes / No / Unknown →
+      `null`). Equipment is a tag input.
+- [x] The draft is saved to `sessionStorage` (§3.6), and "Save" leads on to the policies page.
+- [x] A helper that maps 422 `details[].field` (`business.x.y`) onto form fields. Step 9 uses it
+      too.
+- **Done when:** there are tests for required fields, unknown → `null`, and a server 422 shown
+  on the right field.
+
+### Step 8 – Policies page · M2 · `feature/fe-policies`
+
+- [x] `api/policies.ts`: `usePolicies` and `useUploadPolicy` (multipart, field `file`).
+- [x] `Policies.tsx`: a drag-and-drop upload that checks the type and the 25 MB limit before
+      sending and shows progress. Handles `invalid_pdf` and `file_too_large`. The list shows
+      filename, pages, chunks, status and flagged count, plus an empty state.
+- [x] Add `AgentStatus` to the nav.
+- **Done when:** there are tests for the client-side size and type check, the server 400 and
+  413, and the list and empty states.
+
+### Step 9 – New analysis and progress · M3 · `feature/fe-new-analysis`
+
+- [x] `api/analyses.ts`: `useRunAnalysis` (`retry: false`, no timeout), `useAnalyses` and
+      `useAnalysis(id)`.
+- [x] `NewAnalysis.tsx`:
+      1. pick 1–5 policies that are `ready`;
+      2. a profile summary with an "Edit" link (if there is no draft, go to the profile page);
+      3. Run.
+- [x] The progress screen from §3.4: the four steps, elapsed time, a "you can leave this page"
+      note pointing to History, and a disabled Run button.
+- [x] Errors: 502/503/504 name the failed step (`stage`) and offer Retry; `404
+      policy_not_found`; 422 goes back to the profile.
+- [x] On success, go to `/app/analyses/:request_id` and put the response in the query cache.
+- **Done when:** there are tests for the policy limit, the progress screen and each error path.
+
+### Step 10 – Results page · M4 (shell + Report), M3 (Coverage), M1 (Risk profile)
+
+Three PRs. M4's goes first, because it contains the tab slots.
+
+- [x] `feature/fe-results` (M4): `ResultsPage.tsx`, with the header (date, status badge,
+      headline, counts by status), the disclaimer that is always shown, the warnings, the partial
+      banner, the "AI used" line from §4 and the tabs. The default tab is Report, or Coverage when the result is partial.
+      `ReportTab.tsx` shows finding cards sorted by priority, with the tags "Potential gap",
+      "Verify with your insurer" and "AI-written" / "Template", and `EvidenceList`.
+      404 → an "Analysis not found" state.
+- [x] `feature/fe-coverage-tab` (M3): `CoverageTab.tsx` with the table, the status filter,
+      "gaps only", expanding rows with evidence, and `AiLabel` for `method`.
+- [x] `feature/fe-risk-tab` (M1): `RiskProfileTab.tsx`, grouped by category, showing source,
+      confidence, the input that led to each risk, and the profile warnings.
+- **Done when:** there are tests using the complete and partial fixtures, the five-status fixture
+  and the 404.
+
+### Step 11 – History and dashboard · M4 (History), M3 (Dashboard)
+
+- [x] `feature/fe-history` (M4): `History.tsx` lists analyses newest first (date, status, gaps,
+      findings) and opens the results page. Includes an empty state.
+- [x] `feature/fe-dashboard` (M3): `Dashboard.tsx` with the 3-step checklist (profile, a ready
+      policy, an analysis) and a card for the latest analysis.
+- **Done when:** each has a test for the empty state and the list/checklist.
+
+### Step 12 – Real gateway integration · all · `feature/fe-integration`
+
+- [x] Run `scripts/start_agents.ps1 -NoLlm` and the gateway, then `npm run dev` (MSW off).
+- [x] Walk the whole flow: register → profile → upload `data/sample_policies/...` → analysis →
+      results → history → logout. Each member checks their own pages.
+- [x] Get a `partial` result by stopping Agent 4 during a run, and a 503 by stopping Agent 1.
+- [ ] Do the full flow once with the LLMs switched on (Gemini for Agent 1, Ollama or Gemini for
+      Agents 3 and 4), using `scripts/start_agents.ps1` without `-NoLlm`. On M4's laptop set
+      `OLLAMA_MODEL=qwen3:4b` (see §10, item 5); a report then takes several minutes, and some
+      findings may fall back to templates when Agent 4's time budget runs out. Check the slow
+      progress screen, the "AI-written" labels and the "AI used" line, and that long LLM
+      explanations still fit the layout.
+- [ ] Run `python scripts/make_frontend_fixtures.py --use-llm` with the same settings and commit
+      the fixtures, so the mock API has real LLM wording from then on.
+- [ ] Log each contract mismatch as an issue for the agent's owner. Don't work around backend
+      bugs in the UI.
+- **Done when:** the whole flow works on the real backend and every mismatch is fixed or logged.
+
+#### Step 12 results (2026-09-26)
+
+Run with the real gateway and all four real agents (on test ports with throwaway data, so the
+normal `data/app.db` was not touched), driven through the real UI in Chrome.
+
+| Check | Result |
+|---|---|
+| Register → dashboard (agent status "All services up") | Works |
+| Business profile form → saved → Policies | Works |
+| Upload a text PDF + `data/sample_policies/adversarial/TestDoc1.pdf` | Works; both Ready (TestDoc1: 5 pages, 14 sections) |
+| Analysis → results (Report / Coverage / Risk profile tabs) | Works; `complete`, 13 risks, no page errors |
+| History → open → logout (token cleared) | Works |
+| Agent 4 stopped | `partial` result, banner, Coverage tab opens, header shows "1 service down" |
+| Agent 1 stopped | 503 "A required analysis service is not available", step "Risk profiling", Try again |
+| No frontend ↔ gateway contract mismatch was found | – |
+| LLM run (Agent 4 on `qwen3:4b`) | **Not done yet.** Ollama could not load the model: only ~1.3 GB RAM was free with the app, two dev servers and the backend running ("unable to allocate CPU_REPACK buffer", 1.76 GB). Agent 4 fell back correctly: a `complete` report with 13 template findings after its 280 s budget, and the UI said "No AI model was used". Retry with more free RAM (close Chrome/VS Code and other servers) |
+| `make_frontend_fixtures.py --use-llm` | Not done yet (needs the LLM run to work first) |
+
+Backend findings for the agents' owners (not worked around in the UI):
+
+1. **Agent 2 (M2):** a PDF with very little text is stored as `ready` with `chunk_count: 0` and
+   no warning, so it silently never provides evidence. Suggest `failed`, or a `warnings` entry
+   in the upload response. (The Policies page now shows a note for such a policy.)
+2. **Agent 3 (M3):** the API builds `CoverageAnalysisService()` without an interpreter, so the
+   LLM step never runs (known issue I7). Its notes also use internal IDs, e.g.
+   "LLM interpretation was unavailable for risk 'PROP_THEFT'"; the risk name would be clearer.
+3. **Agent 4 (M4):** the flagged-clause warning names the policy by ID (`POL-…`) instead of its
+   filename, and is repeated once per finding that cites it (the UI de-duplicates it).
+4. **Agent 4 (M4):** when Ollama cannot load the model, batches 1 and 2 failed in ~3–5 s but
+   batch 3 waited 288 s before failing, so a report with zero LLM text took 5 minutes. Stopping
+   after the first "model could not be loaded" error would return the template report at once.
+5. **Agent 1 (M1):** only uses Gemini and ignores `LLM_PROVIDER=ollama`; with no
+   `GEMINI_API_KEY` it is rule-based ("The AI assistant is not configured…"). Fine, but worth
+   documenting in the README.
+
+### Step 13 – Polish and accessibility · all · small PRs
+
+- [ ] Loading skeletons and empty states on every page.
+- [ ] Works at 360 px width.
+- [ ] Keyboard navigation and visible focus.
+- [ ] Labels on all inputs.
+- [ ] Status is never shown by colour alone.
+- [ ] Contrast checked.
+- [ ] A print stylesheet for the results page, if we decided on it in §10, item 6.
+- [ ] No `console.log` of tokens, passwords or business details (grep for it).
+
+### Step 14 – Docs and demo · M4 + all · `feature/fe-docs`
+
+- [ ] A frontend section in the root `README.md`: install, run on mocks, run against the
+      gateway, test.
+- [ ] Update `docs/architecture.md` and `docs/project-structure.md` to say the frontend is React.
+- [ ] Screenshots for the report, and a demo script that walks the flow in step 12.

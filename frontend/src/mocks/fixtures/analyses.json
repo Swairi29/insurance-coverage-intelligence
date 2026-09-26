@@ -1,0 +1,37 @@
+[
+  {
+    "request_id": "58d8945992344e04b1026871beae356d",
+    "status": "partial",
+    "created_at": "2026-09-26T04:17:25.611859Z",
+    "total_findings": 14,
+    "potential_gaps": 14
+  },
+  {
+    "request_id": "fcdc070e072f4ed8a2d1b25ecdccf4e3",
+    "status": "complete",
+    "created_at": "2026-09-26T04:17:25.469488Z",
+    "total_findings": 14,
+    "potential_gaps": 14
+  },
+  {
+    "request_id": "42688df24ce844d8a386f3adcbfcd4bd",
+    "status": "complete",
+    "created_at": "2026-09-26T04:17:25.327352Z",
+    "total_findings": 18,
+    "potential_gaps": 18
+  },
+  {
+    "request_id": "ff466b160ec74e1f97b8eade261f3854",
+    "status": "complete",
+    "created_at": "2026-09-26T04:17:25.165197Z",
+    "total_findings": 14,
+    "potential_gaps": 14
+  },
+  {
+    "request_id": "5a7e5a7e5a7e4a7e9a7e5a7e5a7e5a7e",
+    "status": "complete",
+    "created_at": "2026-09-25T08:30:00Z",
+    "total_findings": 14,
+    "potential_gaps": 13
+  }
+]
