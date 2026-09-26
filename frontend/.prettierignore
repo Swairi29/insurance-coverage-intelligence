@@ -4,3 +4,4 @@ node_modules
 package-lock.json
 LANDING_CONTENT.md
 assets/styles.css
+public/mockServiceWorker.js

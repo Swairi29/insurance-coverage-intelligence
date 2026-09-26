@@ -6,7 +6,8 @@
 
 import type { ErrorResponse, GatewayError, Stage, ValidationErrorDetail } from './types';
 
-const BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? '';
+/** Read per request, so tests can point it at an absolute origin with vi.stubEnv. */
+const baseUrl = (): string => import.meta.env.VITE_API_BASE_URL ?? '';
 
 export const NETWORK_ERROR_MESSAGE =
   'Could not reach the server. Check your connection and try again.';
@@ -96,7 +97,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   let response: Response;
   try {
-    response = await fetch(`${BASE_URL}${path}`, { method, headers, body: payload, signal });
+    response = await fetch(`${baseUrl()}${path}`, { method, headers, body: payload, signal });
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') throw err;
     throw new ApiError({ status: 0, error: 'network_error', message: NETWORK_ERROR_MESSAGE });

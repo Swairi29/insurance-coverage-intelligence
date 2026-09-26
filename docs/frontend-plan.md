@@ -227,11 +227,13 @@ frontend/
     │       ├── CoverageTab.tsx                                                 (M3)
     │       └── RiskProfileTab.tsx                                              (M1)
     ├── mocks/                # MSW handlers + fixtures                         (everyone)
-    │   ├── handlers.ts
-    │   └── fixtures/
-    │       ├── analysis-complete.json
+    │   ├── handlers.ts       # magic inputs for every error path are listed at the top
+    │   ├── db.ts             # in-memory state, reset per test
+    │   └── fixtures/         # made by scripts/make_frontend_fixtures.py
+    │       ├── analysis-{bakery,restaurant,retail_shop}.json
     │       ├── analysis-partial.json
-    │       └── policies.json
+    │       ├── analysis-all-statuses.json
+    │       └── policies.json, analyses.json, user.json
     └── test/                 # test setup
 ```
 
@@ -320,7 +322,7 @@ Each member builds their pages from §6 using MSW. Nobody needs the backend runn
 
 ### Week 3 – Connect to the real gateway
 
-- Turn MSW off (`VITE_USE_MOCKS=false`) and run against the real gateway with all four agents.
+- Use `npm run dev` (MSW off) instead of `npm run dev:mocks`, and run against the real gateway with all four agents.
 - Fix contract mismatches. When a mismatch is in the backend, raise it with the agent's owner and
   don't work around it in the UI.
 - Test with a real LLM once (Agent 4 with Ollama) to check the slow path and the `partial` path
@@ -410,17 +412,20 @@ Tick a step here when its PR is merged.
 
 ### Step 3 – Mock API and fixtures · M4 + all · `feature/fe-mocks`
 
-- [ ] Add MSW. Start it in `main.tsx` only when `VITE_USE_MOCKS=true`, and add `.env.example`.
-- [ ] Add handlers for every endpoint in §3.2, including the error cases. The handlers are driven
+- [x] Add MSW. Start it in `main.tsx` only when `VITE_USE_MOCKS=true`, and add `.env.example`.
+      `npm run dev:mocks` turns it on (via `.env.mocks`); `npm run dev` uses the real gateway.
+- [x] Add handlers for every endpoint in §3.2, including the error cases. The handlers are driven
       by magic inputs, e.g. the password `wrong` → 401, and a file named `big.pdf` → 413.
-      Add a slow mode for `POST /analyses` (a 20 s delay).
-- [ ] Add fixtures in `src/mocks/fixtures/`:
-      - `analysis-complete.json` and `analysis-partial.json`, from a real no-LLM run (M4);
-      - `policies.json` (M2);
-      - `risk_profile` examples for the three business types (M1);
-      - assessments for all five statuses, evidence with `flagged: true`, and evidence with no
-        section (M2, M3).
-      Replace real names and emails with made-up ones.
+      Add a slow mode for `POST /analyses` (a 20 s delay: a business name containing "Slow").
+      The full list is at the top of `src/mocks/handlers.ts`.
+- [x] Add fixtures in `src/mocks/fixtures/`, made by `python scripts/make_frontend_fixtures.py`
+      (gateway + all four real agents in-process, no LLM):
+      - `analysis-bakery.json` (the complete run) and `analysis-partial.json`;
+      - `policies.json`;
+      - full analyses for the three business types (each has its `risk_profile`);
+      - `analysis-all-statuses.json`: hand-edited so all five statuses appear. It also has flagged
+        evidence and evidence with no section.
+      Real names and emails are replaced with made-up ones.
 - **Done when:** the app runs fully on mocks with no backend running.
 
 ### Step 4 – Auth and app shell · M4 · `feature/fe-auth`
@@ -523,7 +528,7 @@ Three PRs. M4's goes first, because it contains the tab slots.
 
 ### Step 12 – Real gateway integration · all · `feature/fe-integration`
 
-- [ ] Run `scripts/start_agents.ps1 -NoLlm` and the gateway, then `VITE_USE_MOCKS=false npm run dev`.
+- [ ] Run `scripts/start_agents.ps1 -NoLlm` and the gateway, then `npm run dev` (MSW off).
 - [ ] Walk the whole flow: register → profile → upload `data/sample_policies/...` → analysis →
       results → history → logout. Each member checks their own pages.
 - [ ] Get a `partial` result by stopping Agent 4 during a run, and a 503 by stopping Agent 1.
