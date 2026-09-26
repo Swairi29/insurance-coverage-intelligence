@@ -96,7 +96,7 @@ Authenticated calls send `Authorization: Bearer <token>`. The full field lists a
 | 422 | `{error: "validation_error", message, details: [{field, message}]}` | Show each `details[].message` next to the form field named by `field` (e.g. `business.employee_count`) |
 | 429 | `GatewayError` + `Retry-After` header | "Too many attempts, try again in N minutes"; disable the button |
 | 404 / 409 / 413 / 400 | `GatewayError` `{error, message}` | Show `message`. It is already written for users |
-| 502 / 503 / 504 | `GatewayError` with `stage` (`risk_profiling`, `policy_retrieval`, …) | "The analysis could not finish at step X. Please try again." plus a Retry button |
+| 502 / 503 / 504 | `GatewayError` with `stage` (`risk_profile`, `policy_evidence`, `coverage`, `report`, `policy_upload`) | "The analysis could not finish at step X. Please try again." plus a Retry button |
 
 The gateway never puts agent output or user input in an error body. The UI never shows raw JSON
 or stack traces either.
@@ -397,14 +397,14 @@ Tick a step here when its PR is merged.
 
 ### Step 2 – API types and client · M4 · `feature/fe-api-client`
 
-- [ ] `src/api/types.ts`: TS copies of `BusinessProfile`, `PolicyDocument`, `AnalysisRequest`,
+- [x] `src/api/types.ts`: TS copies of `BusinessProfile`, `PolicyDocument`, `AnalysisRequest`,
       `AnalysisResponse` (with `RiskProfileResponse`, `CoverageAnalysisResponse` and
       `ExplanationResponse` and their nested models), `AnalysisSummary`, `TokenResponse`,
       `UserResponse`, `GatewayError` and `ErrorResponse`. The enums are string unions.
-- [ ] `src/api/client.ts`: a `fetch` wrapper. It adds the base URL and the bearer token, parses
+- [x] `src/api/client.ts`: a `fetch` wrapper. It adds the base URL and the bearer token, parses
       JSON, and throws a typed `ApiError {status, error, message, stage?, details?, retryAfter?}`
       for every error shape in §3.3. On 401 it calls an `onUnauthorized` hook.
-- [ ] Unit tests for `client.ts`, with one test per error shape (401, 422, 429 with
+- [x] Unit tests for `client.ts`, with one test per error shape (401, 422, 429 with
       `Retry-After`, a `GatewayError` with `stage`, and a network failure).
 - **Done when:** M1, M2 and M3 have reviewed `types.ts` against their Pydantic models.
 
