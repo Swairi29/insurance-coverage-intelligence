@@ -372,3 +372,180 @@ Each member builds their pages from §6 using MSW. Nobody needs the backend runn
 | 5 | Members' laptops can't all run the LLM | MSW + `-NoLlm` mode cover development; only one real LLM run is needed |
 | 6 | Do we need a PDF/print export of the report? | Decide in week 1. A print stylesheet (`@media print`) is the cheapest option |
 | 7 | TypeScript experience in the team | Keep types simple. `api/types.ts` is written once by M4 and everyone reviews it |
+
+---
+
+## 11. Implementation steps
+
+We build the frontend in this order, one step at a time. Each step is one PR on its own branch
+(the name is given), follows §8 (definition of done), and is merged before the next step that
+depends on it. Steps 7–10 depend only on steps 1–6, so they can be built in parallel.
+Tick a step here when its PR is merged.
+
+### Step 1 – Project scaffold · M4 · `feature/fe-setup`
+
+- [x] Remove the Streamlit stubs from `frontend/`: `app.py`, `api_client.py`, `pages/`,
+      `components/` and `requirements.txt`. Copy the landing text into a note first, for step 7.
+      Keep `assets/styles.css` until step 7 has used its colours.
+- [x] Create a Vite React + TypeScript app in `frontend/`.
+- [x] Add Tailwind, with the status colours from §4 as tokens in `tailwind.config.ts`.
+- [x] Add ESLint + Prettier and the scripts `npm run dev`, `build`, `lint`, `typecheck` and `test`.
+- [x] Add Vitest + React Testing Library, with setup in `src/test/`.
+- [x] Add the dev proxy in `vite.config.ts` (§3.1).
+- [x] Add `frontend/node_modules` and `frontend/dist` to `.gitignore`.
+- **Done when:** `npm run dev` shows a placeholder page, and lint, typecheck and a sample test pass.
+
+### Step 2 – API types and client · M4 · `feature/fe-api-client`
+
+- [ ] `src/api/types.ts`: TS copies of `BusinessProfile`, `PolicyDocument`, `AnalysisRequest`,
+      `AnalysisResponse` (with `RiskProfileResponse`, `CoverageAnalysisResponse` and
+      `ExplanationResponse` and their nested models), `AnalysisSummary`, `TokenResponse`,
+      `UserResponse`, `GatewayError` and `ErrorResponse`. The enums are string unions.
+- [ ] `src/api/client.ts`: a `fetch` wrapper. It adds the base URL and the bearer token, parses
+      JSON, and throws a typed `ApiError {status, error, message, stage?, details?, retryAfter?}`
+      for every error shape in §3.3. On 401 it calls an `onUnauthorized` hook.
+- [ ] Unit tests for `client.ts`, with one test per error shape (401, 422, 429 with
+      `Retry-After`, a `GatewayError` with `stage`, and a network failure).
+- **Done when:** M1, M2 and M3 have reviewed `types.ts` against their Pydantic models.
+
+### Step 3 – Mock API and fixtures · M4 + all · `feature/fe-mocks`
+
+- [ ] Add MSW. Start it in `main.tsx` only when `VITE_USE_MOCKS=true`, and add `.env.example`.
+- [ ] Add handlers for every endpoint in §3.2, including the error cases. The handlers are driven
+      by magic inputs, e.g. the password `wrong` → 401, and a file named `big.pdf` → 413.
+      Add a slow mode for `POST /analyses` (a 20 s delay).
+- [ ] Add fixtures in `src/mocks/fixtures/`:
+      - `analysis-complete.json` and `analysis-partial.json`, from a real no-LLM run (M4);
+      - `policies.json` (M2);
+      - `risk_profile` examples for the three business types (M1);
+      - assessments for all five statuses, evidence with `flagged: true`, and evidence with no
+        section (M2, M3).
+      Replace real names and emails with made-up ones.
+- **Done when:** the app runs fully on mocks with no backend running.
+
+### Step 4 – Auth and app shell · M4 · `feature/fe-auth`
+
+- [ ] `src/auth/`: `AuthProvider` (token in memory and `sessionStorage`), `useAuth`, and
+      `RequireAuth` (redirects to `/login?next=…`).
+- [ ] The router in `App.tsx` with every route from §4. Pages that don't exist yet are
+      placeholders.
+- [ ] `Login.tsx` and `Register.tsx`. They handle 401, 409, 422, 429 (the button is disabled for
+      the `Retry-After` time) and 503. After registering, the user is logged in automatically.
+- [ ] `components/Layout/`: the nav (Dashboard, Profile, Policies, New analysis, History), the
+      user's email and Logout. Logout clears the token, the profile draft and the query cache.
+- [ ] `/app` checks the stored token with `GET /auth/me` on load.
+- [ ] A `NotFound` page.
+- **Done when:** register → login → protected page → logout works on mocks. There are tests for
+  the redirect, the 401 and the 429.
+
+### Step 5 – Shared components · M1, M2, M3, M4 · one small PR each
+
+- [ ] `StatusBadge` (M3): colour and text label for each of the five statuses, a
+      "Potential gap" tag, and the `complete` / `partial` badges.
+- [ ] `ConfidenceLabel` (M1): High / Medium / Low, with the number in a tooltip.
+- [ ] `EvidenceList` (M2): accepts both `EvidenceClause` and `EvidenceCitation`, maps
+      `policy_id` to the filename, collapses long text, and warns on flagged clauses.
+      Renders plain text only.
+- [ ] `AgentStatus` (M2): polls `/health/agents` every 30 s and shows the down agents.
+- [ ] `ErrorMessage` and `Disclaimer` (M4). `ErrorMessage` takes an `ApiError` and never shows
+      raw JSON.
+- **Done when:** each has a test covering its variants. M2 has a test for the flagged state and
+  for text that contains HTML.
+
+### Step 6 – The 10-minute request check · M3 · no PR (write the result here)
+
+- [ ] Run the real gateway with a slow Agent 4 (the real LLM, or a fake that sleeps 10 min), then
+      call `POST /api/v1/analyses` through the Vite proxy from the browser.
+- [ ] Write the result in §10, risk 1. If it fails, fix the proxy settings before step 9.
+
+### Step 7 – Landing page and business profile · M1 · `feature/fe-profile`
+
+- [ ] `Landing.tsx`: the hero, the three capability cards and "Get started", reusing the
+      InsureIntel text and colours. Then delete `frontend/assets/styles.css`.
+- [ ] `BusinessProfile.tsx` with React Hook Form. It has every field from §6 M1, with the limits
+      from `shared/models/business.py`. The yes/no questions are three-way (Yes / No / Unknown →
+      `null`). Equipment is a tag input.
+- [ ] The draft is saved to `sessionStorage` (§3.6), and "Save" leads on to the policies page.
+- [ ] A helper that maps 422 `details[].field` (`business.x.y`) onto form fields. Step 9 uses it
+      too.
+- **Done when:** there are tests for required fields, unknown → `null`, and a server 422 shown
+  on the right field.
+
+### Step 8 – Policies page · M2 · `feature/fe-policies`
+
+- [ ] `api/policies.ts`: `usePolicies` and `useUploadPolicy` (multipart, field `file`).
+- [ ] `Policies.tsx`: a drag-and-drop upload that checks the type and the 25 MB limit before
+      sending and shows progress. Handles `invalid_pdf` and `file_too_large`. The list shows
+      filename, pages, chunks, status and flagged count, plus an empty state.
+- [ ] Add `AgentStatus` to the nav.
+- **Done when:** there are tests for the client-side size and type check, the server 400 and
+  413, and the list and empty states.
+
+### Step 9 – New analysis and progress · M3 · `feature/fe-new-analysis`
+
+- [ ] `api/analyses.ts`: `useRunAnalysis` (`retry: false`, no timeout), `useAnalyses` and
+      `useAnalysis(id)`.
+- [ ] `NewAnalysis.tsx`:
+      1. pick 1–5 policies that are `ready`;
+      2. a profile summary with an "Edit" link (if there is no draft, go to the profile page);
+      3. Run.
+- [ ] The progress screen from §3.4: the four steps, elapsed time, a "you can leave this page"
+      note pointing to History, and a disabled Run button.
+- [ ] Errors: 502/503/504 name the failed step (`stage`) and offer Retry; `404
+      policy_not_found`; 422 goes back to the profile.
+- [ ] On success, go to `/app/analyses/:request_id` and put the response in the query cache.
+- **Done when:** there are tests for the policy limit, the progress screen and each error path.
+
+### Step 10 – Results page · M4 (shell + Report), M3 (Coverage), M1 (Risk profile)
+
+Three PRs. M4's goes first, because it contains the tab slots.
+
+- [ ] `feature/fe-results` (M4): `ResultsPage.tsx`, with the header (date, status badge,
+      headline, counts by status), the disclaimer that is always shown, the warnings, the partial
+      banner and the tabs. The default tab is Report, or Coverage when the result is partial.
+      `ReportTab.tsx` shows finding cards sorted by priority, with the tags "Potential gap",
+      "Verify with your insurer" and "AI-written" / "Template", and `EvidenceList`.
+      404 → an "Analysis not found" state.
+- [ ] `feature/fe-coverage-tab` (M3): `CoverageTab.tsx` with the table, the status filter,
+      "gaps only" and expanding rows with evidence.
+- [ ] `feature/fe-risk-tab` (M1): `RiskProfileTab.tsx`, grouped by category, showing source,
+      confidence, the input that led to each risk, and the profile warnings.
+- **Done when:** there are tests using the complete and partial fixtures, the five-status fixture
+  and the 404.
+
+### Step 11 – History and dashboard · M4 (History), M3 (Dashboard)
+
+- [ ] `feature/fe-history` (M4): `History.tsx` lists analyses newest first (date, status, gaps,
+      findings) and opens the results page. Includes an empty state.
+- [ ] `feature/fe-dashboard` (M3): `Dashboard.tsx` with the 3-step checklist (profile, a ready
+      policy, an analysis) and a card for the latest analysis.
+- **Done when:** each has a test for the empty state and the list/checklist.
+
+### Step 12 – Real gateway integration · all · `feature/fe-integration`
+
+- [ ] Run `scripts/start_agents.ps1 -NoLlm` and the gateway, then `VITE_USE_MOCKS=false npm run dev`.
+- [ ] Walk the whole flow: register → profile → upload `data/sample_policies/...` → analysis →
+      results → history → logout. Each member checks their own pages.
+- [ ] Get a `partial` result by stopping Agent 4 during a run, and a 503 by stopping Agent 1.
+- [ ] Do one run with the real LLM (Ollama).
+- [ ] Log each contract mismatch as an issue for the agent's owner. Don't work around backend
+      bugs in the UI.
+- **Done when:** the whole flow works on the real backend and every mismatch is fixed or logged.
+
+### Step 13 – Polish and accessibility · all · small PRs
+
+- [ ] Loading skeletons and empty states on every page.
+- [ ] Works at 360 px width.
+- [ ] Keyboard navigation and visible focus.
+- [ ] Labels on all inputs.
+- [ ] Status is never shown by colour alone.
+- [ ] Contrast checked.
+- [ ] A print stylesheet for the results page, if we decided on it in §10, item 6.
+- [ ] No `console.log` of tokens, passwords or business details (grep for it).
+
+### Step 14 – Docs and demo · M4 + all · `feature/fe-docs`
+
+- [ ] A frontend section in the root `README.md`: install, run on mocks, run against the
+      gateway, test.
+- [ ] Update `docs/architecture.md` and `docs/project-structure.md` to say the frontend is React.
+- [ ] Screenshots for the report, and a demo script that walks the flow in step 12.
