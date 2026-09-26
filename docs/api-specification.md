@@ -228,3 +228,113 @@ report = httpx.post(
 
 Pass the same `request_id` to every agent so one run can be traced through the logs.
 `tests/integration/test_agent3_to_agent4.py` runs this chain end to end.
+`services/orchestration/pipeline.py` does exactly this; see the gateway section below.
+
+## Orchestration Gateway (port 8000)
+
+The only API the frontend calls. It logs users in, forwards policy uploads to Agent 2, runs
+Agents 1 → 2 → 3 → 4 in order, and keeps each user's policies and analysis history in SQLite.
+Only the gateway knows `INTERNAL_API_KEY` and the agents' URLs.
+
+Run: `uvicorn services.orchestration.api:app --port 8000 --reload`
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/health` | none | Gateway only |
+| `GET` | `/health/agents` | none | `up` / `down` for each agent's `/health`; `status` is `degraded` if any is down |
+| `POST` | `/api/v1/auth/register` | none | `{"email", "password"}` → 201 `UserResponse`; 409 if the email is taken |
+| `POST` | `/api/v1/auth/login` | none | `{"email", "password"}` → `TokenResponse` (`access_token`, `expires_in` seconds) |
+| `GET` | `/api/v1/auth/me` | Bearer | `UserResponse` (`user_id`, `email`, `business_id`, `created_at`) |
+| `GET` | `/api/v1/policies` | Bearer | The user's uploaded policies, newest first |
+| `POST` | `/api/v1/policies` | Bearer | Multipart `file` (PDF) → Agent 2 → `PolicyUploadResponse` |
+| `POST` | `/api/v1/analyses` | Bearer | `AnalysisRequest` → runs the four agents → `AnalysisResponse` |
+| `GET` | `/api/v1/analyses` | Bearer | The user's past runs (`AnalysisSummary[]`, newest first, max 50) |
+| `GET` | `/api/v1/analyses/{request_id}` | Bearer | One stored `AnalysisResponse`; 404 if missing or another user's |
+
+"Bearer" means the header `Authorization: Bearer <access_token>`. The token expires after
+`JWT_EXPIRY_MINUTES`; then log in again.
+
+**Rules**
+
+- Passwords: 8 characters minimum, 72 bytes maximum (bcrypt's limit). Emails are lower-cased.
+- Each user owns one `business_id` (`B-` + 16 hex characters), created at registration. It is
+  **never** taken from a request body: Agent 2 uses it as a folder name, and it is what keeps
+  one business's policies away from another's.
+- An analysis may only use the user's own `policy_ids`; otherwise it returns 404 and no agent is
+  called.
+- The gateway creates a new `request_id` for every upload and analysis. It is sent to every agent
+  as the `X-Request-ID` header, and in the body to Agents 1, 3 and 4 (Agent 2's schema has no
+  such field). It comes back in the response's `X-Request-ID` header and in the body.
+
+### `AnalysisRequest` (`shared/schemas/requests.py`)
+
+```json
+{
+  "business": { "business_name": "Sunrise Bakery", "business_type": "bakery", "...": "BusinessProfile" },
+  "policy_ids": ["POL-3f2a9c81b0d4"]
+}
+```
+
+`policy_ids`: 1-5, unique. `business_id` and `request_id` are rejected (422).
+
+### `AnalysisResponse` (`shared/schemas/responses.py`)
+
+| Field | Notes |
+|---|---|
+| `request_id`, `business_id`, `created_at` | |
+| `status` | `complete`, or `partial` when Agent 4 failed |
+| `risk_profile` | Agent 1's `RiskProfileResponse` |
+| `coverage` | Agent 3's `CoverageAnalysisResponse` (Coverage Results page) |
+| `report` | Agent 4's `ExplanationResponse` (Report page); `null` when `partial` |
+| `warnings` | e.g. no risks found, report unavailable, run could not be saved |
+| `stage_ms` | Time spent per stage: `risk_profile`, `policy_evidence`, `coverage`, `report` |
+
+If Agent 1 finds no risks, Agents 2 and 3 are skipped (they need at least one risk) and the
+report has no findings.
+
+### Errors
+
+| Code | When | Body |
+|---|---|---|
+| 401 | No, invalid or expired token; wrong email or password | `{"detail": ...}` |
+| 404 | A `policy_id` or `request_id` that is not the user's | `GatewayError` |
+| 409 | Email already registered | `GatewayError` |
+| 413 | Upload over `MAX_UPLOAD_MB` (checked before Agent 2 is called) | `GatewayError` |
+| 400 | Agent 2 says the file is not a valid PDF | `GatewayError` |
+| 422 | Invalid body | `ErrorResponse`, without the input values |
+| 502 | An agent refused the call (4xx), failed (5xx) or broke the contract | `GatewayError` |
+| 503 | An agent could not be reached, or login is not configured (`JWT_SECRET_KEY`) | `GatewayError` |
+| 504 | An agent timed out | `GatewayError` |
+
+`GatewayError`: `{"error": "agent_timeout", "message": "...", "stage": "coverage", "request_id": "..."}`.
+`stage` is `risk_profile`, `policy_evidence`, `coverage`, `report` or `policy_upload`. Agent
+error bodies are never passed on, because they can contain policy text or the caller's input.
+An Agent 4 failure is **not** an error: the run returns 200 with `status: "partial"`.
+
+### Storage
+
+SQLite file at `DATABASE_PATH` (default `./data/app.db`, gitignored), created on first use.
+Tables: `users` (bcrypt hash only), `policies` (which `policy_id` belongs to which business) and
+`analyses`. The full `AnalysisResponse` contains policy excerpts, so it is stored encrypted
+with `DOCUMENT_ENCRYPTION_KEY`, the same key Agent 2 uses for the PDFs. If the key is missing,
+the run is still returned, with a warning that it was not saved.
+
+### Configuration
+
+| Variable | Default | Effect |
+|---|---|---|
+| `RISK_AGENT_URL` … `EXPLANATION_AGENT_URL` | `http://localhost:8001` … `8004` | Agent base URLs |
+| `REQUEST_TIMEOUT_SECONDS` | `60` | Per-call timeout for Agents 1-3 and uploads |
+| `EXPLANATION_TIMEOUT_SECONDS` | `300` | Agent 4 (a local model can take minutes) |
+| `INTERNAL_API_KEY` | - | Sent as `X-API-Key` to every agent; must match theirs |
+| `JWT_SECRET_KEY` | - | Signs login tokens; at least 32 characters, or login returns 503 |
+| `JWT_EXPIRY_MINUTES` | `60` | Token lifetime |
+| `DATABASE_PATH` | `./data/app.db` | SQLite file |
+| `DOCUMENT_ENCRYPTION_KEY` | - | Encrypts stored analysis results |
+
+### Known limits
+
+- Agent 3's HTTP API has no interpreter yet (issue I7), so a live run only produces `unclear`
+  and `not_found`. The pipeline passes Agent 3's decisions through unchanged either way.
+- Agent 2 does not log the `X-Request-ID` header yet, so its log lines cannot be matched to a run.
+- No login rate limiting yet, and registration says when an email is already taken.

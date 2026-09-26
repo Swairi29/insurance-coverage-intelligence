@@ -202,3 +202,68 @@ class ExplanationRequest(BaseModel):
         if len(ids) != len(set(ids)):
             raise ValueError("assessments must not contain duplicate risk_id values.")
         return assessments
+
+
+# --- Orchestration gateway (consumed by the frontend) ---
+
+_EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+MIN_PASSWORD_LENGTH = 8
+MAX_PASSWORD_BYTES = 72  # bcrypt only uses the first 72 bytes
+
+
+class LoginRequest(BaseModel):
+    """Body of `POST /api/v1/auth/login`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=1, max_length=MAX_PASSWORD_BYTES)
+
+    @field_validator("email")
+    @classmethod
+    def _normalise_email(cls, value: str) -> str:
+        return value.strip().lower()
+
+
+class RegisterRequest(LoginRequest):
+    """Body of `POST /api/v1/auth/register`."""
+
+    password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_BYTES)
+
+    @field_validator("email")
+    @classmethod
+    def _check_email(cls, value: str) -> str:
+        if not _EMAIL_PATTERN.match(value):
+            raise ValueError("email must be a valid email address.")
+        return value
+
+    @field_validator("password")
+    @classmethod
+    def _check_password_bytes(cls, value: str) -> str:
+        # The length limit counts characters; bcrypt's limit counts UTF-8 bytes.
+        if len(value.encode("utf-8")) > MAX_PASSWORD_BYTES:
+            raise ValueError(f"password must be at most {MAX_PASSWORD_BYTES} bytes.")
+        return value
+
+
+class AnalysisRequest(BaseModel):
+    """Body of `POST /api/v1/analyses`.
+
+    `business_id` and `request_id` are not accepted: the gateway takes the
+    business from the logged-in user and generates a new request_id per run.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    business: BusinessProfile
+    # Same "5 policies per analysis" limit as Agent 2.
+    policy_ids: List[str] = Field(min_length=1, max_length=5)
+
+    @field_validator("policy_ids")
+    @classmethod
+    def _unique_policy_ids(cls, policy_ids: List[str]) -> List[str]:
+        if len(policy_ids) != len(set(policy_ids)):
+            raise ValueError("policy_ids must not contain duplicates.")
+        if any(not 1 <= len(pid) <= 64 for pid in policy_ids):
+            raise ValueError("each policy_id must be 1-64 characters.")
+        return policy_ids
