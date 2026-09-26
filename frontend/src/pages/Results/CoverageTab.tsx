@@ -40,7 +40,7 @@ export function CoverageTab({
 
   return (
     <div>
-      <div className="flex flex-wrap items-end gap-4">
+      <div className="flex flex-wrap items-end gap-4 print:hidden">
         <div>
           <label htmlFor={filterId} className="block text-sm font-semibold text-ink-heading">
             Status
@@ -73,8 +73,10 @@ export function CoverageTab({
         </p>
       </div>
 
-      <div className="mt-4 overflow-x-auto rounded-card border border-line bg-white">
-        <table className="w-full min-w-[720px] text-left text-sm">
+      {/* `relative` contains the absolutely positioned sr-only caption, which otherwise
+          widened the whole page on phones. */}
+      <div className="relative mt-4 overflow-x-auto rounded-card border border-line bg-white print:overflow-visible">
+        <table className="w-full min-w-[720px] text-left text-sm print:min-w-0">
           <caption className="sr-only">Coverage status for each identified risk</caption>
           <thead className="border-b border-line bg-brand-soft/60 text-xs uppercase tracking-wide text-muted-strong">
             <tr>
@@ -122,7 +124,7 @@ export function CoverageTab({
                       >
                         <span
                           aria-hidden="true"
-                          className={`mt-0.5 inline-block text-xs text-muted transition-transform ${expanded ? 'rotate-90' : ''}`}
+                          className={`mt-0.5 inline-block text-xs text-muted transition-transform print:hidden ${expanded ? 'rotate-90' : ''}`}
                         >
                           ▶
                         </span>

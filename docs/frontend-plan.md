@@ -379,7 +379,7 @@ Each member builds their pages from §6 using MSW. Nobody needs the backend runn
 | 3 | The gateway has no CORS, so only the dev proxy works | Fine for the demo. For a production build, serve the built files from the same origin or add CORS on the gateway (separate PR) |
 | 4 | The business profile isn't stored on the server | `sessionStorage` draft for now. Ask the team whether we want a `/profile` endpoint |
 | 5 | Low-RAM laptops can't run the bigger local LLM | `qwen3:8b` (5.2 GB) does not fit on M4's 16 GB laptop, but `qwen3:4b` does (checked 2026-09-26: 3.2 GB in RAM on CPU, about 5–7 tokens/s, valid JSON output). Use `OLLAMA_MODEL=qwen3:4b` there and close big apps (Chrome, VS Code) during an LLM run. MSW and `-NoLlm` mode cover day-to-day development |
-| 6 | Do we need a PDF/print export of the report? | Decide in week 1. A print stylesheet (`@media print`) is the cheapest option |
+| 6 | Do we need a PDF/print export of the report? | **Decided: yes, a print stylesheet** (step 13). "Print report" uses the browser's print, which also offers Save as PDF |
 | 7 | TypeScript experience in the team | Keep types simple. `api/types.ts` is written once by M4 and everyone reviews it |
 
 ---
@@ -593,14 +593,28 @@ Backend findings for the agents' owners (not worked around in the UI):
 
 ### Step 13 – Polish and accessibility · all · small PRs
 
-- [ ] Loading skeletons and empty states on every page.
-- [ ] Works at 360 px width.
-- [ ] Keyboard navigation and visible focus.
-- [ ] Labels on all inputs.
-- [ ] Status is never shown by colour alone.
-- [ ] Contrast checked.
-- [ ] A print stylesheet for the results page, if we decided on it in §10, item 6.
-- [ ] No `console.log` of tokens, passwords or business details (grep for it).
+- [x] Loading skeletons and empty states on every page.
+- [x] Works at 360 px width.
+- [x] Keyboard navigation and visible focus.
+- [x] Labels on all inputs.
+- [x] Status is never shown by colour alone.
+- [x] Contrast checked.
+- [x] A print stylesheet for the results page, if we decided on it in §10, item 6.
+- [x] No `console.log` of tokens, passwords or business details (grep for it).
+
+#### Step 13 results (2026-09-26)
+
+- **axe (WCAG 2.1 A/AA + best practice)** on all 13 pages and result tabs, in Chrome: 0 violations.
+  Fixed on the way: the grey "muted" text was 4.36–4.49:1 on tinted backgrounds, now `#626d80`
+  (≥ 4.75:1 on every background used); login/register content outside landmarks.
+- **360 px:** no page scrolls sideways. Fixed: the coverage table's screen-reader caption
+  widened the whole page to 720 px.
+- **Keyboard:** 38 tab stops on the results page, all with a visible focus ring, in a sensible order.
+- **Loading:** skeleton placeholders on Policies, History, New analysis, Dashboard and Results.
+- **Print** (decided: yes, §10 item 6): "Print report" button; header, nav, tabs and filters are
+  hidden; all three sections are printed, each on a new page, cards do not split, and the notes
+  print expanded. A 14-finding report prints on 17 pages.
+- No `console` calls in app code; the token is only kept in `sessionStorage`.
 
 ### Step 14 – Docs and demo · M4 + all · `feature/fe-docs`
 

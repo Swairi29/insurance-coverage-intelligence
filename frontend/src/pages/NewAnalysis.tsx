@@ -8,6 +8,7 @@ import type { AnalysisRequest, BusinessProfile, PolicyDocument } from '../api/ty
 import { ErrorMessage } from '../components/ErrorMessage';
 import { DocumentIcon } from '../components/icons';
 import { Button } from '../components/ui/Button';
+import { SkeletonList } from '../components/ui/Skeleton';
 import { Spinner } from '../components/ui/Spinner';
 import { formatDateTime, plural } from '../lib/format';
 import { AGENT_STAGES, STAGE_LABELS } from '../lib/labels';
@@ -97,9 +98,7 @@ function NewAnalysisForm({ profile }: { profile: BusinessProfile }) {
           </p>
           <div className="mt-4">
             {policies.isPending ? (
-              <div role="status" className="flex items-center gap-2 text-sm text-muted">
-                <Spinner /> Loading your policies…
-              </div>
+              <SkeletonList label="Loading your policies" rows={2} />
             ) : policies.isError ? (
               <ErrorMessage
                 title="Your policies could not be loaded"

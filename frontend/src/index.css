@@ -12,3 +12,15 @@
     @apply font-display tracking-tight text-ink-heading;
   }
 }
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+  body {
+    background: #fff;
+    /* Keep status colours and tints, which carry meaning, when printing. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

@@ -52,7 +52,8 @@ describe('results header', () => {
     // Agent 4 repeats the same flagged-clause warning; it is shown once.
     const repeated = bakery.report!.warnings[0];
     expect(bakery.report!.warnings.filter((w) => w === repeated).length).toBeGreaterThan(1);
-    expect(screen.getAllByText(repeated)).toHaveLength(1);
+    const notes = screen.getByText(/^Notes about this analysis \(/).closest('details')!;
+    expect(within(notes).getAllByText(repeated)).toHaveLength(1);
   });
 
   it('names the model when AI wrote part of the report', async () => {
@@ -124,7 +125,8 @@ describe('partial result', () => {
     expect(screen.getByRole('tab', { name: 'Coverage' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('table')).toBeInTheDocument();
     // The gateway's own warning is shown.
-    expect(screen.getByText(partialAnalysis.warnings[0])).toBeInTheDocument();
+    const notes = screen.getByText(/^Notes about this analysis \(/).closest('details')!;
+    expect(within(notes).getByText(partialAnalysis.warnings[0])).toBeInTheDocument();
     // Without a report, the headline and counts come from the coverage results.
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       '14 risks checked, 14 potential gaps.',
@@ -202,5 +204,31 @@ describe('risk profile tab and tabs', () => {
       'aria-selected',
       'true',
     );
+  });
+});
+
+describe('printing', () => {
+  it('prints the report with the browser, including every section', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    const { user, container } = await openResults(bakery.request_id);
+
+    await user.click(screen.getByRole('button', { name: 'Print report' }));
+    expect(print).toHaveBeenCalledOnce();
+
+    // All three sections are in the page; closed ones are hidden on screen but printed.
+    const panels = container.querySelectorAll('[role="tabpanel"]');
+    expect(panels).toHaveLength(3);
+    for (const panel of panels) expect(panel).toHaveClass('print:block');
+    expect([...panels].filter((p) => p.hasAttribute('hidden'))).toHaveLength(2);
+    print.mockRestore();
+  });
+
+  it('prints a plain copy of the notes, hidden on screen', async () => {
+    const { container } = await openResults(bakery.request_id);
+    const copy = [...container.querySelectorAll('div[hidden]')].find((d) =>
+      d.textContent?.startsWith('Notes about this analysis'),
+    )!;
+    expect(copy).toHaveClass('print:block');
+    expect(copy.querySelectorAll('li').length).toBeGreaterThan(0);
   });
 });

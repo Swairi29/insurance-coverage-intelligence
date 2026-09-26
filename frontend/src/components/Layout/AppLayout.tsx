@@ -23,14 +23,14 @@ export function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-soft/40">
+    <div className="min-h-screen bg-brand-soft/40 print:bg-white">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-brand focus:shadow"
       >
         Skip to content
       </a>
-      <header className="border-b border-line bg-white">
+      <header className="border-b border-line bg-white print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <Brand to="/app" />
           <div className="flex min-w-0 items-center gap-3">
@@ -67,7 +67,7 @@ export function AppLayout() {
           </ul>
         </nav>
       </header>
-      <main id="main" className="mx-auto max-w-6xl px-4 py-8">
+      <main id="main" className="mx-auto max-w-6xl px-4 py-8 print:max-w-none print:p-0">
         <Outlet />
       </main>
     </div>

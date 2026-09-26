@@ -8,7 +8,8 @@ export default {
     extend: {
       colors: {
         ink: { DEFAULT: '#172033', heading: '#172b4d' },
-        muted: { DEFAULT: '#697386', strong: '#53627a' },
+        // #626d80 keeps 4.5:1 contrast on every light background used (checked with axe, step 13).
+        muted: { DEFAULT: '#626d80', strong: '#53627a' },
         line: '#e6eaf1',
         brand: {
           DEFAULT: '#3563e9',

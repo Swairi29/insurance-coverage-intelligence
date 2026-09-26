@@ -11,7 +11,7 @@ import type { PolicyDocument, PolicyStatus } from '../api/types';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { DocumentIcon, WarningIcon } from '../components/icons';
 import { Button } from '../components/ui/Button';
-import { Spinner } from '../components/ui/Spinner';
+import { SkeletonList } from '../components/ui/Skeleton';
 import { formatBytes, formatDateTime, plural } from '../lib/format';
 
 type UploadState = 'uploading' | 'done' | 'failed' | 'rejected';
@@ -156,9 +156,7 @@ export default function Policies() {
       <h2 className="mt-10 text-lg font-bold">Your policies</h2>
       <div className="mt-3">
         {policies.isPending ? (
-          <div role="status" className="flex items-center gap-2 text-sm text-muted">
-            <Spinner /> Loading your policies…
-          </div>
+          <SkeletonList label="Loading your policies" />
         ) : policies.isError ? (
           <ErrorMessage
             title="Your policies could not be loaded"

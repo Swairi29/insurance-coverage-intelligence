@@ -3,7 +3,7 @@ import { useAnalyses } from '../api/analyses';
 import type { AnalysisSummary } from '../api/types';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { AnalysisStatusBadge } from '../components/StatusBadge';
-import { Spinner } from '../components/ui/Spinner';
+import { SkeletonList } from '../components/ui/Skeleton';
 import { formatDateTime, plural } from '../lib/format';
 
 const newestFirst = (rows: AnalysisSummary[]) =>
@@ -31,9 +31,7 @@ export default function History() {
 
       <div className="mt-6">
         {analyses.isPending ? (
-          <div role="status" className="flex items-center gap-2 text-sm text-muted">
-            <Spinner /> Loading your analyses…
-          </div>
+          <SkeletonList label="Loading your analyses" />
         ) : analyses.isError ? (
           <ErrorMessage
             title="Your history could not be loaded"
