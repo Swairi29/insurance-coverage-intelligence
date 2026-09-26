@@ -33,6 +33,13 @@ export default {
       borderRadius: {
         card: '17px',
       },
+      keyframes: {
+        // Indeterminate progress bar: the API reports no progress, only the end.
+        progress: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(300%)' },
+        },
+      },
     },
   },
   plugins: [],

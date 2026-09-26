@@ -180,6 +180,11 @@ describe('register and logout', () => {
 describe('navigation', () => {
   it('shows the main navigation and marks the current page', async () => {
     storedToken(`mock-token-${demoUser.email}`);
+    // New analysis needs a saved profile, or it sends the user to the profile page.
+    window.sessionStorage.setItem(
+      SESSION_KEYS.profileDraft,
+      JSON.stringify({ business_name: 'Test Bakery', business_type: 'bakery' }),
+    );
     const { user } = renderApp('/app');
     await screen.findByRole('heading', { name: 'Dashboard' });
 

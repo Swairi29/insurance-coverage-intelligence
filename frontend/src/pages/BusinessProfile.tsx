@@ -26,6 +26,8 @@ import {
 /** Navigation state: step 9 sends the user back here with a 422's details. */
 export interface ProfilePageState {
   serverErrors?: ValidationErrorDetail[];
+  /** Why the user was sent here, e.g. from the new-analysis page without a profile. */
+  notice?: string;
 }
 
 export default function BusinessProfile() {
@@ -45,7 +47,8 @@ export default function BusinessProfile() {
   });
 
   // Show the errors the gateway found when an analysis was started with this profile.
-  const serverErrors = (location.state as ProfilePageState | null)?.serverErrors;
+  const pageState = location.state as ProfilePageState | null;
+  const serverErrors = pageState?.serverErrors;
   const serverMapped = useMemo(
     () => (serverErrors?.length ? profileErrorsFrom(serverErrors) : null),
     [serverErrors],
@@ -83,6 +86,7 @@ export default function BusinessProfile() {
       </p>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6 space-y-6">
+        {pageState?.notice && <Alert tone="info">{pageState.notice}</Alert>}
         {(errorCount > 0 || otherServerErrors.length > 0) && (
           <Alert tone="error" title="Please check the highlighted fields">
             {otherServerErrors.length > 0 && (

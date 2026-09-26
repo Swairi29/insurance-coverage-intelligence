@@ -500,17 +500,17 @@ Tick a step here when its PR is merged.
 
 ### Step 9 – New analysis and progress · M3 · `feature/fe-new-analysis`
 
-- [ ] `api/analyses.ts`: `useRunAnalysis` (`retry: false`, no timeout), `useAnalyses` and
+- [x] `api/analyses.ts`: `useRunAnalysis` (`retry: false`, no timeout), `useAnalyses` and
       `useAnalysis(id)`.
-- [ ] `NewAnalysis.tsx`:
+- [x] `NewAnalysis.tsx`:
       1. pick 1–5 policies that are `ready`;
       2. a profile summary with an "Edit" link (if there is no draft, go to the profile page);
       3. Run.
-- [ ] The progress screen from §3.4: the four steps, elapsed time, a "you can leave this page"
+- [x] The progress screen from §3.4: the four steps, elapsed time, a "you can leave this page"
       note pointing to History, and a disabled Run button.
-- [ ] Errors: 502/503/504 name the failed step (`stage`) and offer Retry; `404
+- [x] Errors: 502/503/504 name the failed step (`stage`) and offer Retry; `404
       policy_not_found`; 422 goes back to the profile.
-- [ ] On success, go to `/app/analyses/:request_id` and put the response in the query cache.
+- [x] On success, go to `/app/analyses/:request_id` and put the response in the query cache.
 - **Done when:** there are tests for the policy limit, the progress screen and each error path.
 
 ### Step 10 – Results page · M4 (shell + Report), M3 (Coverage), M1 (Risk profile)
