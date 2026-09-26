@@ -51,6 +51,8 @@ def sanitize(text: str, max_chars: int = MAX_CLAUSE_CHARS) -> str:
     delimiters (<<< and >>>), collapses whitespace and truncates with "…".
     """
     text = "".join(ch for ch in text if unicodedata.category(ch) not in ("Cc", "Cf") or ch in "\n\t")
+    # PDF extraction splits words at line ends ("in-\ndemnify" -> "indemnify").
+    text = re.sub(r"(?<=[a-z])-[ \t]*\r?\n[ \t]*(?=[a-z])", "", text)
     # Loop: removing one delimiter can join the pieces of another ("<<>>><" -> "<<<").
     previous = None
     while previous != text:

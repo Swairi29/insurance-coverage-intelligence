@@ -60,6 +60,20 @@ def test_sanitize_strips_control_characters_and_collapses_whitespace():
     assert sanitize("a\x00b\x07 \n\n\t  c‮d") == "ab cd"
 
 
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        ("The Insurer will in-\ndemnify the Insured", "The Insurer will indemnify the Insured"),
+        ("machin-  \r\n  ery breakdown", "machinery breakdown"),
+        ("Page 3 -\nSection 1", "Page 3 - Section 1"),  # not a split word
+        ("Fire-\nFighting equipment", "Fire- Fighting equipment"),  # capital: keep as is
+        ("well-known insurer", "well-known insurer"),  # normal hyphen untouched
+    ],
+)
+def test_sanitize_rejoins_words_split_across_lines(raw, expected):
+    assert sanitize(raw) == expected
+
+
 def test_sanitize_truncates_on_word_boundary():
     text = "word " * 400
     cleaned = sanitize(text, 100)
