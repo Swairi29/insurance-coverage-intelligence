@@ -6,6 +6,7 @@ import Landing from './pages/Landing';
 import NotFound from './pages/NotFound';
 import BusinessProfile from './pages/BusinessProfile';
 import Placeholder from './pages/Placeholder';
+import Policies from './pages/Policies';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 
@@ -39,7 +40,7 @@ export default function App() {
       >
         <Route index element={<Placeholder title="Dashboard" step={11} />} />
         <Route path="profile" element={<BusinessProfile />} />
-        <Route path="policies" element={<Placeholder title="Policies" step={8} />} />
+        <Route path="policies" element={<Policies />} />
         <Route path="analyses/new" element={<Placeholder title="New analysis" step={9} />} />
         <Route path="analyses" element={<Placeholder title="History" step={11} />} />
         <Route path="analyses/:requestId" element={<Placeholder title="Results" step={10} />} />

@@ -490,11 +490,11 @@ Tick a step here when its PR is merged.
 
 ### Step 8 – Policies page · M2 · `feature/fe-policies`
 
-- [ ] `api/policies.ts`: `usePolicies` and `useUploadPolicy` (multipart, field `file`).
-- [ ] `Policies.tsx`: a drag-and-drop upload that checks the type and the 25 MB limit before
+- [x] `api/policies.ts`: `usePolicies` and `useUploadPolicy` (multipart, field `file`).
+- [x] `Policies.tsx`: a drag-and-drop upload that checks the type and the 25 MB limit before
       sending and shows progress. Handles `invalid_pdf` and `file_too_large`. The list shows
       filename, pages, chunks, status and flagged count, plus an empty state.
-- [ ] Add `AgentStatus` to the nav.
+- [x] Add `AgentStatus` to the nav.
 - **Done when:** there are tests for the client-side size and type check, the server 400 and
   413, and the list and empty states.
 

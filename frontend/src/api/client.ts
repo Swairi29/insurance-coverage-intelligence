@@ -103,6 +103,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     throw new ApiError({ status: 0, error: 'network_error', message: NETWORK_ERROR_MESSAGE });
   }
 
+  return readResponse<T>(response, token);
+}
+
+/** Success → parsed JSON. Failure → ApiError (and the 401 hook when a token was sent). */
+async function readResponse<T>(response: Response, token: string | null): Promise<T> {
   if (!response.ok) {
     const apiError = await toApiError(response);
     if (response.status === 401 && token) config.onUnauthorized();
@@ -120,6 +125,54 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       message: GENERIC_ERROR_MESSAGE,
     });
   }
+}
+
+/**
+ * POST a FormData and report upload progress (0–1). Uses XMLHttpRequest because fetch has
+ * no upload progress; otherwise it behaves exactly like `api.post` (token, errors, 401).
+ */
+export function uploadWithProgress<T>(
+  path: string,
+  form: FormData,
+  { onProgress, signal }: { onProgress?: (fraction: number) => void; signal?: AbortSignal } = {},
+): Promise<T> {
+  const token = config.getToken();
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${baseUrl()}${path}`);
+    xhr.setRequestHeader('Accept', 'application/json');
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) onProgress?.(event.loaded / event.total);
+    };
+    xhr.onload = () => {
+      const response = new Response(xhr.status === 204 ? null : xhr.responseText, {
+        status: xhr.status,
+        headers: parseHeaders(xhr.getAllResponseHeaders()),
+      });
+      readResponse<T>(response, token).then(resolve, reject);
+    };
+    xhr.onerror = () =>
+      reject(new ApiError({ status: 0, error: 'network_error', message: NETWORK_ERROR_MESSAGE }));
+    xhr.onabort = () => reject(new DOMException('The upload was cancelled.', 'AbortError'));
+
+    if (signal?.aborted) {
+      xhr.abort();
+      return;
+    }
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true });
+    xhr.send(form);
+  });
+}
+
+function parseHeaders(raw: string): Headers {
+  const headers = new Headers();
+  for (const line of raw.trim().split(/[\r\n]+/)) {
+    const index = line.indexOf(':');
+    if (index > 0) headers.append(line.slice(0, index).trim(), line.slice(index + 1).trim());
+  }
+  return headers;
 }
 
 export const api = {

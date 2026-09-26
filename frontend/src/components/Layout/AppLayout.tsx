@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
+import { AgentStatus } from '../AgentStatus';
 import { Brand } from '../Brand';
 import { Button } from '../ui/Button';
 
@@ -33,7 +34,9 @@ export function AppLayout() {
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <Brand to="/app" />
           <div className="flex min-w-0 items-center gap-3">
-            {/* Placeholder slot: the agent status dot joins here in step 8. */}
+            <span className="hidden md:inline-flex">
+              <AgentStatus />
+            </span>
             <span className="hidden truncate text-sm text-muted sm:inline" title={user?.email}>
               {user?.email}
             </span>

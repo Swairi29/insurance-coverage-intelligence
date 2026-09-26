@@ -16,7 +16,7 @@ function LocationProbe() {
  * carry navigation state: `{ pathname: '/app/profile', state: {...} }`.
  */
 export function renderApp(route: string | { pathname: string; state?: unknown } = '/') {
-  const client = createQueryClient();
+  const client = createQueryClient({ retryDelay: 0 });
   const user = userEvent.setup();
   const result = render(
     <MemoryRouter initialEntries={[route]}>

@@ -7,10 +7,16 @@ function shouldRetry(failureCount: number, error: unknown): boolean {
   return failureCount < 1;
 }
 
-export function createQueryClient(): QueryClient {
+/** `retryDelay: 0` is for tests, so a retried read does not add a second of waiting. */
+export function createQueryClient({ retryDelay }: { retryDelay?: number } = {}): QueryClient {
   return new QueryClient({
     defaultOptions: {
-      queries: { retry: shouldRetry, refetchOnWindowFocus: false, staleTime: 30_000 },
+      queries: {
+        retry: shouldRetry,
+        ...(retryDelay !== undefined && { retryDelay }),
+        refetchOnWindowFocus: false,
+        staleTime: 30_000,
+      },
       // Writes (upload, analysis) are never retried automatically (plan §3.4).
       mutations: { retry: false },
     },
