@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { AppProviders } from './AppProviders';
 import { createQueryClient } from './queryClient';
+import { ROUTER_FUTURE } from './routerFuture';
 import './index.css';
 
 /** With VITE_USE_MOCKS=true (`npm run dev:mocks`) the mock API answers instead of the gateway. */
@@ -16,7 +17,7 @@ async function enableMocking(): Promise<void> {
 enableMocking().then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <BrowserRouter>
+      <BrowserRouter future={ROUTER_FUTURE}>
         <AppProviders client={createQueryClient()}>
           <App />
         </AppProviders>

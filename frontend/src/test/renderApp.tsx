@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import App from '../App';
 import { AppProviders } from '../AppProviders';
 import { createQueryClient } from '../queryClient';
+import { ROUTER_FUTURE } from '../routerFuture';
 
 /** Shows the current URL, so tests can check redirects. */
 function LocationProbe() {
@@ -19,7 +20,7 @@ export function renderApp(route: string | { pathname: string; state?: unknown } 
   const client = createQueryClient({ retryDelay: 0 });
   const user = userEvent.setup();
   const result = render(
-    <MemoryRouter initialEntries={[route]}>
+    <MemoryRouter initialEntries={[route]} future={ROUTER_FUTURE}>
       <AppProviders client={client}>
         <App />
         <LocationProbe />

@@ -532,9 +532,9 @@ Three PRs. M4's goes first, because it contains the tab slots.
 
 ### Step 11 – History and dashboard · M4 (History), M3 (Dashboard)
 
-- [ ] `feature/fe-history` (M4): `History.tsx` lists analyses newest first (date, status, gaps,
+- [x] `feature/fe-history` (M4): `History.tsx` lists analyses newest first (date, status, gaps,
       findings) and opens the results page. Includes an empty state.
-- [ ] `feature/fe-dashboard` (M3): `Dashboard.tsx` with the 3-step checklist (profile, a ready
+- [x] `feature/fe-dashboard` (M3): `Dashboard.tsx` with the 3-step checklist (profile, a ready
       policy, an analysis) and a card for the latest analysis.
 - **Done when:** each has a test for the empty state and the list/checklist.
 

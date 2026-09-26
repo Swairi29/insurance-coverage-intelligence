@@ -43,7 +43,7 @@ describe('protected pages', () => {
     storedToken(`mock-token-${demoUser.email}`);
     renderApp('/app');
 
-    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Your workspace' })).toBeInTheDocument();
   });
 
   it('logs out and asks to log in again when the stored token is rejected', async () => {
@@ -79,7 +79,7 @@ describe('protected pages', () => {
     storedToken(`mock-token-${demoUser.email}`);
     renderApp('/login');
 
-    await screen.findByRole('heading', { name: 'Dashboard' });
+    await screen.findByRole('heading', { name: 'Your workspace' });
     expect(location()).toBe('/app');
   });
 });
@@ -103,15 +103,23 @@ describe('login', () => {
 
   it('locks the form after too many failed attempts (429)', async () => {
     const { user } = renderApp('/login');
+    // Paste instead of type: six logins typed key by key take ~5 s.
+    const attempt = async (password: string) => {
+      for (const [label, value] of [
+        ['Email', demoUser.email],
+        ['Password', password],
+      ]) {
+        await user.clear(screen.getByLabelText(label));
+        await user.click(screen.getByLabelText(label));
+        await user.paste(value);
+      }
+      await user.click(screen.getByRole('button', { name: 'Log in' }));
+    };
     for (let i = 0; i < 5; i++) {
-      await user.clear(screen.getByLabelText('Password'));
-      await user.clear(screen.getByLabelText('Email'));
-      await fillLogin(user, demoUser.email, 'wrong');
+      await attempt('wrong');
       await screen.findByText('Invalid email or password.');
     }
-    await user.clear(screen.getByLabelText('Password'));
-    await user.clear(screen.getByLabelText('Email'));
-    await fillLogin(user, demoUser.email, DEMO_PASSWORD);
+    await attempt(DEMO_PASSWORD);
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Too many failed logins');
@@ -160,7 +168,7 @@ describe('register and logout', () => {
     await user.type(screen.getByLabelText('Confirm password'), 'long-enough');
     await user.click(screen.getByRole('button', { name: 'Create account' }));
 
-    await screen.findByRole('heading', { name: 'Dashboard' });
+    await screen.findByRole('heading', { name: 'Your workspace' });
     const header = screen.getByRole('banner');
     expect(within(header).getByText('owner@newshop.test')).toBeInTheDocument();
     expect(window.sessionStorage.getItem(SESSION_KEYS.token)).not.toBeNull();
@@ -186,7 +194,7 @@ describe('navigation', () => {
       JSON.stringify({ business_name: 'Test Bakery', business_type: 'bakery' }),
     );
     const { user } = renderApp('/app');
-    await screen.findByRole('heading', { name: 'Dashboard' });
+    await screen.findByRole('heading', { name: 'Your workspace' });
 
     const nav = screen.getByRole('navigation', { name: 'Main' });
     await user.click(within(nav).getByRole('link', { name: 'New analysis' }));
