@@ -200,6 +200,7 @@ def _all_statuses(complete: dict, policy_id: str) -> dict:
                 status=e["status"], potential_gap=e["gap"], priority=e["priority"], title=e["title"],
                 explanation=e["explanation"], recommendation=e["recommendation"], coverage_confidence=0.8,
                 verification_required=e["status"] != "covered",
+                generated_by="template",  # hand-written here, so never labelled AI-written
                 evidence=[{"chunk_id": c["chunk_id"], "policy_id": c["policy_id"], "section": c["section"],
                            "page": c["page"], "excerpt": c["text"][:400], "flagged": False}
                           for c in e["evidence"]])
@@ -218,8 +219,9 @@ def _all_statuses(complete: dict, policy_id: str) -> dict:
                  f"policy wording found, {counts['excluded']} excluded and "
                  f"{counts['unclear'] + counts['conditional']} need checking.")
     if not USE_LLM:
-        b["report"]["metadata"].update(llm_used=True, llm_provider="ollama", llm_model="qwen3:4b",
-                                       llm_findings=1, template_findings=len(findings) - 1)
+        b["report"]["metadata"].update(llm_used=True, llm_provider="ollama", llm_model="qwen3:4b")
+    llm = sum(f["generated_by"] == "llm" for f in findings)
+    b["report"]["metadata"].update(llm_findings=llm, template_findings=len(findings) - llm)
     return b
 
 

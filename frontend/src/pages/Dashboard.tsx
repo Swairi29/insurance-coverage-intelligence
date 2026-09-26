@@ -5,6 +5,7 @@ import { usePolicies } from '../api/policies';
 import type { AnalysisSummary } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { AnalysisStatusBadge } from '../components/StatusBadge';
+import { SkeletonLines } from '../components/ui/Skeleton';
 import { Spinner } from '../components/ui/Spinner';
 import { formatDateTime, plural } from '../lib/format';
 import { loadProfileDraft } from '../lib/profile';
@@ -114,9 +115,7 @@ export default function Dashboard() {
           </h2>
           <div className="mt-4">
             {analyses.isPending ? (
-              <div role="status" className="flex items-center gap-2 text-sm text-muted">
-                <Spinner /> Loading…
-              </div>
+              <SkeletonLines label="Loading your latest analysis" lines={4} />
             ) : analyses.isError ? (
               <p className="text-sm text-muted">Your analyses could not be loaded right now.</p>
             ) : latest ? (

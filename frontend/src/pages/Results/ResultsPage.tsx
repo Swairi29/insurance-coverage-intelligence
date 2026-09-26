@@ -10,7 +10,8 @@ import { ErrorMessage } from '../../components/ErrorMessage';
 import { SparkleIcon } from '../../components/icons';
 import { AnalysisStatusBadge, StatusBadge } from '../../components/StatusBadge';
 import { Alert } from '../../components/ui/Alert';
-import { Spinner } from '../../components/ui/Spinner';
+import { Button } from '../../components/ui/Button';
+import { SkeletonReport } from '../../components/ui/Skeleton';
 import { formatDateTime } from '../../lib/format';
 import { BUSINESS_TYPE_LABELS } from '../../lib/profile';
 import { aiUsage, analysisWarnings, headline, statusCounts } from '../../lib/results';
@@ -31,11 +32,7 @@ export default function ResultsPage() {
   const analysis = useAnalysis(requestId);
 
   if (analysis.isPending) {
-    return (
-      <div role="status" className="flex items-center gap-2 text-sm text-muted">
-        <Spinner /> Loading the analysis…
-      </div>
-    );
+    return <SkeletonReport label="Loading the analysis" />;
   }
   if (analysis.isError) {
     if (isApiError(analysis.error) && analysis.error.status === 404) {
@@ -107,11 +104,19 @@ function Results({ analysis }: { analysis: AnalysisResponse }) {
 
   return (
     <article className="max-w-5xl">
-      <Link to="/app/analyses" className="text-sm font-semibold text-brand hover:underline">
-        ← History
-      </Link>
+      <div className="flex items-center justify-between gap-3 print:hidden">
+        <Link to="/app/analyses" className="text-sm font-semibold text-brand hover:underline">
+          ← History
+        </Link>
+        <Button variant="secondary" onClick={() => window.print()}>
+          Print report
+        </Button>
+      </div>
+      <p className="hidden font-display text-lg font-extrabold text-ink-heading print:block">
+        InsureIntel coverage report
+      </p>
 
-      <header className="mt-3 rounded-card border border-line bg-white p-5 sm:p-6">
+      <header className="mt-3 rounded-card border border-line bg-white p-5 sm:p-6 print:border-0 print:p-0">
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
           <AnalysisStatusBadge status={analysis.status} />
           <span>{formatDateTime(analysis.created_at)}</span>
@@ -150,7 +155,7 @@ function Results({ analysis }: { analysis: AnalysisResponse }) {
         role="tablist"
         aria-label="Result sections"
         onKeyDown={onTabKey}
-        className="mt-6 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="mt-6 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line [scrollbar-width:none] print:hidden [&::-webkit-scrollbar]:hidden"
       >
         {TABS.map((t) => {
           const selected = t.id === tab;
@@ -182,42 +187,61 @@ function Results({ analysis }: { analysis: AnalysisResponse }) {
         })}
       </div>
 
-      <div
-        role="tabpanel"
-        id={`panel-${tab}`}
-        aria-labelledby={`tab-${tab}`}
-        tabIndex={0}
-        className="pt-6 focus-visible:outline-none"
-      >
-        {tab === 'report' && <ReportTab analysis={analysis} policyNames={policyNames} />}
-        {tab === 'coverage' && (
-          <CoverageTab
-            assessments={analysis.coverage.assessments}
-            model={analysis.coverage.metadata.llm_model}
-            policyNames={policyNames}
-          />
-        )}
-        {tab === 'risks' && <RiskProfileTab profile={analysis.risk_profile} />}
-      </div>
+      {/* All three panels are rendered; only the open one is shown on screen, and all of them
+          are printed, each under its own heading. */}
+      {TABS.map((t, index) => (
+        <div
+          key={t.id}
+          role="tabpanel"
+          id={`panel-${t.id}`}
+          aria-labelledby={`tab-${t.id}`}
+          tabIndex={0}
+          // `hidden` hides closed panels on screen and from screen readers; print:block
+          // overrides it (the base [hidden] rule is weaker), so every panel is printed.
+          hidden={t.id !== tab}
+          className={`pt-6 focus-visible:outline-none print:block ${index > 0 ? 'print:break-before-page' : ''}`}
+        >
+          <h2 className="mb-4 hidden text-xl font-extrabold print:block">{t.label}</h2>
+          {t.id === 'report' && <ReportTab analysis={analysis} policyNames={policyNames} />}
+          {t.id === 'coverage' && (
+            <CoverageTab
+              assessments={analysis.coverage.assessments}
+              model={analysis.coverage.metadata.llm_model}
+              policyNames={policyNames}
+            />
+          )}
+          {t.id === 'risks' && <RiskProfileTab profile={analysis.risk_profile} />}
+        </div>
+      ))}
     </article>
   );
 }
 
 /** The agents' notes. More than a few are collapsed, so they do not push the results down. */
 function AnalysisNotes({ warnings }: { warnings: string[] }) {
+  const list = (
+    <ul className="mt-2 list-disc space-y-0.5 pl-5">
+      {warnings.map((warning) => (
+        <li key={warning}>{warning}</li>
+      ))}
+    </ul>
+  );
   return (
-    <details
-      open={warnings.length <= 3}
-      className="group rounded-lg border border-brand-border bg-brand-soft px-4 py-3 text-sm text-muted-strong"
-    >
-      <summary className="cursor-pointer font-semibold text-ink-heading marker:text-brand">
-        Notes about this analysis ({warnings.length})
-      </summary>
-      <ul className="mt-2 list-disc space-y-0.5 pl-5">
-        {warnings.map((warning) => (
-          <li key={warning}>{warning}</li>
-        ))}
-      </ul>
-    </details>
+    <>
+      <details
+        open={warnings.length <= 3}
+        className="group rounded-lg border border-brand-border bg-brand-soft px-4 py-3 text-sm text-muted-strong print:hidden"
+      >
+        <summary className="cursor-pointer font-semibold text-ink-heading marker:text-brand">
+          Notes about this analysis ({warnings.length})
+        </summary>
+        {list}
+      </details>
+      {/* A collapsed <details> prints closed, so a plain copy is printed instead. */}
+      <div hidden className="text-sm text-muted-strong print:block">
+        <p className="font-semibold text-ink-heading">Notes about this analysis</p>
+        {list}
+      </div>
+    </>
   );
 }

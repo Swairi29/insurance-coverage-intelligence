@@ -1,5 +1,5 @@
 import { screen, within } from '@testing-library/react';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { analysesFixture } from '../mocks/fixtures';
 import { server } from '../mocks/server';
 import { renderApp } from '../test/renderApp';
@@ -36,6 +36,23 @@ describe('history page', () => {
     await user.click(within(list).getAllByRole('link')[0]);
 
     expect(await screen.findByRole('tablist', { name: 'Result sections' })).toBeInTheDocument();
+  });
+
+  it('shows a loading skeleton until the list arrives', async () => {
+    server.use(
+      http.get('*/api/v1/analyses', async () => {
+        await delay(200);
+        return undefined;
+      }),
+    );
+    loginAsDemoUser();
+    renderApp('/app/analyses');
+
+    expect(
+      await screen.findByRole('status', { name: 'Loading your analyses' }),
+    ).toBeInTheDocument();
+    expect(await screen.findByRole('list', { name: 'Past analyses' })).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Loading your analyses' })).not.toBeInTheDocument();
   });
 
   it('shows an empty state', async () => {

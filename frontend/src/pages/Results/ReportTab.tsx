@@ -78,7 +78,7 @@ function FindingCard({
   policyNames: Record<string, string>;
 }) {
   return (
-    <li className="rounded-card border border-line bg-white p-5">
+    <li className="rounded-card border border-line bg-white p-5 print:break-inside-avoid">
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={finding.status} />
         {finding.potential_gap && <GapTag />}

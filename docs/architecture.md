@@ -3,7 +3,9 @@
 ## Components
 
 ```text
- Frontend (not built yet)
+ Frontend (React)  :5173 in development   frontend/
+   login, business profile, policy upload, analysis progress, results, history
+          │  /api and /health, forwarded by the Vite dev proxy
           │  HTTP, Authorization: Bearer <JWT>
           ▼
  Orchestration gateway  :8000   services/orchestration/
@@ -80,7 +82,34 @@ complete report always reaches the gateway before that timeout.
 - **Prompt injection**: Agent 2 flags instruction-like clauses, and Agent 4 never sends flagged
   clauses to the LLM. See [responsible-ai.md](responsible-ai.md).
 
+## Frontend
+
+A React single-page app in `frontend/` (Vite, TypeScript, React Router, TanStack Query, React Hook
+Form, Tailwind). The full plan and the checks done on it are in
+[frontend-plan.md](frontend-plan.md).
+
+- **Only talks to the gateway.** In development the Vite server forwards `/api` and `/health` to
+  `127.0.0.1:8000`, so the browser sees one origin and the gateway needs no CORS. It never knows
+  `INTERNAL_API_KEY` or the agents' addresses.
+- **Login.** The JWT is kept in memory and `sessionStorage` (a refresh keeps the session, closing
+  the tab ends it) and checked with `GET /auth/me` on load. Any 401 logs the user out.
+- **Business profile.** The gateway does not store it; the app keeps it in `sessionStorage` and
+  sends it with each analysis. A 422 about the profile is shown next to the right form field.
+- **The slow analysis call.** `POST /api/v1/analyses` is one request that can take ~10 minutes with
+  a local LLM. It has no client or proxy timeout and is never retried automatically; the page shows
+  progress, and the gateway saves the result to History even if the page is closed (checked with a
+  570 s request, see the plan's step 6).
+- **Showing results honestly.** Coverage status comes from Agent 3 and is shown with a colour *and*
+  a label. Each finding says whether its text is AI-written or template, the header names the model
+  used, confidence is a word (High/Medium/Low) rather than a percentage, the disclaimer is always
+  visible, and a `partial` result says the report is missing instead of failing. Policy text is
+  rendered as plain text only, and clauses flagged by Agent 2 are marked.
+- **Mock API.** `npm run dev:mocks` and the tests use MSW with fixtures made from a real run of all
+  four agents (`scripts/make_frontend_fixtures.py`), so the UI can be built and tested without the
+  backend or an LLM.
+
 ## Running it
 
 See the README, "Running the system": `scripts/start_agents.ps1` / `scripts/start_agents.sh`
-start all five services, and `scripts/smoke_test_gateway.py` checks the full chain.
+start all five services, `npm run dev` in `frontend/` starts the web app, and
+`scripts/smoke_test_gateway.py` checks the full chain.

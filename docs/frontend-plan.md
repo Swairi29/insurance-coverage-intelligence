@@ -379,7 +379,7 @@ Each member builds their pages from §6 using MSW. Nobody needs the backend runn
 | 3 | The gateway has no CORS, so only the dev proxy works | Fine for the demo. For a production build, serve the built files from the same origin or add CORS on the gateway (separate PR) |
 | 4 | The business profile isn't stored on the server | `sessionStorage` draft for now. Ask the team whether we want a `/profile` endpoint |
 | 5 | Low-RAM laptops can't run the bigger local LLM | `qwen3:8b` (5.2 GB) does not fit on M4's 16 GB laptop, but `qwen3:4b` does (checked 2026-09-26: 3.2 GB in RAM on CPU, about 5–7 tokens/s, valid JSON output). Use `OLLAMA_MODEL=qwen3:4b` there and close big apps (Chrome, VS Code) during an LLM run. MSW and `-NoLlm` mode cover day-to-day development |
-| 6 | Do we need a PDF/print export of the report? | Decide in week 1. A print stylesheet (`@media print`) is the cheapest option |
+| 6 | Do we need a PDF/print export of the report? | **Decided: yes, a print stylesheet** (step 13). "Print report" uses the browser's print, which also offers Save as PDF |
 | 7 | TypeScript experience in the team | Keep types simple. `api/types.ts` is written once by M4 and everyone reviews it |
 
 ---
@@ -544,15 +544,15 @@ Three PRs. M4's goes first, because it contains the tab slots.
 - [x] Walk the whole flow: register → profile → upload `data/sample_policies/...` → analysis →
       results → history → logout. Each member checks their own pages.
 - [x] Get a `partial` result by stopping Agent 4 during a run, and a 503 by stopping Agent 1.
-- [ ] Do the full flow once with the LLMs switched on (Gemini for Agent 1, Ollama or Gemini for
+- [x] Do the full flow once with the LLMs switched on (Gemini for Agent 1, Ollama or Gemini for
       Agents 3 and 4), using `scripts/start_agents.ps1` without `-NoLlm`. On M4's laptop set
       `OLLAMA_MODEL=qwen3:4b` (see §10, item 5); a report then takes several minutes, and some
       findings may fall back to templates when Agent 4's time budget runs out. Check the slow
       progress screen, the "AI-written" labels and the "AI used" line, and that long LLM
       explanations still fit the layout.
-- [ ] Run `python scripts/make_frontend_fixtures.py --use-llm` with the same settings and commit
+- [x] Run `python scripts/make_frontend_fixtures.py --use-llm` with the same settings and commit
       the fixtures, so the mock API has real LLM wording from then on.
-- [ ] Log each contract mismatch as an issue for the agent's owner. Don't work around backend
+- [ ] Log each contract mismatch as an issue for the agent's owner. *(No frontend–gateway mismatch was found. The 5 backend findings below are recorded here; filing them as issues is postponed, 2026-09-26.)* Don't work around backend
       bugs in the UI.
 - **Done when:** the whole flow works on the real backend and every mismatch is fixed or logged.
 
@@ -571,8 +571,8 @@ normal `data/app.db` was not touched), driven through the real UI in Chrome.
 | Agent 4 stopped | `partial` result, banner, Coverage tab opens, header shows "1 service down" |
 | Agent 1 stopped | 503 "A required analysis service is not available", step "Risk profiling", Try again |
 | No frontend ↔ gateway contract mismatch was found | – |
-| LLM run (Agent 4 on `qwen3:4b`) | **Not done yet.** Ollama could not load the model: only ~1.3 GB RAM was free with the app, two dev servers and the backend running ("unable to allocate CPU_REPACK buffer", 1.76 GB). Agent 4 fell back correctly: a `complete` report with 13 template findings after its 280 s budget, and the UI said "No AI model was used". Retry with more free RAM (close Chrome/VS Code and other servers) |
-| `make_frontend_fixtures.py --use-llm` | Not done yet (needs the LLM run to work first) |
+| LLM run (Agent 4 on `qwen3:4b`) | Works once enough RAM is free. First try: Ollama could not load the model with ~1.3 GB free ("unable to allocate CPU_REPACK buffer"); Agent 4 fell back to 13 template findings after its 280 s budget and the UI said "No AI model was used". Second try, with other apps closed (3.5 GB free): `complete` after 356 s, 8 of 13 findings AI-written (two batches of 4 accepted, the rest template after the time budget), header "AI used: qwen3:4b via Ollama (report: 8 of 13 findings)", AI-written labels on 8 cards, no page errors |
+| `make_frontend_fixtures.py --use-llm` | Done: the fixtures now hold real `qwen3:4b` wording (bakery 5 of 14, restaurant 8 of 18, retail shop 6 of 14 findings AI-written; the rest template after the time budget). Hand-edited findings in `analysis-all-statuses.json` are always labelled Template |
 
 Backend findings for the agents' owners (not worked around in the UI):
 
@@ -593,18 +593,32 @@ Backend findings for the agents' owners (not worked around in the UI):
 
 ### Step 13 – Polish and accessibility · all · small PRs
 
-- [ ] Loading skeletons and empty states on every page.
-- [ ] Works at 360 px width.
-- [ ] Keyboard navigation and visible focus.
-- [ ] Labels on all inputs.
-- [ ] Status is never shown by colour alone.
-- [ ] Contrast checked.
-- [ ] A print stylesheet for the results page, if we decided on it in §10, item 6.
-- [ ] No `console.log` of tokens, passwords or business details (grep for it).
+- [x] Loading skeletons and empty states on every page.
+- [x] Works at 360 px width.
+- [x] Keyboard navigation and visible focus.
+- [x] Labels on all inputs.
+- [x] Status is never shown by colour alone.
+- [x] Contrast checked.
+- [x] A print stylesheet for the results page, if we decided on it in §10, item 6.
+- [x] No `console.log` of tokens, passwords or business details (grep for it).
+
+#### Step 13 results (2026-09-26)
+
+- **axe (WCAG 2.1 A/AA + best practice)** on all 13 pages and result tabs, in Chrome: 0 violations.
+  Fixed on the way: the grey "muted" text was 4.36–4.49:1 on tinted backgrounds, now `#626d80`
+  (≥ 4.75:1 on every background used); login/register content outside landmarks.
+- **360 px:** no page scrolls sideways. Fixed: the coverage table's screen-reader caption
+  widened the whole page to 720 px.
+- **Keyboard:** 38 tab stops on the results page, all with a visible focus ring, in a sensible order.
+- **Loading:** skeleton placeholders on Policies, History, New analysis, Dashboard and Results.
+- **Print** (decided: yes, §10 item 6): "Print report" button; header, nav, tabs and filters are
+  hidden; all three sections are printed, each on a new page, cards do not split, and the notes
+  print expanded. A 14-finding report prints on 17 pages.
+- No `console` calls in app code; the token is only kept in `sessionStorage`.
 
 ### Step 14 – Docs and demo · M4 + all · `feature/fe-docs`
 
-- [ ] A frontend section in the root `README.md`: install, run on mocks, run against the
+- [x] A frontend section in the root `README.md`: install, run on mocks, run against the
       gateway, test.
-- [ ] Update `docs/architecture.md` and `docs/project-structure.md` to say the frontend is React.
-- [ ] Screenshots for the report, and a demo script that walks the flow in step 12.
+- [x] Update `docs/architecture.md` and `docs/project-structure.md` to say the frontend is React.
+- [x] Screenshots for the report, and a demo script that walks the flow in step 12.

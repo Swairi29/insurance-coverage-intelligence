@@ -54,7 +54,7 @@ export function RiskProfileTab({ profile }: { profile: RiskProfileResponse }) {
 
 function RiskCard({ risk, model }: { risk: IdentifiedRisk; model: string | null }) {
   return (
-    <li className="rounded-card border border-line bg-white p-4">
+    <li className="rounded-card border border-line bg-white p-4 print:break-inside-avoid">
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-bold">{risk.name}</h3>
         <AiLabel kind="risk" value={risk.source} model={model} />

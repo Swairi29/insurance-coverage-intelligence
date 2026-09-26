@@ -1,4 +1,5 @@
 import { screen, within } from '@testing-library/react';
+import type { AnalysisResponse } from '../../api/types';
 import { COVERAGE_STATUSES } from '../../api/types';
 import { STATUS_LABELS } from '../../lib/labels';
 import { FLAGGED_MESSAGE } from '../../components/EvidenceList';
@@ -7,6 +8,16 @@ import { renderApp } from '../../test/renderApp';
 import { loginAsDemoUser } from '../../test/session';
 
 const bakery = analysisByType.bakery;
+
+/** The "AI used" line the header should show for a fixture (Agents 1 and 3 are rule-based). */
+function aiUsedText(analysis: AnalysisResponse): string {
+  const meta = analysis.report?.metadata;
+  if (!meta?.llm_used || meta.llm_findings === 0) {
+    return 'No AI model was used; these results are rule-based and use standard wording.';
+  }
+  const total = meta.llm_findings + meta.template_findings;
+  return `AI used: ${meta.llm_model} via Ollama (report: ${meta.llm_findings} of ${total} findings).`;
+}
 const location = () => screen.getByTestId('location').textContent;
 
 async function openResults(requestId: string, query = '') {
@@ -33,7 +44,7 @@ describe('results header', () => {
     const counts = screen.getByRole('list', { name: 'Findings by status' });
     expect(counts).toHaveTextContent(`${STATUS_LABELS.not_found}6`);
     expect(counts).toHaveTextContent(`${STATUS_LABELS.unclear}8`);
-    expect(screen.getByText(/No AI model was used/)).toBeInTheDocument();
+    expect(screen.getByText(aiUsedText(bakery))).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Disclaimer' })).toHaveTextContent(
       bakery.report!.disclaimer,
     );
@@ -41,14 +52,13 @@ describe('results header', () => {
     // Agent 4 repeats the same flagged-clause warning; it is shown once.
     const repeated = bakery.report!.warnings[0];
     expect(bakery.report!.warnings.filter((w) => w === repeated).length).toBeGreaterThan(1);
-    expect(screen.getAllByText(repeated)).toHaveLength(1);
+    const notes = screen.getByText(/^Notes about this analysis \(/).closest('details')!;
+    expect(within(notes).getAllByText(repeated)).toHaveLength(1);
   });
 
   it('names the model when AI wrote part of the report', async () => {
     await openResults(allStatusesAnalysis.request_id);
-    expect(
-      screen.getByText('AI used: qwen3:4b via Ollama (report: 1 of 14 findings).'),
-    ).toBeInTheDocument();
+    expect(screen.getByText(aiUsedText(allStatusesAnalysis))).toBeInTheDocument();
   });
 
   it('shows "Analysis not found" for an unknown id', async () => {
@@ -96,8 +106,10 @@ describe('report tab', () => {
     expect(within(covered).queryByText('Verify with your insurer')).not.toBeInTheDocument();
 
     const aiWritten = findingCards().filter((c) => within(c).queryByText('AI-written'));
-    expect(aiWritten).toHaveLength(1);
-    expect(within(aiWritten[0]).getByTitle(/qwen3:4b/)).toBeInTheDocument();
+    expect(aiWritten).toHaveLength(allStatusesAnalysis.report!.metadata.llm_findings);
+    expect(aiWritten.length).toBeGreaterThan(0);
+    const model = allStatusesAnalysis.report!.metadata.llm_model!;
+    expect(within(aiWritten[0]).getByTitle(new RegExp(model))).toBeInTheDocument();
 
     expect(screen.getAllByText(FLAGGED_MESSAGE).length).toBeGreaterThan(0);
   });
@@ -108,11 +120,13 @@ describe('partial result', () => {
     const { user } = await openResults(partialAnalysis.request_id);
 
     expect(screen.getByText('Partial – no written report')).toBeInTheDocument();
+    expect(screen.getByText(/No AI model was used/)).toBeInTheDocument();
     expect(screen.getByText('The written report is not available')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Coverage' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('table')).toBeInTheDocument();
     // The gateway's own warning is shown.
-    expect(screen.getByText(partialAnalysis.warnings[0])).toBeInTheDocument();
+    const notes = screen.getByText(/^Notes about this analysis \(/).closest('details')!;
+    expect(within(notes).getByText(partialAnalysis.warnings[0])).toBeInTheDocument();
     // Without a report, the headline and counts come from the coverage results.
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       '14 risks checked, 14 potential gaps.',
@@ -190,5 +204,31 @@ describe('risk profile tab and tabs', () => {
       'aria-selected',
       'true',
     );
+  });
+});
+
+describe('printing', () => {
+  it('prints the report with the browser, including every section', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    const { user, container } = await openResults(bakery.request_id);
+
+    await user.click(screen.getByRole('button', { name: 'Print report' }));
+    expect(print).toHaveBeenCalledOnce();
+
+    // All three sections are in the page; closed ones are hidden on screen but printed.
+    const panels = container.querySelectorAll('[role="tabpanel"]');
+    expect(panels).toHaveLength(3);
+    for (const panel of panels) expect(panel).toHaveClass('print:block');
+    expect([...panels].filter((p) => p.hasAttribute('hidden'))).toHaveLength(2);
+    print.mockRestore();
+  });
+
+  it('prints a plain copy of the notes, hidden on screen', async () => {
+    const { container } = await openResults(bakery.request_id);
+    const copy = [...container.querySelectorAll('div[hidden]')].find((d) =>
+      d.textContent?.startsWith('Notes about this analysis'),
+    )!;
+    expect(copy).toHaveClass('print:block');
+    expect(copy.querySelectorAll('li').length).toBeGreaterThan(0);
   });
 });
