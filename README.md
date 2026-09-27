@@ -169,6 +169,12 @@ dev server forwards `/api` and `/health` to the gateway on `127.0.0.1:8000`, so 
 no CORS. With a local LLM the analysis page shows progress for several minutes; the result is also
 saved to History, so the page can be left.
 
+**Demo account:** with the services running, `python scripts/seed_demo.py` creates
+`demo@insureintel.test` / `demo-password-1` with two synthetic policies and a finished analysis,
+so there is something to show straight away. Run it again to add another analysis. If the agents
+use an LLM, the seeded report is AI-written (this takes about 5–6 minutes). It is a known password:
+for your own machine only.
+
 **Without the backend:** `npm run dev:mocks` answers every call from a built-in mock API with
 real, saved analysis results. Log in as `demo@insureintel.test` / `demo-password-1`. Error cases can
 be triggered with special inputs, listed at the top of `frontend/src/mocks/handlers.ts` (for
