@@ -217,8 +217,10 @@ def test_agent3_http_api_to_agent4_http_api():
     assert response.status_code == 200, response.text
     coverage = CoverageAnalysisResponse.model_validate(response.json())
 
-    statuses = {a.status for a in coverage.assessments}
-    assert statuses <= {CoverageStatus.UNCLEAR, CoverageStatus.NOT_FOUND}
+    # Without an LLM, Agent 3 reads the wording with rules (wording.py): every risk with
+    # evidence gets a status from the clause text, and every risk without evidence is not_found.
+    for a in coverage.assessments:
+        assert (a.status == CoverageStatus.NOT_FOUND) == (not a.evidence)
 
     report_response = _post_report(build_explanation_request(risk_profile=profile, coverage=coverage))
     assert report_response.status_code == 200, report_response.text

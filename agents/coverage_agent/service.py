@@ -24,6 +24,7 @@ from agents.coverage_agent.rules import (
     decide_from_evidence,
     potential_gap_for_status,
 )
+from agents.coverage_agent.wording import read_wording
 
 
 @dataclass
@@ -104,28 +105,8 @@ class CoverageAnalysisService:
             # ---------------------------------------------------------
 
             if not self.use_llm or self.interpreter is None:
-                assessments.append(
-                    CoverageAssessment(
-                        risk_id=risk.risk_id,
-                        risk_name=risk.name,
-                        status=CoverageStatus.UNCLEAR,
-                        potential_gap=True,
-                        reason=(
-                            "Relevant policy evidence was retrieved, "
-                            "but semantic interpretation is unavailable."
-                        ),
-                        evidence=evidence,
-                        confidence=0.40,
-                        method=AnalysisMethod.RULES,
-                        matched_signals=[],
-                    )
-                )
-
-                warnings.append(
-                    f"LLM interpretation was unavailable for risk "
-                    f"'{risk.risk_id}'."
-                )
-
+                # No LLM: read the wording with rules (agents/coverage_agent/wording.py).
+                assessments.append(self._wording_assessment(risk, evidence))
                 continue
 
             try:
@@ -198,26 +179,11 @@ class CoverageAnalysisService:
                 # -----------------------------------------------------
 
                 warnings.append(
-                    f"LLM interpretation failed for risk "
-                    f"'{risk.risk_id}': {exc}"
+                    f"The AI could not interpret the wording for '{risk.name}' "
+                    f"({type(exc).__name__}); a rule-based reading was used instead."
                 )
 
-                assessments.append(
-                    CoverageAssessment(
-                        risk_id=risk.risk_id,
-                        risk_name=risk.name,
-                        status=CoverageStatus.UNCLEAR,
-                        potential_gap=True,
-                        reason=(
-                            "Relevant policy evidence was retrieved, "
-                            "but it could not be safely interpreted."
-                        ),
-                        evidence=evidence,
-                        confidence=0.30,
-                        method=AnalysisMethod.RULES,
-                        matched_signals=[],
-                    )
-                )
+                assessments.append(self._wording_assessment(risk, evidence))
 
         processing_ms = int(
             (time.perf_counter() - started) * 1000
@@ -229,4 +195,24 @@ class CoverageAnalysisService:
             llm_used=llm_used,
             llm_model=llm_model,
             processing_ms=processing_ms,
+        )
+
+    @staticmethod
+    def _wording_assessment(
+        risk: IdentifiedRisk,
+        evidence: list[EvidenceClause],
+    ) -> CoverageAssessment:
+        """Rule-based status from the evidence wording, used without an LLM."""
+
+        decision = read_wording(risk.name, evidence)
+        return CoverageAssessment(
+            risk_id=risk.risk_id,
+            risk_name=risk.name,
+            status=decision.status,
+            potential_gap=potential_gap_for_status(decision.status),
+            reason=decision.reason,
+            evidence=evidence,
+            confidence=decision.confidence,
+            method=AnalysisMethod.RULES,
+            matched_signals=decision.matched_signals,
         )

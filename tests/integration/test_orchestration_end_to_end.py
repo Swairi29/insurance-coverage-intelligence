@@ -125,9 +125,9 @@ def test_full_run_through_the_gateway(gateway, router):
     coverage = {a["risk_id"]: (a["status"], a["potential_gap"]) for a in body["coverage"]["assessments"]}
     report = {f["risk_id"]: (f["status"], f["potential_gap"]) for f in body["report"]["findings"]}
     assert report == coverage and len(report) == len(body["risk_profile"]["risks"])
-    # Agent 3's HTTP API has no interpreter yet (issue I7).
-    assert {status for status, _ in coverage.values()} <= {CoverageStatus.UNCLEAR.value,
-                                                           CoverageStatus.NOT_FOUND.value}
+    # Agent 3's HTTP API has no LLM interpreter yet (issue I7), so its rule-based wording reader
+    # decides; the report must still carry every one of those statuses unchanged (checked above).
+    assert {status for status, _ in coverage.values()} <= {s.value for s in CoverageStatus}
 
     # The business name is only sent to Agent 1.
     assert all(b"Sunrise Bakery" not in r.content for r in router.calls[1:])
