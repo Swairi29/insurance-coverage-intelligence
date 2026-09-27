@@ -56,7 +56,6 @@ os.environ.update({
 })
 
 import httpx  # noqa: E402
-import pymupdf  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from services.orchestration.api import app as gateway_app  # noqa: E402
@@ -64,78 +63,8 @@ from services.orchestration.api import get_pipeline  # noqa: E402
 from services.orchestration.database import Database, get_database  # noqa: E402
 from shared.config.settings import get_settings  # noqa: E402
 from shared.schemas.responses import AnalysisResponse  # noqa: E402
+from scripts.demo_data import BUSINESS_PACK, BUSINESSES, demo_policy_files  # noqa: E402
 from tests.integration.test_orchestration_real_agents import RealAgents  # noqa: E402
-
-# Synthetic policy wording.
-BUSINESS_PACK = [
-    "Section 1 - Fire. We will pay for loss or damage to buildings, stock and contents caused by "
-    "fire, lightning or explosion at the premises.",
-    "Section 2 - Burglary. Theft of stock and cash is covered only following forcible and violent "
-    "entry into the premises.",
-    "Section 3 - Machinery. Breakdown of ovens, refrigerators and other machinery is excluded.",
-    "Section 4 - Public Liability. We will indemnify you against legal liability for accidental "
-    "bodily injury to customers or members of the public occurring at the premises.",
-]
-# Contains an instruction-like sentence, so Agent 2 flags it.
-FLOOD_EXTENSION = [
-    (REPO / "data/sample_policies/adversarial/injected_exclusion.txt").read_text(encoding="utf-8"),
-]
-
-BUSINESSES = {
-    "bakery": {
-        "business_name": "Sunrise Bakery",
-        "business_type": "bakery",
-        "description": "A bakery producing bread, cakes and pastries, with a small cafe area.",
-        "employee_count": 8,
-        "equipment": ["Ovens", "Refrigerators", "Mixers"],
-        "operations": {
-            "sales_channels": ["in_store", "delivery"],
-            "accepts_card_payments": True,
-            "handles_cash": True,
-            "stores_customer_data": False,
-            "operates_single_location": True,
-        },
-        "location": {"city": "Colombo", "country": "Sri Lanka", "flood_prone_area": True},
-    },
-    "restaurant": {
-        "business_name": "Lagoon Kitchen",
-        "business_type": "restaurant",
-        "description": "A seafood restaurant with 40 seats, deep fryers and online orders.",
-        "employee_count": 22,
-        "equipment": ["Deep fryers", "Gas stoves", "Walk-in freezer", "POS system"],
-        "operations": {
-            "sales_channels": ["in_store", "online", "delivery"],
-            "accepts_card_payments": True,
-            "handles_cash": True,
-            "stores_customer_data": True,
-            "operates_single_location": True,
-        },
-        "location": {"city": "Negombo", "country": "Sri Lanka", "flood_prone_area": None},
-    },
-    "retail_shop": {
-        "business_name": "Hilltop Hardware",
-        "business_type": "retail_shop",
-        "description": "A hardware and household goods shop with an online store.",
-        "employee_count": 5,
-        "equipment": ["POS system", "CCTV"],
-        "operations": {
-            "sales_channels": ["in_store", "online"],
-            "accepts_card_payments": True,
-            "handles_cash": True,
-            "stores_customer_data": True,
-            "operates_single_location": True,
-        },
-        "location": {"city": "Kandy", "country": "Sri Lanka"},
-    },
-}
-
-
-def _pdf(pages: list[str]) -> bytes:
-    doc = pymupdf.open()
-    for text in pages:
-        doc.new_page().insert_textbox(pymupdf.Rect(50, 50, 545, 800), text, fontsize=11)
-    return doc.tobytes()
-
 
 class Agent4Down(RealAgents):
     def __call__(self, request: httpx.Request) -> httpx.Response:
@@ -239,9 +168,9 @@ def main() -> None:
     headers = {"Authorization": f"Bearer {token}"}
 
     policies = []
-    for name, pages in [("sunrise-business-pack.pdf", BUSINESS_PACK), ("flood-extension.pdf", FLOOD_EXTENSION)]:
+    for name, content in demo_policy_files():
         r = gateway.post("/api/v1/policies", headers=headers,
-                         files={"file": (name, _pdf(pages), "application/pdf")})
+                         files={"file": (name, content, "application/pdf")})
         assert r.status_code == 200, r.text
         policies.append({k: v for k, v in r.json().items() if k != "warnings"})
     policy_ids = [p["policy_id"] for p in policies]

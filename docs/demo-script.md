@@ -15,9 +15,14 @@ A 10–12 minute walk through the whole system in the browser. Screenshots of ea
    Wait until all five services say `up`. Use `--no-llm` for the live run: an LLM report takes
    5–6 minutes, which is too long to wait for in front of an audience.
 3. **Terminal 2, frontend:** `cd frontend` then `npm run dev`, and open http://127.0.0.1:5173.
-4. **Prepare an LLM result to show** (optional, do it before the demo): restart the backend
-   without `--no-llm` (with `OLLAMA_MODEL=qwen3:4b`), run one analysis, and leave it in History.
-   Then restart with `--no-llm` for the live part.
+4. **Seed the demo account** (in a third terminal, once the services are up):
+   ```bash
+   python scripts/seed_demo.py
+   ```
+   This creates `demo@insureintel.test` / `demo-password-1` with two policies and a finished
+   analysis. For an AI-written report to show, start the backend *without* `--no-llm` (with
+   `OLLAMA_MODEL=qwen3:4b`) before seeding (about 5–6 minutes), then restart it with `--no-llm`
+   for the live part.
 5. Have two policy PDFs ready, e.g. `data/sample_policies/adversarial/TestDoc1.pdf` and a short
    synthetic business-pack PDF.
 
@@ -37,7 +42,7 @@ A 10–12 minute walk through the whole system in the browser. Screenshots of ea
 | 7 | **Results → Report tab** | The headline and counts. Each finding has its status, whether it is a potential gap, a "verify with your insurer" tag, what to do, and the exact policy wording it is based on (policy, section, page). The disclaimer is always shown: this is decision support, not advice. |
 | 8 | **Coverage tab**: filter "Potential gaps only", expand a row | Agent 3 decides the status from the evidence; Agent 4 only explains it and can never change it. Confidence is shown as High/Medium/Low, not as a percentage. |
 | 9 | **Risk profile tab** | Why each risk was identified: the profile answers behind it, and whether rules or AI found it. |
-| 10 | **History** → open the LLM analysis prepared earlier | The header names the model ("AI used: qwen3:4b via Ollama, 8 of 13 findings"). Each card is labelled AI-written or Template; if the AI runs out of time, standard wording is used instead. |
+| 10 | Log in as the demo account, **History** → open the seeded analysis | The header names the model ("AI used: qwen3:4b via Ollama, 8 of 13 findings"). Each card is labelled AI-written or Template; if the AI runs out of time, standard wording is used instead. |
 | 11 | **Print report** | The whole report prints (or saves as PDF) with all three sections. |
 | 12 | *Optional, resilience:* stop only Agent 4 in a third PowerShell terminal with `Stop-Process -Id (Get-NetTCPConnection -LocalPort 8004 -State Listen).OwningProcess`, then run an analysis (the dot now says "1 service down") | The result is still shown, marked **Partial**: the coverage results are complete, only the written report is missing. If Agent 1 is down the page says which step failed and offers Try again. |
 | 13 | **Log out** | The token and the business profile are cleared from the browser. |
