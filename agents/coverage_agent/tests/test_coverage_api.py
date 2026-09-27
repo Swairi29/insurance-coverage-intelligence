@@ -7,6 +7,9 @@ from agents.coverage_agent.main import app
 from agents.coverage_agent.interpreter import CoverageInterpreter
 from agents.coverage_agent.service import CoverageAnalysisService
 from shared.models.coverage import CoverageStatus
+from shared.models.policy import EvidenceClause, RiskEvidenceResult
+from shared.models.risk import IdentifiedRisk
+from shared.config.settings import get_settings
 
 
 client = TestClient(app)
@@ -81,6 +84,11 @@ def test_missing_api_key():
 
 
 def test_no_evidence_returns_not_found(monkeypatch):
+    monkeypatch.setenv("INTERNAL_API_KEY", "test-key")
+
+    # Clear cached settings so the test environment variable is loaded.
+    get_settings.cache_clear()
+
     response = client.post(
         "/api/v1/analyse-coverage",
         headers={"X-API-Key": "test-key"},
@@ -123,45 +131,33 @@ def test_llm_interprets_exclusion():
         use_llm=True,
     )
 
+    risk = IdentifiedRisk(
+        risk_id="MECHANICAL_BREAKDOWN",
+        name="Mechanical breakdown",
+        category="property",
+        reason="Equipment may experience breakdown.",
+        source="rule",
+        confidence=0.90,
+        evidence=[],
+    )
+
+    evidence = EvidenceClause(
+        chunk_id="POLICY-1",
+        policy_id="POL-001",
+        section="Exceptions",
+        page=1,
+        text="What is not covered: Mechanical or electrical breakdown.",
+        score=0.90,
+    )
+
+    evidence_result = RiskEvidenceResult(
+        risk_id="MECHANICAL_BREAKDOWN",
+        evidence=[evidence],
+    )
+
     result = service.analyse(
-        risks=[
-            type(
-                "Risk",
-                (),
-                {
-                    "risk_id": "MECHANICAL_BREAKDOWN",
-                    "name": "Mechanical breakdown",
-                    "category": "property",
-                    "reason": "Equipment may experience breakdown.",
-                },
-            )()
-        ],
-        evidence_results=[
-            type(
-                "EvidenceResult",
-                (),
-                {
-                    "risk_id": "MECHANICAL_BREAKDOWN",
-                    "evidence": [
-                        type(
-                            "Evidence",
-                            (),
-                            {
-                                "chunk_id": "POLICY-1",
-                                "policy_id": "POL-001",
-                                "section": "Exceptions",
-                                "page": 1,
-                                "text": (
-                                    "What is not covered: "
-                                    "Mechanical or electrical breakdown."
-                                ),
-                                "score": 0.90,
-                            },
-                        )()
-                    ],
-                },
-            )()
-        ],
+        risks=[risk],
+        evidence_results=[evidence_result],
     )
 
     assessment = result.assessments[0]
