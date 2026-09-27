@@ -23,8 +23,11 @@ A 10–12 minute walk through the whole system in the browser. Screenshots of ea
    analysis. For an AI-written report to show, start the backend *without* `--no-llm` (with
    `OLLAMA_MODEL=qwen3:4b`) before seeding (about 5–6 minutes), then restart it with `--no-llm`
    for the live part.
-5. Have two policy PDFs ready, e.g. `data/sample_policies/adversarial/TestDoc1.pdf` and a short
-   synthetic business-pack PDF.
+5. Have policy PDFs ready. `data/sample_policies/synthetic/` has one per demo business
+   (made up, regenerate with `python scripts/make_sample_policies.py`):
+   `lagoon-kitchen-policy.pdf` (restaurant) and `hilltop-hardware-policy.pdf` (retail shop).
+   `data/sample_policies/adversarial/TestDoc1.pdf` also works. The profile details for Lagoon
+   Kitchen and Hilltop Hardware are in `scripts/demo_data.py`.
 
 **Fallback:** if the backend will not start, run `npm run dev:mocks` instead and log in as
 `demo@insureintel.test` / `demo-password-1`. Everything below works the same on saved data.

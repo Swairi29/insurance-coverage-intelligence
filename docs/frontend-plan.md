@@ -579,9 +579,23 @@ Backend findings for the agents' owners (not worked around in the UI):
 1. **Agent 2 (M2):** a PDF with very little text is stored as `ready` with `chunk_count: 0` and
    no warning, so it silently never provides evidence. Suggest `failed`, or a `warnings` entry
    in the upload response. (The Policies page now shows a note for such a policy.)
+   *Cause found later:* `detect_section` treats any line of up to 100 characters starting with
+   "Section", "Clause" or "Part" as a heading, so a short one-line page such as
+   "Section 1 - Fire. We will pay…" becomes a heading with no body text. Agent 2 also does not
+   normalise ligatures: a PDF that renders "fire" as "ﬁre" (one character) will not match the
+   keyword "fire". Suggest NFKC-normalising extracted text. `scripts/make_sample_policies.py`
+   avoids both problems.
 2. **Agent 3 (M3):** the API builds `CoverageAnalysisService()` without an interpreter, so the
    LLM step never runs (known issue I7). Its notes also use internal IDs, e.g.
    "LLM interpretation was unavailable for risk 'PROP_THEFT'"; the risk name would be clearer.
+   *Update 2026-09-27:* added `agents/coverage_agent/wording.py`, a rule-based reader used when
+   no LLM interpreter is available. It reads the evidence sentences that mention the risk and
+   returns Excluded ("not covered", "does not cover"…), Covered with conditions ("only if",
+   "up to"…), Covered ("we will pay", "includes"…) or Unclear, quoting the sentence in the reason.
+   It never returns Covered when a relevant sentence adds a condition or exclusion, and when unsure
+   it leans towards flagging a gap. On the Lagoon Kitchen sample policy: 7 conditional,
+   7 excluded, 1 covered, 3 unclear (was 18 unclear). The per-risk "LLM interpretation was
+   unavailable" notes are gone. Connecting the LLM interpreter is still open; to agree with M3.
 3. **Agent 4 (M4):** the flagged-clause warning names the policy by ID (`POL-…`) instead of its
    filename, and is repeated once per finding that cites it (the UI de-duplicates it).
 4. **Agent 4 (M4):** when Ollama cannot load the model, batches 1 and 2 failed in ~3–5 s but
