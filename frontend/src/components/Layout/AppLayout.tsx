@@ -23,7 +23,7 @@ export function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-soft/40 print:bg-white">
+    <div className="min-h-screen bg-canvas print:bg-white">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-brand focus:shadow"
