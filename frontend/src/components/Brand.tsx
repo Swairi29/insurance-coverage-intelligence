@@ -17,16 +17,25 @@ export function ShieldIcon({ className = 'h-6 w-6' }: { className?: string }) {
   );
 }
 
+/** `light` for light backgrounds, `dark` for the navy header. */
+export type Tone = 'light' | 'dark';
+
+const TONES: Record<Tone, { text: string; accent: string; focus: string }> = {
+  light: { text: 'text-ink-heading', accent: 'text-brand', focus: 'focus-visible:outline-brand' },
+  dark: { text: 'text-white', accent: 'text-ai-border', focus: 'focus-visible:outline-white' },
+};
+
 /** The InsureIntel name with the shield, linking to `to`. */
-export function Brand({ to = '/' }: { to?: string }) {
+export function Brand({ to = '/', tone = 'light' }: { to?: string; tone?: Tone }) {
+  const colours = TONES[tone];
   return (
     <Link
       to={to}
-      className="inline-flex items-center gap-2 rounded font-display text-xl font-extrabold text-ink-heading focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+      className={`inline-flex items-center gap-2 rounded font-display text-xl font-extrabold focus-visible:outline focus-visible:outline-2 ${colours.text} ${colours.focus}`}
     >
-      <ShieldIcon className="h-6 w-6 text-brand" />
+      <ShieldIcon className={`h-6 w-6 ${colours.accent}`} />
       <span>
-        Insure<span className="text-brand">Intel</span>
+        Insure<span className={colours.accent}>Intel</span>
       </span>
     </Link>
   );

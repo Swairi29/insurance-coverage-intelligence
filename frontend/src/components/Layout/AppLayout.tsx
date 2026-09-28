@@ -30,17 +30,20 @@ export function AppLayout() {
       >
         Skip to content
       </a>
-      <header className="border-b border-line bg-white print:hidden">
+      <header className="border-b border-brand-dark bg-brand print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <Brand to="/app" />
+          <Brand to="/app" tone="dark" />
           <div className="flex min-w-0 items-center gap-3">
             <span className="hidden md:inline-flex">
-              <AgentStatus />
+              <AgentStatus tone="dark" />
             </span>
-            <span className="hidden truncate text-sm text-muted sm:inline" title={user?.email}>
+            <span
+              className="hidden truncate text-sm text-brand-muted sm:inline"
+              title={user?.email}
+            >
               {user?.email}
             </span>
-            <Button variant="secondary" onClick={handleLogout} className="px-3 py-1.5">
+            <Button variant="inverse" size="sm" onClick={handleLogout}>
               Log out
             </Button>
           </div>
@@ -53,10 +56,10 @@ export function AppLayout() {
                   to={item.to}
                   end={item.end}
                   className={({ isActive }) =>
-                    `block border-b-2 px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand ${
+                    `block border-b-2 px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white ${
                       isActive
-                        ? 'border-brand text-brand'
-                        : 'border-transparent text-muted-strong hover:text-ink-heading'
+                        ? 'border-white text-white'
+                        : 'border-transparent text-brand-muted hover:border-brand-muted/50 hover:text-white'
                     }`
                   }
                 >

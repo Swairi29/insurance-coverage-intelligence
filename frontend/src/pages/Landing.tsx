@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { Brand } from '../components/Brand';
 import { InfoIcon } from '../components/icons';
+import { buttonClasses } from '../components/ui/Button';
 
 // Content from the original InsureIntel landing page (the old Streamlit app).
 
@@ -37,10 +38,8 @@ const TRUST = [
   'Evidence-based explanations',
 ];
 
-const primaryLink =
-  'inline-flex items-center justify-center rounded-lg bg-brand px-5 py-3 text-sm font-semibold text-white hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand';
-const secondaryLink =
-  'inline-flex items-center justify-center rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold text-ink-heading hover:border-brand hover:text-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand';
+const primaryLink = buttonClasses('primary', 'lg');
+const secondaryLink = buttonClasses('secondary', 'lg');
 
 export default function Landing() {
   const { status } = useAuth();

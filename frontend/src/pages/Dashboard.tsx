@@ -5,6 +5,7 @@ import { usePolicies } from '../api/policies';
 import type { AnalysisSummary } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { AnalysisStatusBadge } from '../components/StatusBadge';
+import { buttonClasses } from '../components/ui/Button';
 import { SkeletonLines } from '../components/ui/Skeleton';
 import { Spinner } from '../components/ui/Spinner';
 import { formatDateTime, plural } from '../lib/format';
@@ -93,10 +94,10 @@ export default function Dashboard() {
                 </div>
                 <Link
                   to={step.to}
-                  className={`col-start-2 justify-self-start rounded-lg px-3 py-2 text-sm font-semibold sm:col-start-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand ${
+                  className={`col-start-2 justify-self-start sm:col-start-auto ${
                     index === nextIndex
-                      ? 'bg-brand text-white hover:bg-brand-dark'
-                      : 'text-brand hover:bg-brand-soft'
+                      ? buttonClasses('primary', 'sm')
+                      : 'rounded-lg px-3 py-1.5 text-sm font-semibold text-brand hover:bg-brand-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand'
                   }`}
                 >
                   {step.action}

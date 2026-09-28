@@ -1,7 +1,17 @@
-export function Spinner({ className = 'h-5 w-5' }: { className?: string }) {
+/**
+ * `colour` is separate from `className`: two text colours in one class list are decided by CSS
+ * order. Use `text-ai-bright` while the AI is working, the navy default for ordinary loading.
+ */
+export function Spinner({
+  className = 'h-5 w-5',
+  colour = 'text-brand',
+}: {
+  className?: string;
+  colour?: string;
+}) {
   return (
     <svg
-      className={`animate-spin text-brand ${className}`}
+      className={`animate-spin ${colour} ${className}`}
       viewBox="0 0 24 24"
       fill="none"
       aria-hidden="true"

@@ -12,13 +12,16 @@ export default {
         ink: { DEFAULT: '#0f172a', heading: '#0f172a' },
         // #5a6b82 keeps 4.5:1 contrast on every light background used, tints included.
         muted: { DEFAULT: '#5a6b82', strong: '#475569' },
-        line: '#e2e8f0',
+        // `strong` (slate-400) is for dashed drop-zone borders.
+        line: { DEFAULT: '#e2e8f0', strong: '#94a3b8' },
         brand: {
           DEFAULT: '#1e3a8a',
           dark: '#172554',
           tint: '#eff6ff',
           soft: '#f5f8ff',
           border: '#dbeafe',
+          // Secondary text on a navy background (7:1).
+          muted: '#cbd5e1',
         },
         // The AI layer. DEFAULT is for text and filled buttons (6.3:1 with white); `bright`
         // (#6366f1, only 4.47:1) is for spinners, bars and borders, never for text.

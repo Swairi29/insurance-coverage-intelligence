@@ -3,6 +3,7 @@ import { useAnalyses } from '../api/analyses';
 import type { AnalysisSummary } from '../api/types';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { AnalysisStatusBadge } from '../components/StatusBadge';
+import { buttonClasses } from '../components/ui/Button';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { formatDateTime, plural } from '../lib/format';
 
@@ -21,10 +22,7 @@ export default function History() {
             Every analysis you have run. Results are stored encrypted and only you can open them.
           </p>
         </div>
-        <Link
-          to="/app/analyses/new"
-          className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-        >
+        <Link to="/app/analyses/new" className={buttonClasses()}>
           New analysis
         </Link>
       </div>
