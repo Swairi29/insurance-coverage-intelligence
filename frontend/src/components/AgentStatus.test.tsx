@@ -28,6 +28,13 @@ describe('AgentStatus', () => {
     );
   });
 
+  it('uses the bright dot on the navy header', async () => {
+    renderWithQuery(<AgentStatus tone="dark" />);
+
+    const status = await screen.findByText('All services up');
+    expect(status.querySelector('[aria-hidden="true"]')).toHaveClass('bg-status-covered-dot');
+  });
+
   it('says the status is unknown when the gateway cannot be reached', async () => {
     server.use(http.get('*/health/agents', () => new HttpResponse(null, { status: 502 })));
     renderWithQuery(<AgentStatus />);

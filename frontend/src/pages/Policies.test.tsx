@@ -130,6 +130,16 @@ describe('policies page', () => {
     expect(calls).toHaveLength(0);
   });
 
+  it('marks a policy that is still processing as system work, not as a warning', async () => {
+    db.policies = [{ ...db.policies[0], status: 'processing' }];
+    await openPolicies();
+
+    const list = await screen.findByRole('list', { name: 'Your policies' });
+    const badge = within(list).getByText('Processing');
+    expect(badge).toHaveClass('text-ai');
+    expect(badge.querySelector('svg')).not.toBeNull();
+  });
+
   it('uploads a PDF and adds it to the list', async () => {
     const calls = captureUploads(() => {
       const document: PolicyDocument = {

@@ -10,8 +10,9 @@ import {
 import type { PolicyDocument, PolicyStatus } from '../api/types';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { DocumentIcon, WarningIcon } from '../components/icons';
-import { Button } from '../components/ui/Button';
+import { Button, buttonClasses } from '../components/ui/Button';
 import { SkeletonList } from '../components/ui/Skeleton';
+import { Spinner } from '../components/ui/Spinner';
 import { formatBytes, formatDateTime, plural } from '../lib/format';
 
 type UploadState = 'uploading' | 'done' | 'failed' | 'rejected';
@@ -87,10 +88,7 @@ export default function Policies() {
           </p>
         </div>
         {readyCount > 0 && (
-          <Link
-            to="/app/analyses/new"
-            className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-          >
+          <Link to="/app/analyses/new" className={buttonClasses()}>
             Start a new analysis →
           </Link>
         )}
@@ -104,11 +102,12 @@ export default function Policies() {
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         data-testid="dropzone"
+        // Indigo while a file is dragged over or being read: the AI side of the system is working.
         className={`mt-6 flex flex-col items-center justify-center gap-3 rounded-card border-2 border-dashed px-6 py-10 text-center transition-colors ${
-          dragging ? 'border-brand bg-brand-tint' : 'border-line bg-white'
+          dragging || busy ? 'border-ai-bright bg-ai-tint' : 'border-line-strong bg-white'
         }`}
       >
-        <DocumentIcon className="h-8 w-8 text-brand" />
+        <DocumentIcon className={`h-8 w-8 ${dragging || busy ? 'text-ai' : 'text-brand'}`} />
         <p className="font-semibold text-ink-heading">Drag PDF files here</p>
         <p className="text-sm text-muted">or</p>
         <Button onClick={() => inputRef.current?.click()} loading={busy}>
@@ -184,16 +183,29 @@ export default function Policies() {
 
 function UploadItem({ row }: { row: UploadRow }) {
   const percent = Math.round(row.progress * 100);
+  // Once the bytes are sent, the server reads, splits and indexes the PDF. It reports no
+  // progress for that, so the bar becomes an indeterminate one.
+  const indexing = row.state === 'uploading' && percent >= 100;
   return (
     <li className="rounded-lg border border-line bg-white px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <span className="min-w-0 truncate font-semibold text-ink-heading" title={row.name}>
           {row.name}
         </span>
-        <span className="text-xs text-muted">
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted">
           {formatBytes(row.size)} ·{' '}
-          {row.state === 'uploading' && (percent < 100 ? `Uploading ${percent}%` : 'Processing…')}
-          {row.state === 'done' && <span className="text-status-covered">Uploaded</span>}
+          {row.state === 'uploading' &&
+            (indexing ? (
+              <span className="font-semibold text-ai">Reading &amp; indexing…</span>
+            ) : (
+              `Uploading ${percent}%`
+            ))}
+          {row.state === 'done' && (
+            <span className="inline-flex items-center gap-1.5 font-semibold text-status-covered">
+              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-status-covered-dot" />
+              Uploaded
+            </span>
+          )}
           {(row.state === 'failed' || row.state === 'rejected') && (
             <span className="text-status-excluded">Not uploaded</span>
           )}
@@ -202,13 +214,20 @@ function UploadItem({ row }: { row: UploadRow }) {
       {row.state === 'uploading' && (
         <div
           role="progressbar"
-          aria-label={`Uploading ${row.name}`}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-          className="mt-2 h-1.5 overflow-hidden rounded-full bg-brand-tint"
+          aria-label={indexing ? `Reading and indexing ${row.name}` : `Uploading ${row.name}`}
+          aria-valuemin={indexing ? undefined : 0}
+          aria-valuemax={indexing ? undefined : 100}
+          aria-valuenow={indexing ? undefined : percent}
+          className="mt-2 h-1.5 overflow-hidden rounded-full bg-ai-tint"
         >
-          <div className="h-full bg-brand transition-all" style={{ width: `${percent}%` }} />
+          {indexing ? (
+            <div className="h-full w-1/3 rounded-full bg-ai-bright motion-safe:animate-[progress_1.6s_ease-in-out_infinite]" />
+          ) : (
+            <div
+              className="h-full rounded-full bg-ai-bright transition-all"
+              style={{ width: `${percent}%` }}
+            />
+          )}
         </div>
       )}
       {row.state === 'rejected' && (
@@ -235,9 +254,10 @@ const POLICY_STATUS: Record<PolicyStatus, { label: string; className: string }> 
     label: 'Ready',
     className: 'border-status-covered-border bg-status-covered-bg text-status-covered',
   },
+  // Indigo, not amber: processing is the system at work, not a warning.
   processing: {
     label: 'Processing',
-    className: 'border-status-unclear-border bg-status-unclear-bg text-status-unclear',
+    className: 'border-ai-border bg-ai-tint text-ai',
   },
   failed: {
     label: 'Could not be read',
@@ -263,8 +283,11 @@ function PolicyItem({ policy }: { policy: PolicyDocument }) {
           </div>
         </div>
         <span
-          className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${status.className}`}
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${status.className}`}
         >
+          {policy.status === 'processing' && (
+            <Spinner className="h-3 w-3" colour="text-ai-bright" />
+          )}
           {status.label}
         </span>
       </div>
