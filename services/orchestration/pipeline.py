@@ -6,6 +6,9 @@
     Agent 3  POST /api/v1/analyse-coverage          risks + clauses -> coverage assessments
     Agent 4  POST /api/v1/generate-report           risks + assessments -> plain-English report
 
+Outside the chain: policy uploads (Agent 2) and questions about a saved
+analysis (Agent 4, POST /api/v1/answer-question).
+
 Every call carries the shared `X-API-Key` and an `X-Request-ID` header, and the
 same request_id goes in the body of every agent that accepts one (Agent 2 does
 not, so it only gets the header). Each agent must echo the request_id back;
@@ -29,12 +32,15 @@ from pydantic import BaseModel, ValidationError
 from agents.explanation_agent.mapping import build_explanation_request
 from shared.config.settings import Settings
 from shared.models.business import BusinessProfile
+from shared.schemas.requests import QuestionRequest
 from shared.schemas.responses import (
+    AnalysisResponse,
     CoverageAnalysisResponse,
     CoverageMetadata,
     ExplanationResponse,
     PolicyEvidenceResponse,
     PolicyUploadResponse,
+    QuestionAnswerResponse,
     RiskProfileResponse,
 )
 
@@ -54,6 +60,7 @@ class Stage(str, Enum):
     COVERAGE = "coverage"  # Agent 3
     REPORT = "report"  # Agent 4
     POLICY_UPLOAD = "policy_upload"  # Agent 2, outside the analysis chain
+    QUESTION = "question"  # Agent 4, a question about a saved analysis
 
 
 class ErrorKind(str, Enum):
@@ -157,11 +164,12 @@ class PipelineResult:
 
 class AnalysisPipeline:
     def __init__(self, client: AgentClient, urls: AgentUrls, *,
-                 timeout: float, report_timeout: float):
+                 timeout: float, report_timeout: float, question_timeout: float = 150.0):
         self._client = client
         self._urls = urls
         self._timeout = timeout
         self._report_timeout = report_timeout
+        self._question_timeout = question_timeout
 
     @classmethod
     def from_settings(cls, settings: Settings, http: httpx.Client) -> "AnalysisPipeline":
@@ -174,6 +182,7 @@ class AnalysisPipeline:
             AgentUrls.from_settings(settings),
             timeout=settings.request_timeout_seconds,
             report_timeout=settings.explanation_timeout_seconds,
+            question_timeout=settings.question_timeout_seconds,
         )
 
     # --- analysis chain -------------------------------------------------------------------
@@ -268,6 +277,27 @@ class AnalysisPipeline:
         if document.business_id != business_id:
             raise AgentCallError(Stage.POLICY_UPLOAD, ErrorKind.BAD_RESPONSE)
         return document
+
+    def answer_question(self, *, request_id: str, business_id: str, analysis: AnalysisResponse,
+                        question: str) -> QuestionAnswerResponse:
+        """Ask Agent 4 one question about a saved analysis. Raises `AgentCallError`.
+
+        Only the analysis's own assessments (with their clauses) are sent: the
+        answer may not use anything the analysis did not find.
+        """
+        body = QuestionRequest(
+            request_id=request_id,
+            business_id=business_id,
+            business_type=analysis.risk_profile.business_type,
+            question=question,
+            assessments=analysis.coverage.assessments,
+        )
+        answer = self._client.post_json(
+            Stage.QUESTION, f"{self._urls.explanation}/api/v1/answer-question", body.model_dump(mode="json"),
+            request_id=request_id, timeout=self._question_timeout, response_model=QuestionAnswerResponse,
+        )
+        _check_echo(Stage.QUESTION, answer.request_id, request_id)
+        return answer
 
     def check_agents(self, timeout: float = 3.0) -> Dict[str, str]:
         """`up` / `down` per agent from its `/health` endpoint."""

@@ -11,6 +11,7 @@ Run: `uvicorn agents.explanation_agent.main:app --port 8004 --reload`
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | `POST` | `/api/v1/generate-report` | `X-API-Key` | Build the report |
+| `POST` | `/api/v1/answer-question` | `X-API-Key` | Answer one question about a saved analysis (see [Questions](#questions---post-apiv1answer-question)) |
 | `GET` | `/health` | none | `{"status": "healthy", "agent": "explanation-recommendation"}` |
 
 ### Request - `ExplanationRequest` (`shared/schemas/requests.py`)
@@ -231,6 +232,77 @@ Pass the same `request_id` to every agent so one run can be traced through the l
 `tests/integration/test_agent3_to_agent4.py` runs this chain end to end.
 `services/orchestration/pipeline.py` does exactly this; see the gateway section below.
 
+### Questions - `POST /api/v1/answer-question`
+
+Answers one question from the business owner about **one saved analysis**, using only what
+that analysis contains: Agent 3's assessments and the clauses behind them. Nothing is retrieved
+again. Code: `agents/explanation_agent/qa.py` (choosing the context, no LLM) and `qa_answer.py`
+(prompt `prompts/qa_v1.txt`, validation, rule-based answer).
+
+**Request - `QuestionRequest`**
+
+```json
+{
+  "request_id": "a1b2c3",
+  "business_id": "B-3f2a9c81b0d4e5f6",
+  "business_type": "bakery",
+  "question": "If someone steals my stock, am I covered?",
+  "assessments": [ { "risk_id": "PROP_THEFT", "status": "conditional", "evidence": [ "..." ], "...": "CoverageAssessment" } ]
+}
+```
+
+- `question`: 3-500 characters, must contain words; all whitespace (including line breaks) is
+  collapsed to single spaces, so a question cannot add its own lines or blocks to the prompt.
+- `assessments`: 0-50, unique `risk_id`. The business name is not accepted.
+
+**Response 200 - `QuestionAnswerResponse`**
+
+```json
+{
+  "schema_version": "1.0",
+  "request_id": "a1b2c3",
+  "answerable": true,
+  "answer": "Theft cover applies only after forcible and violent entry (Section 3, page 7). ...",
+  "citations": [ { "chunk_id": "P001-p7-c2", "policy_id": "P001", "section": "Section 3 - Burglary", "page": 7, "excerpt": "...", "flagged": false } ],
+  "related_risk_ids": ["PROP_THEFT"],
+  "generated_by": "llm",
+  "disclaimer": "This answer only uses this analysis and the policy wording it found. ...",
+  "metadata": { "llm_used": true, "llm_provider": "gemini", "llm_model": "gemini-3.5-flash", "processing_ms": 6531 }
+}
+```
+
+| Field | Notes |
+|---|---|
+| `answerable` | `false`: the analysis does not answer the question, and `answer` says so. Then `citations` is always empty |
+| `answer` | Plain text, at most 1200 characters. Rule-based answers are a heading line followed by `- ` list lines - keep the line breaks when rendering |
+| `citations` | 0-6 clauses the answer is based on, unique, only clauses that were shown to the LLM |
+| `related_risk_ids` | Risks of this analysis the answer is about, best match first |
+| `generated_by` | `llm`, or `template` for the rule-based answer |
+| `metadata.llm_provider` / `llm_model` | Set when the LLM was **tried**; `llm_used` says whether its answer was kept |
+
+How an answer is made:
+
+1. The question is sanitised and scanned for prompt injection. A suspicious question, or an
+   analysis with no risks, gets a fixed answer and never reaches the LLM.
+2. Clauses are pooled from all assessments (flagged ones withheld everywhere) and ranked against
+   the question by keyword overlap (IDF-weighted, everyday words such as "oven" mapped to risk
+   words such as "equipment"). At most 6 are shown. A one-line overview of every risk and its
+   status is always included.
+3. The LLM answers in JSON. The answer is rejected if its shape is wrong (V1), it names a risk
+   that is not in the analysis (V2), cites a clause it was not shown (V3), uses a blocked phrase
+   (V5), claims cover for a risk that is not `covered` / `conditional` (V6), echoes injected
+   instructions (V7), contains markup or links (V8), or is empty or over 130 words (V9).
+4. If the LLM is off, fails, is rate-limited or its answer is rejected, a rule-based answer is
+   returned: the related risks with the plain meaning of their status and their best clause, a
+   glossary definition for "what does X mean?", or "This analysis does not seem to answer that".
+
+**Errors:** 401 (API key), 422 (`ErrorResponse`, the question is never echoed), 500
+`{"detail": "The question could not be answered."}`. An LLM failure is not an error.
+
+**Configuration:** `QA_LLM_TIMEOUT_SECONDS` (default `60`) limits one Ollama call. Gemini calls
+use `LLM_TIMEOUT_SECONDS` and `LLM_MAX_RETRIES`. `EXPLANATION_USE_LLM=false` gives rule-based
+answers only.
+
 ## Orchestration Gateway (port 8000)
 
 The only API the frontend calls. It logs users in, forwards policy uploads to Agent 2, runs
@@ -251,6 +323,7 @@ Run: `uvicorn services.orchestration.api:app --port 8000 --reload`
 | `POST` | `/api/v1/analyses` | Bearer | `AnalysisRequest` → runs the four agents → `AnalysisResponse` |
 | `GET` | `/api/v1/analyses` | Bearer | The user's past runs (`AnalysisSummary[]`, newest first, max 50) |
 | `GET` | `/api/v1/analyses/{request_id}` | Bearer | One stored `AnalysisResponse`; 404 if missing or another user's |
+| `POST` | `/api/v1/analyses/{request_id}/questions` | Bearer | `{"question": "..."}` → Agent 4 → `QuestionAnswerResponse`; 404 if missing or another user's |
 
 "Bearer" means the header `Authorization: Bearer <access_token>`. The token expires after
 `JWT_EXPIRY_MINUTES`; then log in again.
@@ -267,7 +340,13 @@ Run: `uvicorn services.orchestration.api:app --port 8000 --reload`
   one business's policies away from another's.
 - An analysis may only use the user's own `policy_ids`; otherwise it returns 404 and no agent is
   called.
-- The gateway creates a new `request_id` for every upload and analysis. It is sent to every agent
+- Questions: the body is only `{"question": "..."}` (3-500 characters). The gateway loads the
+  analysis with the same ownership check as `GET /analyses/{request_id}` and sends Agent 4 only
+  the business type, the question and that analysis's assessments. Each user may ask 10
+  questions per minute (429 `too_many_questions` with `Retry-After`); questions about an
+  analysis the user does not own are not counted. Questions and answers are not stored, and the
+  question text is never logged.
+- The gateway creates a new `request_id` for every upload, analysis and question. It is sent to every agent
   as the `X-Request-ID` header, and in the body to Agents 1, 3 and 4 (Agent 2's schema has no
   such field). It comes back in the response's `X-Request-ID` header and in the body.
 
@@ -304,7 +383,7 @@ report has no findings.
 | 401 | No, invalid or expired token; wrong email or password | `{"detail": ...}` |
 | 404 | A `policy_id` or `request_id` that is not the user's | `GatewayError` |
 | 409 | Email already registered | `GatewayError` |
-| 429 | 5 failed logins for one email within 15 minutes (`too_many_attempts`, with `Retry-After` seconds) | `GatewayError` |
+| 429 | 5 failed logins for one email within 15 minutes (`too_many_attempts`), or more than 10 questions in a minute (`too_many_questions`); both with `Retry-After` seconds | `GatewayError` |
 | 413 | Upload over `MAX_UPLOAD_MB` (checked before Agent 2 is called) | `GatewayError` |
 | 400 | Agent 2 says the file is not a valid PDF | `GatewayError` |
 | 422 | Invalid body | `ErrorResponse`, without the input values |
@@ -313,7 +392,7 @@ report has no findings.
 | 504 | An agent timed out | `GatewayError` |
 
 `GatewayError`: `{"error": "agent_timeout", "message": "...", "stage": "coverage", "request_id": "..."}`.
-`stage` is `risk_profile`, `policy_evidence`, `coverage`, `report` or `policy_upload`. Agent
+`stage` is `risk_profile`, `policy_evidence`, `coverage`, `report`, `policy_upload` or `question`. Agent
 error bodies are never passed on, because they can contain policy text or the caller's input.
 An Agent 4 failure is **not** an error: the run returns 200 with `status: "partial"`.
 
@@ -332,6 +411,7 @@ the run is still returned, with a warning that it was not saved.
 | `RISK_AGENT_URL` … `EXPLANATION_AGENT_URL` | `http://127.0.0.1:8001` … `8004` | Agent base URLs |
 | `REQUEST_TIMEOUT_SECONDS` | `60` | Per-call timeout for Agents 1-3 and uploads |
 | `EXPLANATION_TIMEOUT_SECONDS` | `600` | Agent 4 (a local model can take minutes; Agent 4 stops using the LLM after `EXPLANATION_LLM_BUDGET_SECONDS`, so it answers in time) |
+| `QUESTION_TIMEOUT_SECONDS` | `150` | Agent 4 for one question; longer than Gemini's retries, so Agent 4 can still fall back to the rule-based answer |
 | `INTERNAL_API_KEY` | - | Sent as `X-API-Key` to every agent; must match theirs |
 | `JWT_SECRET_KEY` | - | Signs login tokens; at least 32 characters, or login returns 503 |
 | `JWT_EXPIRY_MINUTES` | `60` | Token lifetime |
@@ -344,5 +424,5 @@ the run is still returned, with a warning that it was not saved.
   and `not_found`. The pipeline passes Agent 3's decisions through unchanged either way.
 - Agent 2 does not log the `X-Request-ID` header yet, so its log lines cannot be matched to a run.
 - Registration says when an email is already taken (409), which reveals that the account exists.
-- The failed-login count is per gateway process; running several gateway processes would need a
-  shared store.
+- The failed-login and question counts are per gateway process; running several gateway
+  processes would need a shared store.

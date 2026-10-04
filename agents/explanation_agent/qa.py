@@ -44,7 +44,7 @@ RISK_MATCH_WEIGHT = 0.5
 _WORD = re.compile(r"[a-z0-9]+")
 
 # Words that say nothing about *which* risk or clause is meant. Insurance words like
-# "cover" are here too: almost every clause and question uses them.
+# "cover", "damage" and "loss" are here too: almost every clause and question uses them.
 _STOPWORDS = frozenset(
     """a about after again all also am an and any are as at be been before being but by can
     could did do does doing for from had has have how i if in into is it its just me might
@@ -52,7 +52,8 @@ _STOPWORDS = frozenset(
     the their them then there these they this those through to too under until up very was we
     were what when where which while who whom why will with would you your yours
     cover covered covers coverage insur insurance insured insurer polic policy policies
-    claim claims risk risks business shop happen happens get got pay paid""".split()
+    claim claims risk risks business shop happen happens get got pay paid
+    damage damages damaged loss losses lose lost say says said mean means meaning""".split()
 )
 
 # Everyday words people ask with -> words used in risk names and policy wording.

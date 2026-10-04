@@ -27,7 +27,7 @@ from pathlib import Path
 from string import Template
 from typing import List, Optional, Set
 
-from agents.explanation_agent.context import make_excerpt
+from agents.explanation_agent.context import find_glossary_terms, load_glossary, make_excerpt
 from agents.explanation_agent.llm import ExplanationLLMError, TextGenerator, generate_json
 from agents.explanation_agent.qa import (
     QuestionContext,
@@ -98,6 +98,7 @@ NO_RISKS_ANSWER = (
     "business profile and run a new analysis."
 )
 FALLBACK_INTRO = "Here is what this analysis found for the risks your question seems to be about:"
+GLOSSARY_INTRO = "In insurance wording:"
 NOT_IN_ANALYSIS = (
     "This analysis does not seem to answer that. It looked at: {risks}. For anything else, "
     "check your policy document or ask your insurer or broker."
@@ -189,6 +190,11 @@ def fallback_answer(context: QuestionContext) -> tuple:
         return False, NO_RISKS_ANSWER, [], []
 
     related = related_assessments(context)[:FALLBACK_MAX_RISKS]
+    # "What does indemnify mean?": the glossary answers it even when no risk matches.
+    terms = find_glossary_terms([context.question], load_glossary()) if not related else []
+    if terms:
+        lines = [GLOSSARY_INTRO, *(f"- {t['term']}: {t['definition']}" for t in terms[:FALLBACK_MAX_RISKS])]
+        return True, "\n".join(lines), [], []
     if not related:
         names = ", ".join(a.risk_name for a in context.assessments)
         answer = NOT_IN_ANALYSIS.format(risks=names)

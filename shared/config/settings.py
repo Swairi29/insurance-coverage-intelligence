@@ -83,6 +83,10 @@ class Settings(BaseSettings):
     # local model on CPU can take minutes to write a large report.
     request_timeout_seconds: float = Field(default=60.0, gt=0)
     explanation_timeout_seconds: float = Field(default=600.0, gt=0)
+    # Gateway -> Agent 4 for one question. Longer than one answer can take
+    # (Gemini: LLM_TIMEOUT_SECONDS x (LLM_MAX_RETRIES + 1) plus pauses; Ollama:
+    # QA_LLM_TIMEOUT_SECONDS), so Agent 4 can still fall back to the rule-based answer.
+    question_timeout_seconds: float = Field(default=150.0, gt=0)
     # SQLite file for users, uploaded policies and analysis runs.
     database_path: str = "./data/app.db"
 

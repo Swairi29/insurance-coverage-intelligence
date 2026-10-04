@@ -168,3 +168,9 @@ def test_related_assessments_in_ranked_order():
 @pytest.mark.parametrize("question", ["What does indemnify mean?", "What is an indemnity?"])
 def test_glossary_terms_from_the_question(question):
     assert "indemnify" in [term["term"] for term in glossary_for(_context(question))]
+
+
+def test_generic_words_do_not_relate_other_risks():
+    # "damage" is in almost every clause; it must not pull in the fire risk (live check, Q6).
+    context = _context("What does the policy say about flood damage?", "injection.json")
+    assert context.related_risk_ids == ["PROP_WEATHER"]

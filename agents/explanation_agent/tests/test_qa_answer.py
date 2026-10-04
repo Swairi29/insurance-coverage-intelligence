@@ -265,3 +265,10 @@ def test_rules_answers_pass_the_same_safety_checks():
         data = {"answerable": response.answerable, "answer": response.answer,
                 "cited_chunk_ids": [c.chunk_id for c in response.citations], "risk_ids": response.related_risk_ids}
         assert validate_answer(data, _context(question)).ok, question
+
+
+def test_rules_answer_what_a_term_means_from_the_glossary():
+    response = _rules("What does indemnify mean?")
+    assert response.answerable is True
+    assert response.answer.startswith("In insurance wording:\n- indemnify: To pay you back")
+    assert response.citations == []

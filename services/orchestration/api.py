@@ -31,17 +31,19 @@ from fastapi.responses import JSONResponse
 from services.orchestration.auth import (
     AuthConfigError,
     LoginLimiter,
+    QuestionLimiter,
     authenticate,
     create_access_token,
     get_current_user,
     get_login_limiter,
+    get_question_limiter,
     register_user,
 )
 from services.orchestration.database import Database, DuplicateEmailError, UserRecord, get_database
 from services.orchestration.pipeline import AgentCallError, AnalysisPipeline, ErrorKind, PipelineResult
 from shared.config.settings import get_settings
 from shared.models.policy import PolicyDocument
-from shared.schemas.requests import AnalysisRequest, LoginRequest, RegisterRequest
+from shared.schemas.requests import AnalysisRequest, AskQuestionRequest, LoginRequest, RegisterRequest
 from shared.schemas.responses import (
     AnalysisResponse,
     AnalysisStatus,
@@ -49,6 +51,7 @@ from shared.schemas.responses import (
     ErrorResponse,
     GatewayError,
     PolicyUploadResponse,
+    QuestionAnswerResponse,
     TokenResponse,
     UserResponse,
 )
@@ -283,9 +286,8 @@ def list_analyses(user: UserRecord = Depends(get_current_user), db: Database = D
     return db.list_analyses(user.user_id)
 
 
-@app.get("/api/v1/analyses/{request_id}", response_model=AnalysisResponse)
-def get_analysis(request_id: str, user: UserRecord = Depends(get_current_user),
-                 db: Database = Depends(get_database)):
+def _load_analysis(db: Database, user: UserRecord, request_id: str) -> AnalysisResponse | JSONResponse:
+    """One of the user's saved analyses, or the error response to return instead."""
     encrypted = db.get_analysis(user_id=user.user_id, request_id=request_id)
     if encrypted is None:  # also when it belongs to someone else
         return _error(404, "analysis_not_found", "Analysis not found.")
@@ -294,3 +296,48 @@ def get_analysis(request_id: str, user: UserRecord = Depends(get_current_user),
     except SecurityConfigError:
         logger.error("Stored analysis could not be decrypted (request %s).", request_id)
         return _error(500, "analysis_unreadable", "The stored analysis could not be read.")
+
+
+@app.get("/api/v1/analyses/{request_id}", response_model=AnalysisResponse)
+def get_analysis(request_id: str, user: UserRecord = Depends(get_current_user),
+                 db: Database = Depends(get_database)):
+    return _load_analysis(db, user, request_id)
+
+
+@app.post("/api/v1/analyses/{request_id}/questions", response_model=QuestionAnswerResponse)
+def ask_question(
+    request_id: str,
+    body: AskQuestionRequest,
+    response: Response,
+    user: UserRecord = Depends(get_current_user),
+    db: Database = Depends(get_database),
+    pipeline: AnalysisPipeline = Depends(get_pipeline),
+    limiter: QuestionLimiter = Depends(get_question_limiter),
+):
+    """Answer one question from this saved analysis only. Nothing is stored."""
+    question_id = _new_request_id()
+    wait = limiter.retry_after(user.user_id)
+    if wait:
+        limited = _error(429, "too_many_questions",
+                         f"Too many questions in a short time. Please wait {wait} seconds.",
+                         request_id=question_id)
+        limited.headers["Retry-After"] = str(wait)
+        return limited
+
+    analysis = _load_analysis(db, user, request_id)
+    if isinstance(analysis, JSONResponse):
+        return analysis
+
+    # Counted once the analysis is found: only real questions use up the limit.
+    limiter.record(user.user_id)
+    # The question text is never logged.
+    logger.info("Question about analysis %s (request %s).", request_id, question_id)
+    try:
+        answer = pipeline.answer_question(request_id=question_id, business_id=user.business_id,
+                                          analysis=analysis, question=body.question)
+    except AgentCallError as exc:
+        logger.warning("Question failed at %s (%s) (request %s).", exc.stage.value, exc.kind.value, question_id)
+        return _agent_error(exc, question_id)
+
+    response.headers["X-Request-ID"] = question_id
+    return answer
