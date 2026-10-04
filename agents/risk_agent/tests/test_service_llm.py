@@ -176,7 +176,7 @@ def test_unexpected_programming_errors_are_not_hidden(bakery):
     assert result.llm_used is False
 
 def test_rule_warnings_are_kept_next_to_llm_warnings():
-    odd = BusinessProfile.model_construct(business_name="X", business_type="pharmacy", equipment=["freezer"])
+    odd = BusinessProfile.model_construct(business_name="X", business_type="spaceport", equipment=["freezer"])
     result = service_with(FakeClient(error=LLMTimeoutError("t"))).identify(odd)
     assert [w.code for w in result.warnings] == [
         WarningCode.UNSUPPORTED_BUSINESS_TYPE, WarningCode.LLM_UNAVAILABLE,
@@ -184,7 +184,7 @@ def test_rule_warnings_are_kept_next_to_llm_warnings():
 
 
 def test_unknown_business_type_only_accepts_general_risks_from_the_llm():
-    odd = BusinessProfile.model_construct(business_name="X", business_type="pharmacy")
+    odd = BusinessProfile.model_construct(business_name="X", business_type="spaceport")
     client = FakeClient(llm_answer(
         suggestion("FIRE_COOKING", "Cooking equipment is used on site."),      # not a general risk
         suggestion("EMP_INJURY", "Staff may be hurt while lifting stock."),    # general risk

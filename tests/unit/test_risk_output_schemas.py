@@ -145,7 +145,7 @@ def test_response_rejects_unknown_status_and_business_type():
     with pytest.raises(ValidationError):
         response(status="done")
     with pytest.raises(ValidationError):
-        response(business_type="pharmacy")
+        response(business_type="spaceport")
 
 
 def test_metadata_and_warning_validation():
@@ -171,7 +171,7 @@ def validation_errors(payload):
 @pytest.mark.security
 def test_error_response_lists_field_paths_and_messages():
     errors = validation_errors({
-        "business": {"business_name": "Sunrise Bakery", "business_type": "pharmacy",
+        "business": {"business_name": "Sunrise Bakery", "business_type": "spaceport",
                      "employee_count": -3},
     })
     body = ErrorResponse.from_validation_errors(errors)

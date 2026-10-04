@@ -12,6 +12,7 @@ import { SESSION_KEYS, readSession, removeSession, writeSession } from './sessio
 /** Limits from shared/models/business.py. */
 export const PROFILE_LIMITS = {
   nameLength: 100,
+  typeDetailLength: 60,
   descriptionLength: 2000,
   placeLength: 80,
   maxEmployees: 250,
@@ -22,8 +23,37 @@ export const PROFILE_LIMITS = {
 export const BUSINESS_TYPE_LABELS: Record<BusinessType, string> = {
   bakery: 'Bakery',
   restaurant: 'Restaurant',
-  retail_shop: 'Retail shop',
+  cafe: 'Café',
+  retail_shop: 'General retail shop',
+  grocery_store: 'Grocery store / supermarket',
+  pharmacy: 'Pharmacy',
+  clothing_store: 'Clothing store',
+  hardware_store: 'Hardware store',
+  salon: 'Salon / barber',
+  repair_workshop: 'Repair workshop / garage',
+  professional_services: 'Office / professional services',
+  other: 'Other (describe it)',
 };
+
+/** The business-type dropdown, grouped like shared/models/business.py. */
+export const BUSINESS_TYPE_GROUPS: { label: string; types: BusinessType[] }[] = [
+  { label: 'Food and drink', types: ['bakery', 'restaurant', 'cafe'] },
+  {
+    label: 'Shops',
+    types: ['retail_shop', 'grocery_store', 'pharmacy', 'clothing_store', 'hardware_store'],
+  },
+  { label: 'Services', types: ['salon', 'repair_workshop', 'professional_services'] },
+  { label: 'Something else', types: ['other'] },
+];
+
+/** How a business type is shown on results: "Other" shows what the owner typed. */
+export function businessTypeLabel(profile: {
+  business_type: BusinessType;
+  business_type_detail?: string | null;
+}): string {
+  if (profile.business_type === 'other') return profile.business_type_detail || 'Other';
+  return BUSINESS_TYPE_LABELS[profile.business_type].replace(' (describe it)', '');
+}
 
 export const SALES_CHANNEL_LABELS: Record<SalesChannel, string> = {
   in_store: 'In store',
@@ -51,6 +81,7 @@ export type YesNoField = (typeof YES_NO_QUESTIONS)[number]['name'];
 export interface ProfileFormValues {
   business_name: string;
   business_type: BusinessType | '';
+  business_type_detail: string;
   description: string;
   employee_count: string;
   equipment: string[];
@@ -61,6 +92,7 @@ export interface ProfileFormValues {
 export const EMPTY_PROFILE_FORM: ProfileFormValues = {
   business_name: '',
   business_type: '',
+  business_type_detail: '',
   description: '',
   employee_count: '',
   equipment: [],
@@ -89,6 +121,10 @@ export function toBusinessProfile(form: ProfileFormValues): BusinessProfile {
   return {
     business_name: form.business_name.trim(),
     business_type: form.business_type,
+    // Only "other" sends it; for a listed type it would be stale text from an earlier choice.
+    ...(form.business_type === 'other'
+      ? { business_type_detail: textOrNull(form.business_type_detail) }
+      : {}),
     description: textOrNull(form.description),
     employee_count: employees === '' ? null : Number(employees),
     equipment: form.equipment,
@@ -115,6 +151,7 @@ export function toFormValues(profile: BusinessProfile): ProfileFormValues {
   return {
     business_name: profile.business_name,
     business_type: profile.business_type,
+    business_type_detail: profile.business_type_detail ?? '',
     description: profile.description ?? '',
     employee_count: profile.employee_count == null ? '' : String(profile.employee_count),
     equipment: profile.equipment ?? [],
@@ -161,6 +198,7 @@ export function saveProfileDraft(profile: BusinessProfile): void {
 export const PROFILE_ERROR_FIELDS = [
   'business_name',
   'business_type',
+  'business_type_detail',
   'description',
   'employee_count',
   'equipment',

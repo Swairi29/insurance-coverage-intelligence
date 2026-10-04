@@ -20,7 +20,7 @@ Run: `uvicorn agents.explanation_agent.main:app --port 8004 --reload`
 |---|---|---|
 | `request_id` | string, optional | Letters, digits, `-`, `_`; max 64. Generated if missing or `null`. |
 | `business_id` | string | Required, max 64. |
-| `business_type` | `bakery` \| `restaurant` \| `retail_shop` \| `null` | The business **name** is deliberately not sent. |
+| `business_type` | `bakery` \| `restaurant` \| `cafe` \| `retail_shop` \| `grocery_store` \| `pharmacy` \| `clothing_store` \| `hardware_store` \| `salon` \| `repair_workshop` \| `professional_services` \| `other` \| `null` | The business **name** is deliberately not sent. |
 | `risks` | `IdentifiedRisk[]` | From Agent 1, max 50, unique `risk_id`. |
 | `assessments` | `CoverageAssessment[]` | From Agent 3, max 50, unique `risk_id`. |
 
@@ -320,9 +320,10 @@ Run: `uvicorn services.orchestration.api:app --port 8000 --reload`
 | `GET` | `/api/v1/auth/me` | Bearer | `UserResponse` (`user_id`, `email`, `business_id`, `created_at`) |
 | `GET` | `/api/v1/policies` | Bearer | The user's uploaded policies, newest first |
 | `POST` | `/api/v1/policies` | Bearer | Multipart `file` (PDF) → Agent 2 → `PolicyUploadResponse` |
-| `POST` | `/api/v1/analyses` | Bearer | `AnalysisRequest` → runs the four agents → `AnalysisResponse` |
+| `POST` | `/api/v1/analyses` | Bearer | `AnalysisRequest` → **202** `AnalysisProgress`; the four agents then run in the background |
+| `GET` | `/api/v1/analyses/{request_id}/status` | Bearer | `AnalysisProgress`: which agent is running, what each was sent and returned (counts only); 404 if missing or another user's |
 | `GET` | `/api/v1/analyses` | Bearer | The user's past runs (`AnalysisSummary[]`, newest first, max 50) |
-| `GET` | `/api/v1/analyses/{request_id}` | Bearer | One stored `AnalysisResponse`; 404 if missing or another user's |
+| `GET` | `/api/v1/analyses/{request_id}` | Bearer | One stored `AnalysisResponse`; 409 `analysis_running` while it runs; 404 if missing, failed or another user's |
 | `POST` | `/api/v1/analyses/{request_id}/questions` | Bearer | `{"question": "..."}` → Agent 4 → `QuestionAnswerResponse`; 404 if missing or another user's |
 
 "Bearer" means the header `Authorization: Bearer <access_token>`. The token expires after
@@ -361,6 +362,27 @@ Run: `uvicorn services.orchestration.api:app --port 8000 --reload`
 
 `policy_ids`: 1-5, unique. `business_id` and `request_id` are rejected (422).
 
+### Running an analysis: 202, then status
+
+`POST /api/v1/analyses` checks the body and the policy ownership, then answers **202** at once
+with an `AnalysisProgress` (every stage `queued`), an `X-Request-ID` header and a `Location`
+header pointing at the status endpoint. The pipeline runs in a background task. The frontend
+polls `GET /api/v1/analyses/{request_id}/status` every 1.5 s until `state` is no longer
+`running`, then fetches the result. `scripts/gateway_client.py` does the same for the scripts.
+
+`AnalysisProgress` (`shared/schemas/responses.py`):
+
+| Field | Notes |
+|---|---|
+| `state` | `running`, `complete`, `partial` (no written report) or `failed` |
+| `stages[]` | One per agent call, in order: `stage`, `agent` ("Risk Profiling Agent"), `endpoint` ("POST /api/v1/risk-profile"), `state` (`queued` / `running` / `done` / `failed` / `skipped`), `sent` ("14 risks, 2 policies"), `received` ("22 clauses found", or the failure reason), `started_at`, `finished_at`, `duration_ms` |
+| `error` | `GatewayError` when `state` is `failed` (same codes as before, e.g. `agent_timeout` at `coverage`) |
+
+The gateway is the hub: it calls each agent in turn and passes the result on; agents never call
+each other, so every stage is one gateway → agent call. `sent` and `received` are counts only,
+never business or policy content. Running jobs are kept in memory per gateway process; after a
+restart the status of a saved analysis is rebuilt from its stored result.
+
 ### `AnalysisResponse` (`shared/schemas/responses.py`)
 
 | Field | Notes |
@@ -387,9 +409,13 @@ report has no findings.
 | 413 | Upload over `MAX_UPLOAD_MB` (checked before Agent 2 is called) | `GatewayError` |
 | 400 | Agent 2 says the file is not a valid PDF | `GatewayError` |
 | 422 | Invalid body | `ErrorResponse`, without the input values |
-| 502 | An agent refused the call (4xx), failed (5xx) or broke the contract | `GatewayError` |
-| 503 | An agent could not be reached, or login is not configured (`JWT_SECRET_KEY`) | `GatewayError` |
-| 504 | An agent timed out | `GatewayError` |
+| 409 | The result of an analysis that is still running (`analysis_running`) | `GatewayError` |
+| 502 | An agent refused the call (4xx), failed (5xx) or broke the contract (uploads and questions) | `GatewayError` |
+| 503 | An agent could not be reached (uploads and questions), or login is not configured (`JWT_SECRET_KEY`) | `GatewayError` |
+| 504 | An agent timed out (uploads and questions) | `GatewayError` |
+
+An analysis that fails in the background is reported by the status endpoint (`state: "failed"`
+with its `GatewayError`), not by an HTTP error, because the 202 has already been sent.
 
 `GatewayError`: `{"error": "agent_timeout", "message": "...", "stage": "coverage", "request_id": "..."}`.
 `stage` is `risk_profile`, `policy_evidence`, `coverage`, `report`, `policy_upload` or `question`. Agent

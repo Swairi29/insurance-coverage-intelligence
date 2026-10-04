@@ -293,3 +293,47 @@ class GatewayError(BaseModel):
     message: str
     stage: Optional[str] = None
     request_id: Optional[str] = None
+
+
+# --- Analysis progress (gateway, while the agents run) ---
+
+
+class StageState(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class StageProgress(BaseModel):
+    """One agent call made by the gateway. Summaries are counts only, never content."""
+
+    stage: str  # "risk_profile" | "policy_evidence" | "coverage" | "report"
+    agent: str  # e.g. "Risk Profiling Agent"
+    endpoint: str  # e.g. "POST /api/v1/risk-profile"
+    state: StageState = StageState.QUEUED
+    sent: Optional[str] = None  # what the gateway sent, e.g. "business profile"
+    received: Optional[str] = None  # what came back, e.g. "14 risks identified"
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    duration_ms: Optional[int] = Field(default=None, ge=0)
+
+
+class RunState(str, Enum):
+    RUNNING = "running"
+    COMPLETE = "complete"
+    PARTIAL = "partial"  # finished without the written report
+    FAILED = "failed"
+
+
+class AnalysisProgress(BaseModel):
+    """Body of `POST /api/v1/analyses` (202) and `GET /api/v1/analyses/{id}/status`."""
+
+    schema_version: str = SCHEMA_VERSION
+    request_id: str
+    state: RunState
+    created_at: datetime
+    updated_at: datetime
+    stages: List[StageProgress]
+    error: Optional[GatewayError] = None  # set when state is "failed"

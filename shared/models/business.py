@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_vali
 MAX_NAME_LENGTH = 100
 MAX_DESCRIPTION_LENGTH = 2000
 MAX_PLACE_LENGTH = 80
+MAX_TYPE_DETAIL_LENGTH = 60
 MAX_EMPLOYEES = 250  # upper bound for an SME
 MAX_EQUIPMENT_ITEMS = 50
 MAX_EQUIPMENT_ITEM_LENGTH = 60
@@ -53,11 +54,24 @@ class _InputModel(BaseModel):
 
 
 class BusinessType(str, Enum):
-    """Business types the Risk Profiling Agent currently supports."""
+    """The main kinds of small business. `OTHER` is for anything else; the owner then
+    names it in `business_type_detail`, and only general risks are assumed for it."""
 
+    # Food and drink
     BAKERY = "bakery"
     RESTAURANT = "restaurant"
+    CAFE = "cafe"
+    # Shops
     RETAIL_SHOP = "retail_shop"
+    GROCERY_STORE = "grocery_store"
+    PHARMACY = "pharmacy"
+    CLOTHING_STORE = "clothing_store"
+    HARDWARE_STORE = "hardware_store"
+    # Services
+    SALON = "salon"
+    REPAIR_WORKSHOP = "repair_workshop"
+    PROFESSIONAL_SERVICES = "professional_services"
+    OTHER = "other"
 
 
 # Friendly spellings that map onto a supported type (after normalisation).
@@ -66,6 +80,19 @@ _BUSINESS_TYPE_ALIASES = {
     "retail_store": "retail_shop",
     "shop": "retail_shop",
     "small_retail_shop": "retail_shop",
+    "coffee_shop": "cafe",
+    "grocery": "grocery_store",
+    "supermarket": "grocery_store",
+    "chemist": "pharmacy",
+    "clothing": "clothing_store",
+    "boutique": "clothing_store",
+    "hardware": "hardware_store",
+    "beauty_salon": "salon",
+    "hair_salon": "salon",
+    "barber": "salon",
+    "garage": "repair_workshop",
+    "workshop": "repair_workshop",
+    "office": "professional_services",
 }
 
 
@@ -126,6 +153,8 @@ class BusinessProfile(_InputModel):
 
     business_name: str = Field(min_length=1, max_length=MAX_NAME_LENGTH)
     business_type: BusinessType
+    # What the business is when `business_type` is "other", e.g. "printing shop".
+    business_type_detail: Optional[str] = Field(default=None, max_length=MAX_TYPE_DETAIL_LENGTH)
     description: Optional[str] = Field(default=None, max_length=MAX_DESCRIPTION_LENGTH)
     employee_count: Optional[int] = Field(default=None, ge=0, le=MAX_EMPLOYEES)
     equipment: List[
@@ -146,6 +175,13 @@ class BusinessProfile(_InputModel):
         if isinstance(token, str):
             return _BUSINESS_TYPE_ALIASES.get(token, token)
         return token  # not text: let Pydantic report the error
+
+    @field_validator("business_type_detail", mode="before")
+    @classmethod
+    def _clean_type_detail(cls, value):
+        if isinstance(value, str):
+            return _clean_single_line(value) or None  # blank -> "not provided"
+        return value
 
     @field_validator("description", mode="before")
     @classmethod

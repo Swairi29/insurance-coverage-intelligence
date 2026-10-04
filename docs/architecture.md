@@ -31,7 +31,9 @@ models live in `shared/schemas/` and `shared/models/`, so every hop is validated
    into clauses (with OCR for scanned pages) and indexes them for that business only. The gateway
    records the policy against the user's `business_id`.
 2. **Analyse**: `POST /api/v1/analyses` with a business profile and up to 5 of the user's
-   `policy_ids`. The gateway creates a `request_id` and runs:
+   `policy_ids`. The gateway creates a `request_id`, answers 202 straight away and runs the stages
+   below in a background task, recording each agent call for `GET /api/v1/analyses/{id}/status`
+   (the agent workspace in the frontend). The gateway is the hub: agents never call each other.
 
    | Stage | Agent | Input | Output |
    |---|---|---|---|
@@ -95,10 +97,11 @@ Form, Tailwind). The full plan and the checks done on it are in
   the tab ends it) and checked with `GET /auth/me` on load. Any 401 logs the user out.
 - **Business profile.** The gateway does not store it; the app keeps it in `sessionStorage` and
   sends it with each analysis. A 422 about the profile is shown next to the right form field.
-- **The slow analysis call.** `POST /api/v1/analyses` is one request that can take ~10 minutes with
-  a local LLM. It has no client or proxy timeout and is never retried automatically; the page shows
-  progress, and the gateway saves the result to History even if the page is closed (checked with a
-  570 s request, see the plan's step 6).
+- **The analysis runs in the background.** `POST /api/v1/analyses` answers 202 at once; the
+  agent workspace (`/app/analyses/{id}/progress`) polls the status endpoint and shows each agent's
+  state, what the gateway handed to it and what came back (counts only). The gateway saves the
+  result to History even if the page is closed, and a failed run can be retried from the
+  workspace.
 - **Showing results honestly.** Coverage status comes from Agent 3 and is shown with a colour *and*
   a label. Each finding says whether its text is AI-written or template, the header names the model
   used, confidence is a word (High/Medium/Low) rather than a percentage, the disclaimer is always

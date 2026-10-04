@@ -14,12 +14,13 @@
 //             big.pdf (or > 25 MB)            -> 413 file_too_large
 //             agent-down.pdf                  -> 503 agent_unavailable, stage policy_upload
 //             a name containing "flagged"     -> uploaded with 1 flagged chunk
-//   analysis  business_name "Down Ltd"        -> 503 agent_unavailable, stage risk_profile
-//             business_name "Timeout Ltd"     -> 504 agent_timeout, stage coverage
-//             business_name "Broken Ltd"      -> 502 agent_bad_response, stage policy_evidence
-//             business_name "Partial Ltd"     -> 200, status "partial" (Agent 4 down)
-//             business_name "All Statuses"    -> 200, one finding of every coverage status
-//             business_name containing "Slow" -> takes 20 s instead of 1.5 s
+//   analysis  POST answers 202; GET .../status then walks through the four agents.
+//             business_name "Down Ltd"        -> fails at risk_profile (agent_unavailable)
+//             business_name "Timeout Ltd"     -> fails at coverage (agent_timeout)
+//             business_name "Broken Ltd"      -> fails at policy_evidence (agent_bad_response)
+//             business_name "Partial Ltd"     -> status "partial" (Agent 4 down)
+//             business_name "All Statuses"    -> one finding of every coverage status
+//             business_name containing "Slow" -> each agent takes 6x longer
 //             employee_count > 250            -> 422 with details
 //             an unknown policy id            -> 404 policy_not_found
 
@@ -39,6 +40,7 @@ import type {
 } from '../api/types';
 import { db, newId, sortNewestFirst } from './db';
 import { allStatusesAnalysis, analysisByType, partialAnalysis } from './fixtures';
+import { progressAt, queuedProgress, type MockJob } from './jobs';
 
 // '*' matches any origin: the page's own in the browser, http://localhost:3000 in tests.
 const API = '*/api/v1';
@@ -46,8 +48,9 @@ const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const MAX_FAILED_LOGINS = 5;
 const LOCKOUT_SECONDS = 15 * 60;
 const TOKEN_PREFIX = 'mock-token-';
-const ANALYSIS_DELAY_MS = 1500;
-const SLOW_ANALYSIS_DELAY_MS = 20_000;
+/** Fake time per agent (risk, policy, coverage, report). Zero in tests. */
+const STAGE_MS = [1200, 1500, 1800, 3500];
+const SLOW_FACTOR = 6;
 
 /** Fake server time, so loading states can be seen. Skipped in tests. */
 const wait = (ms: number) => (import.meta.env.MODE === 'test' ? Promise.resolve() : delay(ms));
@@ -109,7 +112,8 @@ function buildAnalysis(business: BusinessProfile, requestId: string): AnalysisRe
       ? partialAnalysis
       : name === 'all statuses'
         ? allStatusesAnalysis
-        : (analysisByType[business.business_type] ?? analysisByType.bakery);
+        : ((analysisByType as Partial<Record<string, AnalysisResponse>>)[business.business_type] ??
+          analysisByType.bakery);
   const analysis = structuredClone(template);
   analysis.request_id = requestId;
   analysis.created_at = new Date().toISOString();
@@ -118,6 +122,49 @@ function buildAnalysis(business: BusinessProfile, requestId: string): AnalysisRe
   analysis.coverage.request_id = requestId;
   if (analysis.report) analysis.report.request_id = requestId;
   return analysis;
+}
+
+/** Store a finished run once, like the gateway does when the pipeline ends. */
+function saveFinished(job: MockJob): void {
+  if (job.saved || !job.result) return;
+  job.saved = true;
+  const analysis = job.result;
+  db.analyses.set(job.requestId, analysis);
+  const counts = analysis.report
+    ? analysis.report.summary
+    : {
+        total_findings: analysis.coverage.assessments.length,
+        potential_gaps: analysis.coverage.assessments.filter((a) => a.potential_gap).length,
+      };
+  db.summaries = sortNewestFirst([
+    {
+      request_id: job.requestId,
+      status: analysis.status,
+      created_at: analysis.created_at,
+      total_findings: counts.total_findings,
+      potential_gaps: counts.potential_gaps,
+    },
+    ...db.summaries,
+  ]);
+}
+
+/** The status of a seeded analysis, rebuilt from its result like the gateway does. */
+function progressFromSaved(analysis: AnalysisResponse) {
+  const start = Date.parse(analysis.created_at);
+  const durations = (['risk_profile', 'policy_evidence', 'coverage', 'report'] as const).map(
+    (stage) => analysis.stage_ms[stage] ?? 0,
+  );
+  const job: MockJob = {
+    requestId: analysis.request_id,
+    startedAt: start - durations.reduce((a, b) => a + b, 0),
+    durations,
+    result: analysis,
+    policyCount: new Set(
+      analysis.coverage.assessments.flatMap((a) => a.evidence.map((e) => e.policy_id)),
+    ).size,
+    saved: true,
+  };
+  return progressAt(job, Date.now());
 }
 
 // --- handlers -------------------------------------------------------------------------------
@@ -274,35 +321,48 @@ export const handlers = [
     }
 
     const name = business.business_name.trim().toLowerCase();
-    await wait(name.includes('slow') ? SLOW_ANALYSIS_DELAY_MS : ANALYSIS_DELAY_MS);
-
     const failure = FAILING_BUSINESSES[name];
-    if (failure) {
-      return gatewayError(failure.status, failure.error, AGENT_MESSAGES[failure.error], {
+    const factor = name.includes('slow') ? SLOW_FACTOR : 1;
+    const job: MockJob = {
+      requestId,
+      startedAt: Date.now(),
+      // Instant in tests, except "Slow" names, which let a test see a run in progress.
+      durations: STAGE_MS.map((ms) =>
+        import.meta.env.MODE === 'test' && factor === 1 ? 0 : ms * factor,
+      ),
+      result: failure ? null : buildAnalysis(business, requestId),
+      policyCount: policyIds.length,
+      failure: failure && {
         stage: failure.stage,
-        request_id: requestId,
-      });
-    }
-
-    const analysis = buildAnalysis(business, requestId);
-    db.analyses.set(requestId, analysis);
-    const counts = analysis.report
-      ? analysis.report.summary
-      : {
-          total_findings: analysis.coverage.assessments.length,
-          potential_gaps: analysis.coverage.assessments.filter((a) => a.potential_gap).length,
-        };
-    db.summaries = sortNewestFirst([
-      {
-        request_id: requestId,
-        status: analysis.status,
-        created_at: analysis.created_at,
-        total_findings: counts.total_findings,
-        potential_gaps: counts.potential_gaps,
+        error: {
+          error: failure.error,
+          message: AGENT_MESSAGES[failure.error],
+          stage: failure.stage,
+          request_id: requestId,
+        },
       },
-      ...db.summaries,
-    ]);
-    return HttpResponse.json(analysis, { headers: { 'X-Request-ID': requestId } });
+      saved: false,
+    };
+    db.jobs.set(requestId, job);
+    return HttpResponse.json(queuedProgress(job), {
+      status: 202,
+      headers: { 'X-Request-ID': requestId },
+    });
+  }),
+
+  http.get(`${API}/analyses/:requestId/status`, ({ request, params }) => {
+    if (!currentUser(request)) return unauthorized();
+    const requestId = String(params.requestId);
+    const job = db.jobs.get(requestId);
+    if (job) {
+      const progress = progressAt(job, Date.now());
+      if (progress.state !== 'running' && progress.state !== 'failed') saveFinished(job);
+      return HttpResponse.json(progress);
+    }
+    const saved = db.analyses.get(requestId);
+    return saved
+      ? HttpResponse.json(progressFromSaved(saved))
+      : gatewayError(404, 'analysis_not_found', 'Analysis not found.');
   }),
 
   http.get(`${API}/analyses`, ({ request }) => {
@@ -312,7 +372,15 @@ export const handlers = [
 
   http.get(`${API}/analyses/:requestId`, ({ request, params }) => {
     if (!currentUser(request)) return unauthorized();
-    const analysis = db.analyses.get(String(params.requestId));
+    const requestId = String(params.requestId);
+    const job = db.jobs.get(requestId);
+    if (job && progressAt(job, Date.now()).state === 'running') {
+      return gatewayError(409, 'analysis_running', 'The analysis is still running.', {
+        request_id: requestId,
+      });
+    }
+    if (job) saveFinished(job);
+    const analysis = db.analyses.get(requestId);
     return analysis
       ? HttpResponse.json(analysis)
       : gatewayError(404, 'analysis_not_found', 'Analysis not found.');

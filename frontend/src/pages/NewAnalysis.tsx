@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { useRunAnalysis } from '../api/analyses';
+import { useStartAnalysis } from '../api/analyses';
 import { isApiError } from '../api/client';
 import { MAX_POLICIES_PER_ANALYSIS, policiesQueryKey, usePolicies } from '../api/policies';
 import type { AnalysisRequest, BusinessProfile, PolicyDocument } from '../api/types';
@@ -9,10 +9,9 @@ import { ErrorMessage } from '../components/ErrorMessage';
 import { DocumentIcon, SparkleIcon } from '../components/icons';
 import { Button } from '../components/ui/Button';
 import { SkeletonList } from '../components/ui/Skeleton';
-import { Spinner } from '../components/ui/Spinner';
 import { formatDateTime, plural } from '../lib/format';
-import { AGENT_STAGES, STAGE_LABELS } from '../lib/labels';
-import { BUSINESS_TYPE_LABELS, SALES_CHANNEL_LABELS, loadProfileDraft } from '../lib/profile';
+import { SESSION_KEYS, writeSession } from '../lib/session';
+import { SALES_CHANNEL_LABELS, businessTypeLabel, loadProfileDraft } from '../lib/profile';
 import type { ProfilePageState } from './BusinessProfile';
 
 export default function NewAnalysis() {
@@ -30,7 +29,7 @@ function NewAnalysisForm({ profile }: { profile: BusinessProfile }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const policies = usePolicies();
-  const run = useRunAnalysis();
+  const run = useStartAnalysis();
   const [selected, setSelected] = useState<string[] | null>(null);
   const [lastRequest, setLastRequest] = useState<AnalysisRequest | null>(null);
 
@@ -47,8 +46,10 @@ function NewAnalysisForm({ profile }: { profile: BusinessProfile }) {
   const start = (body: AnalysisRequest) => {
     if (run.isPending) return; // never start two analyses
     setLastRequest(body);
+    // Kept for the workspace's "Retry analysis" button.
+    writeSession(SESSION_KEYS.lastAnalysis, JSON.stringify(body));
     run.mutate(body, {
-      onSuccess: (analysis) => navigate(`/app/analyses/${analysis.request_id}`),
+      onSuccess: (progress) => navigate(`/app/analyses/${progress.request_id}/progress`),
       onError: (error) => {
         if (!isApiError(error)) return;
         if (error.status === 404) {
@@ -65,8 +66,6 @@ function NewAnalysisForm({ profile }: { profile: BusinessProfile }) {
     });
   };
 
-  if (run.isPending) return <AnalysisProgress />;
-
   return (
     <section className="max-w-4xl">
       <h1 className="text-2xl font-extrabold">New analysis</h1>
@@ -78,7 +77,7 @@ function NewAnalysisForm({ profile }: { profile: BusinessProfile }) {
       {run.isError && (
         <div className="mt-6">
           <ErrorMessage
-            title="The analysis could not finish"
+            title="The analysis could not start"
             error={run.error}
             onRetry={lastRequest ? () => start(lastRequest) : undefined}
           />
@@ -147,6 +146,7 @@ function NewAnalysisForm({ profile }: { profile: BusinessProfile }) {
           variant="ai"
           onClick={() => start({ business: profile, policy_ids: chosen })}
           disabled={chosen.length === 0}
+          loading={run.isPending}
         >
           <SparkleIcon className="h-4 w-4" />
           Run analysis
@@ -154,7 +154,7 @@ function NewAnalysisForm({ profile }: { profile: BusinessProfile }) {
         <p className="text-sm text-muted">
           {chosen.length === 0
             ? 'Choose at least one policy.'
-            : `${plural(chosen.length, 'policy', 'policies')} selected. This can take a few minutes.`}
+            : `${plural(chosen.length, 'policy', 'policies')} selected. You can watch each agent work.`}
         </p>
       </div>
     </section>
@@ -227,7 +227,7 @@ function ProfileSummary({ profile }: { profile: BusinessProfile }) {
   const place = [profile.location?.city, profile.location?.country].filter(Boolean).join(', ');
   const rows: [string, string][] = [
     ['Business', profile.business_name],
-    ['Type', BUSINESS_TYPE_LABELS[profile.business_type]],
+    ['Type', businessTypeLabel(profile)],
     ['Employees', profile.employee_count == null ? 'Not given' : String(profile.employee_count)],
     ['Equipment', profile.equipment?.length ? profile.equipment.join(', ') : 'Not given'],
     [
@@ -247,67 +247,5 @@ function ProfileSummary({ profile }: { profile: BusinessProfile }) {
         </div>
       ))}
     </dl>
-  );
-}
-
-/** Shown while POST /analyses runs (plan §3.4). The API reports no progress, only the end. */
-function AnalysisProgress() {
-  const [seconds, setSeconds] = useState(0);
-  useEffect(() => {
-    const started = Date.now();
-    const timer = window.setInterval(
-      () => setSeconds(Math.floor((Date.now() - started) / 1000)),
-      1000,
-    );
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const minutes = Math.floor(seconds / 60);
-  const elapsed = minutes > 0 ? `${minutes} min ${seconds % 60} s` : `${seconds} s`;
-
-  return (
-    <section
-      aria-labelledby="progress-title"
-      aria-busy="true"
-      className="mx-auto max-w-xl rounded-card border border-line border-t-4 border-t-ai-bright bg-white p-6 text-center sm:p-8"
-    >
-      <Spinner className="mx-auto h-10 w-10" colour="text-ai-bright" />
-      <h1 id="progress-title" className="mt-4 text-2xl font-extrabold">
-        Analysing your coverage…
-      </h1>
-      <p className="mt-2 text-sm text-muted" role="timer" aria-live="off">
-        Elapsed: {elapsed}
-      </p>
-      <div
-        role="progressbar"
-        aria-label="Analysis in progress"
-        className="mx-auto mt-5 h-1.5 w-full overflow-hidden rounded-full bg-ai-tint"
-      >
-        <div className="h-full w-1/3 motion-safe:animate-[progress_1.6s_ease-in-out_infinite] rounded-full bg-ai-bright" />
-      </div>
-
-      <ol className="mx-auto mt-6 max-w-xs space-y-2 text-left text-sm" aria-label="Analysis steps">
-        {AGENT_STAGES.map((stage, index) => (
-          <li key={stage} className="flex items-center gap-3">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ai-tint text-xs font-bold text-ai">
-              {index + 1}
-            </span>
-            <span className="text-ink-heading">{STAGE_LABELS[stage]}</span>
-          </li>
-        ))}
-      </ol>
-
-      <p className="mt-6 text-sm text-muted">
-        The first three steps take seconds. Writing the report can take a few minutes when an AI
-        model writes it.
-      </p>
-      <p className="mt-3 rounded-lg bg-brand-soft px-4 py-3 text-sm text-muted-strong">
-        You can leave this page. The analysis keeps running and is saved to your{' '}
-        <Link to="/app/analyses" className="font-semibold text-brand hover:underline">
-          History
-        </Link>{' '}
-        when it finishes.
-      </p>
-    </section>
   );
 }

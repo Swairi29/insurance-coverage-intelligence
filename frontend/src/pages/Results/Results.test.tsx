@@ -140,41 +140,48 @@ describe('partial result', () => {
 });
 
 describe('coverage tab', () => {
-  it('filters by status and by gaps, and expands a row to show its evidence', async () => {
+  const chip = (name: RegExp) =>
+    within(screen.getByRole('group', { name: 'Filter risks' })).getByRole('button', { name });
+
+  it('filters with chips and opens a risk in the evidence drawer', async () => {
     const { user } = await openResults(allStatusesAnalysis.request_id, '?tab=coverage');
     const table = screen.getByRole('table');
     const bodyRows = () => within(table).getAllByRole('row').slice(1);
 
     expect(bodyRows()).toHaveLength(14);
-    expect(screen.getByText('Showing 14 of 14 risks')).toBeInTheDocument();
+    expect(screen.getByText(/^Showing 14 of 14 risks/)).toBeInTheDocument();
+    expect(chip(/^All/)).toHaveAttribute('aria-pressed', 'true');
 
-    await user.selectOptions(screen.getByLabelText('Status'), 'excluded');
+    await user.click(chip(/^Excluded/));
+    expect(chip(/^Excluded/)).toHaveAttribute('aria-pressed', 'true');
     expect(bodyRows()).toHaveLength(1);
     expect(bodyRows()[0]).toHaveTextContent('Equipment breakdown');
 
-    await user.selectOptions(screen.getByLabelText('Status'), 'all');
-    await user.click(screen.getByLabelText('Potential gaps only'));
-    expect(screen.getByText('Showing 13 of 14 risks')).toBeInTheDocument();
+    await user.click(chip(/^Potential gaps/));
+    expect(screen.getByText(/^Showing 13 of 14 risks/)).toBeInTheDocument();
 
-    const toggle = within(table).getByRole('button', { name: /Equipment breakdown/ });
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await user.click(toggle);
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(within(table).getByText(/Breakdown of ovens, refrigerators/)).toBeInTheDocument();
+    const open = within(table).getByRole('button', { name: 'Equipment breakdown' });
+    await user.click(open);
+    const drawer = screen.getByRole('dialog', { name: 'Equipment breakdown' });
+    expect(within(drawer).getByText(/Breakdown of ovens, refrigerators/)).toBeInTheDocument();
+    // Which agent produced which part of the result.
+    expect(drawer).toHaveTextContent('Policy Intelligence Agent');
+    expect(drawer).toHaveTextContent('Found 1 clause in your policies.');
+    expect(drawer).toHaveTextContent('Decided the status with its coverage rules');
+    expect(within(drawer).getByRole('button', { name: 'Close evidence' })).toHaveFocus();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(open).toHaveFocus();
   });
 
-  it('offers every status in the filter, with counts', async () => {
+  it('offers every status as a chip, with counts', async () => {
     await openResults(allStatusesAnalysis.request_id, '?tab=coverage');
-    const options = within(screen.getByLabelText('Status'))
-      .getAllByRole('option')
-      .map((o) => o.textContent);
-    expect(options).toEqual([
-      'All statuses (14)',
-      ...COVERAGE_STATUSES.map((s) => {
-        const n = allStatusesAnalysis.coverage.assessments.filter((a) => a.status === s).length;
-        return `${STATUS_LABELS[s]} (${n})`;
-      }),
-    ]);
+    for (const status of COVERAGE_STATUSES) {
+      const n = allStatusesAnalysis.coverage.assessments.filter((a) => a.status === status).length;
+      // Name is the label followed by the count, e.g. "Covered2" (not "Covered with conditions").
+      expect(chip(new RegExp(`^${STATUS_LABELS[status]}\\s*${n}$`))).toBeInTheDocument();
+    }
     expect(screen.getAllByText('Rules').length).toBeGreaterThan(0);
   });
 });

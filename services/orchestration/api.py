@@ -24,7 +24,7 @@ from functools import lru_cache
 from typing import List
 
 import httpx
-from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -40,11 +40,13 @@ from services.orchestration.auth import (
     register_user,
 )
 from services.orchestration.database import Database, DuplicateEmailError, UserRecord, get_database
+from services.orchestration.jobs import JobStore, get_job_store, progress_from_analysis
 from services.orchestration.pipeline import AgentCallError, AnalysisPipeline, ErrorKind, PipelineResult
 from shared.config.settings import get_settings
 from shared.models.policy import PolicyDocument
 from shared.schemas.requests import AnalysisRequest, AskQuestionRequest, LoginRequest, RegisterRequest
 from shared.schemas.responses import (
+    AnalysisProgress,
     AnalysisResponse,
     AnalysisStatus,
     AnalysisSummary,
@@ -52,6 +54,7 @@ from shared.schemas.responses import (
     GatewayError,
     PolicyUploadResponse,
     QuestionAnswerResponse,
+    RunState,
     TokenResponse,
     UserResponse,
 )
@@ -60,6 +63,7 @@ from shared.utils.security import SecurityConfigError, decrypt_bytes, encrypt_by
 logger = logging.getLogger(__name__)
 
 NOT_SAVED_WARNING = "This analysis could not be saved to your history."
+ANALYSIS_FAILED_MESSAGE = "The analysis could not be completed. Please try again."
 
 _AGENT_ERRORS = {
     ErrorKind.UNAVAILABLE: (503, "A required analysis service is not available. Please try again later."),
@@ -248,26 +252,51 @@ def _summary(analysis: AnalysisResponse) -> AnalysisSummary:
                            created_at=analysis.created_at, total_findings=total, potential_gaps=gaps)
 
 
-@app.post("/api/v1/analyses", response_model=AnalysisResponse)
+@app.post("/api/v1/analyses", status_code=202, response_model=AnalysisProgress)
 def run_analysis(
     body: AnalysisRequest,
     response: Response,
+    background: BackgroundTasks,
     user: UserRecord = Depends(get_current_user),
     db: Database = Depends(get_database),
     pipeline: AnalysisPipeline = Depends(get_pipeline),
+    jobs: JobStore = Depends(get_job_store),
 ):
+    """Start an analysis and answer at once (202); the agents run in the background.
+
+    Follow it with GET /api/v1/analyses/{request_id}/status, then fetch the result.
+    """
     request_id = _new_request_id()
     if db.owned_policy_ids(user.business_id, body.policy_ids) != set(body.policy_ids):
         return _error(404, "policy_not_found", "One or more policies were not found for your account.",
                       request_id=request_id)
 
     logger.info("Analysis started (request %s).", request_id)
+    progress = jobs.create(request_id, user.user_id)
+    background.add_task(_run_analysis_job, pipeline, jobs, db, user, body, request_id)
+    response.headers["X-Request-ID"] = request_id
+    response.headers["Location"] = f"/api/v1/analyses/{request_id}/status"
+    return progress
+
+
+def _run_analysis_job(pipeline: AnalysisPipeline, jobs: JobStore, db: Database, user: UserRecord,
+                      body: AnalysisRequest, request_id: str) -> None:
+    """The pipeline run behind POST /analyses. Never raises: failures go to the job."""
     try:
         result = pipeline.run(request_id=request_id, business_id=user.business_id,
-                              business=body.business, policy_ids=body.policy_ids)
+                              business=body.business, policy_ids=body.policy_ids,
+                              progress=jobs.reporter(request_id))
     except AgentCallError as exc:
         logger.warning("Analysis failed at %s (%s) (request %s).", exc.stage.value, exc.kind.value, request_id)
-        return _agent_error(exc, request_id)
+        _, message = _AGENT_ERRORS[exc.kind]
+        jobs.fail(request_id, GatewayError(error=exc.kind.value, message=message, stage=exc.stage.value,
+                                           request_id=request_id))
+        return
+    except Exception as exc:  # a bug must not leave the run "running" forever
+        logger.error("Analysis crashed (%s) (request %s).", type(exc).__name__, request_id)
+        jobs.fail(request_id, GatewayError(error="analysis_failed", message=ANALYSIS_FAILED_MESSAGE,
+                                           request_id=request_id))
+        return
 
     analysis = _to_response(result)
     try:
@@ -276,9 +305,20 @@ def run_analysis(
     except (SecurityConfigError, sqlite3.Error) as exc:
         logger.error("Analysis could not be saved (%s) (request %s).", type(exc).__name__, request_id)
         analysis.warnings.append(NOT_SAVED_WARNING)
+    jobs.complete(request_id, analysis)
 
-    response.headers["X-Request-ID"] = request_id
-    return analysis
+
+@app.get("/api/v1/analyses/{request_id}/status", response_model=AnalysisProgress)
+def analysis_status(request_id: str, user: UserRecord = Depends(get_current_user),
+                    db: Database = Depends(get_database), jobs: JobStore = Depends(get_job_store)):
+    """Which agent is working, and what each one received and returned (counts only)."""
+    job = jobs.get(request_id, user.user_id)
+    if job is not None:
+        return job.progress
+    saved = _load_analysis(db, user, request_id)
+    if isinstance(saved, JSONResponse):
+        return saved
+    return progress_from_analysis(saved)
 
 
 @app.get("/api/v1/analyses", response_model=List[AnalysisSummary])
@@ -300,8 +340,19 @@ def _load_analysis(db: Database, user: UserRecord, request_id: str) -> AnalysisR
 
 @app.get("/api/v1/analyses/{request_id}", response_model=AnalysisResponse)
 def get_analysis(request_id: str, user: UserRecord = Depends(get_current_user),
-                 db: Database = Depends(get_database)):
-    return _load_analysis(db, user, request_id)
+                 db: Database = Depends(get_database), jobs: JobStore = Depends(get_job_store)):
+    saved = _load_analysis(db, user, request_id)
+    if not (isinstance(saved, JSONResponse) and saved.status_code == 404):
+        return saved
+    # Not in the database: still running, failed, or finished but could not be saved.
+    job = jobs.get(request_id, user.user_id)
+    if job is None:
+        return saved
+    if job.result is not None:
+        return job.result
+    if job.progress.state is RunState.RUNNING:
+        return _error(409, "analysis_running", "The analysis is still running.", request_id=request_id)
+    return saved
 
 
 @app.post("/api/v1/analyses/{request_id}/questions", response_model=QuestionAnswerResponse)

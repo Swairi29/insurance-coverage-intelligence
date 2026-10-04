@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Brand } from '../components/Brand';
-import { buttonClasses } from '../components/ui/Button';
+import { buttonClasses } from '../components/ui/buttonClasses';
 
 export default function NotFound() {
   return (

@@ -6,6 +6,8 @@ export const SESSION_KEYS = {
   token: 'insureintel.token',
   /** The business profile draft (plan §3.6), written by the profile page in step 7. */
   profileDraft: 'insureintel.profileDraft',
+  /** The last analysis request, so a failed run can be retried from its progress screen. */
+  lastAnalysis: 'insureintel.lastAnalysis',
 } as const;
 
 export function readSession(key: string): string | null {

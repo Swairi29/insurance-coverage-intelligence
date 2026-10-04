@@ -193,7 +193,7 @@ def test_explicit_no_answers_prevent_risks():
 
 # --- unknown business types ------------------------------------------------------------------
 
-@pytest.mark.parametrize("bad_type", ["pharmacy", "", None, 42, ["bakery"], "Bakery!"])
+@pytest.mark.parametrize("bad_type", ["spaceport", "", None, 42, ["bakery"], "Bakery!"])
 def test_unknown_business_type_is_handled_safely(bad_type):
     profile = BusinessProfile.model_construct(
         business_name="Mystery", business_type=bad_type, equipment=["Freezer", "oven"],
@@ -210,7 +210,7 @@ def test_unknown_business_type_is_handled_safely(bad_type):
 
 
 def test_unknown_business_type_without_details_gives_no_risks_but_a_warning():
-    profile = BusinessProfile.model_construct(business_name="Mystery", business_type="pharmacy")
+    profile = BusinessProfile.model_construct(business_name="Mystery", business_type="spaceport")
     result = identify_risks(profile)
     assert result.risks == []
     assert result.warnings

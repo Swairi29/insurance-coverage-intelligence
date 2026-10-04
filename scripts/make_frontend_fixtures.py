@@ -64,6 +64,7 @@ from services.orchestration.database import Database, get_database  # noqa: E402
 from shared.config.settings import get_settings  # noqa: E402
 from shared.schemas.responses import AnalysisResponse  # noqa: E402
 from scripts.demo_data import BUSINESS_PACK, BUSINESSES, demo_policy_files  # noqa: E402
+from scripts.gateway_client import run_analysis  # noqa: E402
 from tests.integration.test_orchestration_real_agents import RealAgents  # noqa: E402
 
 class Agent4Down(RealAgents):
@@ -177,16 +178,13 @@ def main() -> None:
 
     analyses = {}
     for kind, business in BUSINESSES.items():
-        r = gateway.post("/api/v1/analyses", headers=headers,
-                         json={"business": business, "policy_ids": policy_ids})
-        assert r.status_code == 200 and r.json()["status"] == "complete", r.text
-        analyses[kind] = r.json()
+        analysis = run_analysis(gateway, headers, {"business": business, "policy_ids": policy_ids})
+        assert analysis["status"] == "complete", analysis["warnings"]
+        analyses[kind] = analysis
 
     gateway_app.dependency_overrides[get_pipeline] = Agent4Down().pipeline
-    r = gateway.post("/api/v1/analyses", headers=headers,
-                     json={"business": BUSINESSES["bakery"], "policy_ids": policy_ids})
-    assert r.status_code == 200 and r.json()["status"] == "partial", r.text
-    partial = r.json()
+    partial = run_analysis(gateway, headers, {"business": BUSINESSES["bakery"], "policy_ids": policy_ids})
+    assert partial["status"] == "partial", partial["warnings"]
     summaries = gateway.get("/api/v1/analyses", headers=headers).json()
     gateway_app.dependency_overrides.clear()
     get_settings.cache_clear()

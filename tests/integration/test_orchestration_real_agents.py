@@ -27,6 +27,7 @@ from services.orchestration.database import Database, get_database  # noqa: E402
 from services.orchestration.pipeline import AgentClient, AnalysisPipeline  # noqa: E402
 from shared.config.settings import get_settings  # noqa: E402
 from tests.integration.test_agent3_to_agent4 import BUSINESS  # noqa: E402
+from scripts.gateway_client import run_analysis  # noqa: E402
 from tests.orchestration_fakes import URLS  # noqa: E402
 
 API_KEY = "real-agents-key"
@@ -114,11 +115,8 @@ def test_upload_and_analysis_through_all_four_real_agents(gateway, agents):
     assert policy["page_count"] == len(POLICY_PAGES) and policy["chunk_count"] >= 1
     agents.calls.clear()
 
-    response = gateway.post("/api/v1/analyses", headers=headers,
-                            json={"business": BUSINESS, "policy_ids": [policy["policy_id"]]})
+    body = run_analysis(gateway, headers, {"business": BUSINESS, "policy_ids": [policy["policy_id"]]})
 
-    assert response.status_code == 200, response.text
-    body = response.json()
     assert body["status"] == "complete", body["warnings"]
     assert [r.url.host for r in agents.calls] == ["risk.test", "policy.test", "coverage.test", "explanation.test"]
     assert {r.headers["X-Request-ID"] for r in agents.calls} == {body["request_id"]}

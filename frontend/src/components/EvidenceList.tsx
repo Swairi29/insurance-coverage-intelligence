@@ -115,7 +115,7 @@ function EvidenceItemView({
           aria-expanded={expanded}
           aria-controls={textId}
           onClick={() => setExpanded((value) => !value)}
-          className="mt-1.5 text-xs font-semibold text-brand hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+          className="mt-1.5 text-xs font-semibold text-brand hover:underline focus-visible:outline focus-visible:outline-2"
         >
           {expanded ? 'Show less' : 'Show more'}
         </button>

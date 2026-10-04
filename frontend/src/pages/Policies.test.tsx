@@ -92,7 +92,7 @@ describe('policies page', () => {
     server.use(http.get('*/api/v1/policies', () => HttpResponse.json([])));
     await openPolicies();
 
-    expect(await screen.findByText('No policies yet')).toBeInTheDocument();
+    expect(await screen.findByText('Upload your first policy')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Start a new analysis →' })).not.toBeInTheDocument();
   });
 

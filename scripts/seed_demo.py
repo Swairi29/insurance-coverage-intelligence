@@ -27,6 +27,7 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.demo_data import BUSINESSES, demo_policy_files  # noqa: E402
+from scripts.gateway_client import AnalysisError, run_analysis  # noqa: E402
 
 DEFAULT_GATEWAY = "http://127.0.0.1:8000"
 DEFAULT_EMAIL = "demo@insureintel.test"
@@ -98,11 +99,12 @@ def seed(client: httpx.Client, email: str = DEFAULT_EMAIL, password: str = DEFAU
         policy_ids.append(response.json()["policy_id"])
         uploaded.append(filename)
 
-    response = client.post("/api/v1/analyses", headers=headers, timeout=ANALYSIS_TIMEOUT_SECONDS,
-                           json={"business": business, "policy_ids": policy_ids})
-    if response.status_code != 200:
-        raise SeedError(f"The analysis failed: {_detail(response)}")
-    analysis = response.json()
+    try:
+        analysis = run_analysis(client, headers, {"business": business, "policy_ids": policy_ids},
+                                timeout_seconds=ANALYSIS_TIMEOUT_SECONDS)
+    except AnalysisError as exc:
+        detail = exc.progress.get("error") if exc.progress else _detail(exc.response) if exc.response else ""
+        raise SeedError(f"The analysis failed: {exc} {detail}") from None
     report = analysis.get("report")
     meta = report["metadata"] if report else {"llm_findings": 0}
     total = report["summary"]["total_findings"] if report else len(analysis["coverage"]["assessments"])

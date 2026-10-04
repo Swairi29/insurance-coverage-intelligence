@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from services.orchestration.api import NOT_SAVED_WARNING, app, get_pipeline
 from services.orchestration.auth import LoginLimiter, QuestionLimiter, get_login_limiter, get_question_limiter
 from services.orchestration.database import Database, get_database
+from services.orchestration.jobs import JobStore, get_job_store
 from services.orchestration.pipeline import REPORT_FAILED_WARNING
 from shared.config.settings import get_settings
 from tests.orchestration_fakes import (
@@ -56,6 +57,8 @@ def client(monkeypatch, agents, db):
     app.dependency_overrides[get_login_limiter] = lambda: limiter
     question_limiter = QuestionLimiter()
     app.dependency_overrides[get_question_limiter] = lambda: question_limiter
+    jobs = JobStore()  # fresh per test; the real one lives as long as the process
+    app.dependency_overrides[get_job_store] = lambda: jobs
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -73,8 +76,20 @@ def upload(client, headers) -> str:
     return response.json()["policy_id"]
 
 
-def analyse(client, headers, policy_ids):
+def start(client, headers, policy_ids):
+    """POST /analyses. TestClient runs the background task before it returns."""
     return client.post("/api/v1/analyses", json={"business": BUSINESS, "policy_ids": policy_ids}, headers=headers)
+
+
+def status(client, headers, request_id):
+    return client.get(f"/api/v1/analyses/{request_id}/status", headers=headers)
+
+
+def analyse(client, headers, policy_ids):
+    """Start an analysis and return the response of fetching its result."""
+    started = start(client, headers, policy_ids)
+    assert started.status_code == 202, started.text
+    return client.get(f"/api/v1/analyses/{started.json()['request_id']}", headers=headers)
 
 
 # --- health ----------------------------------------------------------------------------------
@@ -165,6 +180,7 @@ def test_login_without_jwt_secret_is_503(client, monkeypatch):
     ("get", "/api/v1/analyses"),
     ("post", "/api/v1/analyses"),
     ("get", "/api/v1/analyses/run-1"),
+    ("get", "/api/v1/analyses/run-1/status"),
 ])
 @pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer not-a-token"}, {"Authorization": "Basic abc"}])
 def test_protected_endpoints_need_a_valid_token(client, agents, method, path, headers):
@@ -216,16 +232,82 @@ def test_full_analysis(client, agents):
     policy_id = upload(client, headers)
     agents.calls.clear()
 
-    response = analyse(client, headers, [policy_id])
+    started = start(client, headers, [policy_id])
 
+    assert started.status_code == 202, started.text
+    accepted = started.json()
+    request_id = accepted["request_id"]
+    assert accepted["state"] == "running"
+    assert [s["state"] for s in accepted["stages"]] == ["queued"] * 4
+    assert started.headers["X-Request-ID"] == request_id
+    assert started.headers["Location"] == f"/api/v1/analyses/{request_id}/status"
+
+    response = client.get(f"/api/v1/analyses/{request_id}", headers=headers)
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["status"] == "complete" and body["warnings"] == []
     assert body["business_id"] == business_id
-    assert response.headers["X-Request-ID"] == body["request_id"]
-    assert {r.headers["X-Request-ID"] for r in agents.calls} == {body["request_id"]}
-    assert body["report"]["request_id"] == body["coverage"]["request_id"] == body["request_id"]
+    assert {r.headers["X-Request-ID"] for r in agents.calls} == {request_id}
+    assert body["report"]["request_id"] == body["coverage"]["request_id"] == request_id
     assert BUSINESS_NAME not in str(body["report"])
+
+
+def test_status_shows_each_agent_call(client):
+    headers = login(client)
+    request_id = start(client, headers, [upload(client, headers)]).json()["request_id"]
+
+    progress = status(client, headers, request_id).json()
+
+    assert progress["state"] == "complete"
+    stages = {s["stage"]: s for s in progress["stages"]}
+    assert list(stages) == ["risk_profile", "policy_evidence", "coverage", "report"]
+    assert all(s["state"] == "done" and s["duration_ms"] is not None for s in stages.values())
+    # The gateway calls every agent itself (hub and spoke); these are its own calls.
+    assert stages["risk_profile"]["endpoint"] == "POST /api/v1/risk-profile"
+    assert stages["policy_evidence"]["endpoint"] == "POST /api/v1/retrieve-policy-evidence"
+    assert stages["risk_profile"]["sent"] == "business profile"
+    assert stages["risk_profile"]["received"] == "1 risk identified"
+    assert stages["policy_evidence"]["sent"] == "1 risk, 1 policy"
+    assert stages["policy_evidence"]["received"] == "1 clause found"
+    assert stages["coverage"]["received"] == "1 risk assessed, 0 potential gaps"
+    assert stages["report"]["received"] == "1 finding written (0 by AI)"
+    # Counts only: no business or policy content.
+    assert BUSINESS_NAME not in str(progress) and "forcible" not in str(progress)
+
+
+def test_status_of_another_users_analysis_is_404(client):
+    owner = login(client)
+    request_id = start(client, owner, [upload(client, owner)]).json()["request_id"]
+    other = login(client, "other@example.com")
+
+    assert status(client, other, request_id).status_code == 404
+    assert client.get(f"/api/v1/analyses/{request_id}", headers=other).status_code == 404
+
+
+def test_status_after_a_restart_comes_from_the_saved_analysis(client):
+    headers = login(client)
+    request_id = start(client, headers, [upload(client, headers)]).json()["request_id"]
+    fresh = JobStore()  # the gateway restarted: running jobs are forgotten
+    app.dependency_overrides[get_job_store] = lambda: fresh
+
+    progress = status(client, headers, request_id).json()
+
+    assert progress["state"] == "complete"
+    assert [s["state"] for s in progress["stages"]] == ["done"] * 4
+    assert progress["stages"][0]["received"] == "1 risk identified"
+
+
+def test_result_of_a_running_analysis_is_409(client):
+    headers = login(client)
+    user_id = client.get("/api/v1/auth/me", headers=headers).json()["user_id"]
+    jobs = JobStore()
+    app.dependency_overrides[get_job_store] = lambda: jobs
+    jobs.create("run-1", user_id)
+
+    response = client.get("/api/v1/analyses/run-1", headers=headers)
+
+    assert response.status_code == 409 and response.json()["error"] == "analysis_running"
+    assert status(client, headers, "run-1").json()["state"] == "running"
 
 
 def test_policy_of_another_user_is_404_and_no_agent_is_called(client, agents):
@@ -234,7 +316,7 @@ def test_policy_of_another_user_is_404_and_no_agent_is_called(client, agents):
     intruder = login(client, "intruder@example.com")
     agents.calls.clear()
 
-    response = analyse(client, intruder, [policy_id])
+    response = start(client, intruder, [policy_id])
     assert response.status_code == 404 and response.json()["error"] == "policy_not_found"
     assert agents.calls == []
 
@@ -250,13 +332,19 @@ def test_agent_failure_is_a_safe_gateway_error(client, agents, handler, status_c
     policy_id = upload(client, headers)
     agents.overrides[EVIDENCE_PATH] = handler
 
-    response = analyse(client, headers, [policy_id])
+    started = start(client, headers, [policy_id])
+    assert started.status_code == 202
+    request_id = started.json()["request_id"]
+    response = status(client, headers, request_id)
 
-    body = response.json()
-    assert response.status_code == status_code
-    assert body["error"] == error and body["stage"] == "policy_evidence"
-    assert body["request_id"] == response.headers["X-Request-ID"]
+    progress = response.json()
+    assert progress["state"] == "failed"
+    assert progress["error"] == {"error": error, "message": progress["error"]["message"],
+                                 "stage": "policy_evidence", "request_id": request_id}
+    assert [s["state"] for s in progress["stages"]] == ["done", "failed", "skipped", "skipped"]
+    assert progress["stages"][1]["received"]  # a short reason, e.g. "Service not reachable"
     assert "secret policy wording" not in response.text
+    assert client.get(f"/api/v1/analyses/{request_id}", headers=headers).status_code == 404
     assert client.get("/api/v1/analyses", headers=headers).json() == []  # failed runs are not stored
 
 
@@ -269,6 +357,9 @@ def test_report_failure_is_a_partial_result(client, agents):
 
     body = response.json()
     assert response.status_code == 200 and body["status"] == "partial"
+    progress = status(client, headers, body["request_id"]).json()
+    assert progress["state"] == "partial"
+    assert [s["state"] for s in progress["stages"]] == ["done", "done", "done", "failed"]
     assert body["report"] is None and len(body["coverage"]["assessments"]) == 1
     assert body["warnings"] == [REPORT_FAILED_WARNING]
     assert client.get("/api/v1/analyses", headers=headers).json()[0]["status"] == "partial"
@@ -310,8 +401,8 @@ def test_analysis_is_returned_even_if_it_cannot_be_saved(client, monkeypatch):
 
 
 def _saved_analysis(client, headers) -> str:
-    response = analyse(client, headers, [upload(client, headers)])
-    assert response.status_code == 200, response.text
+    response = start(client, headers, [upload(client, headers)])
+    assert response.status_code == 202, response.text
     return response.json()["request_id"]
 
 

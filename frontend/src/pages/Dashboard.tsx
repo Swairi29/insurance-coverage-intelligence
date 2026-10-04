@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAnalyses } from '../api/analyses';
+import { useAnalyses, useAnalysis } from '../api/analyses';
 import { usePolicies } from '../api/policies';
 import type { AnalysisSummary } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
+import { DocumentIcon, SparkleIcon } from '../components/icons';
 import { AnalysisStatusBadge } from '../components/StatusBadge';
-import { buttonClasses } from '../components/ui/Button';
+import { StatusBar } from '../components/StatusBar';
+import { buttonClasses } from '../components/ui/buttonClasses';
 import { SkeletonLines } from '../components/ui/Skeleton';
 import { Spinner } from '../components/ui/Spinner';
 import { formatDateTime, plural } from '../lib/format';
-import { loadProfileDraft } from '../lib/profile';
+import { businessTypeLabel, loadProfileDraft } from '../lib/profile';
+import { statusCounts } from '../lib/results';
 
 interface ChecklistStep {
   title: string;
@@ -21,7 +24,7 @@ interface ChecklistStep {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [hasProfile] = useState(() => loadProfileDraft() !== null);
+  const [profile] = useState(loadProfileDraft);
   const policies = usePolicies();
   const analyses = useAnalyses();
 
@@ -32,14 +35,16 @@ export default function Dashboard() {
 
   const steps: ChecklistStep[] = [
     {
-      title: 'Describe your business',
-      description: 'Kept in this browser tab and sent with each analysis.',
-      done: hasProfile,
+      title: 'Business profile',
+      description: profile
+        ? `${profile.business_name}, ${businessTypeLabel(profile).toLowerCase()}.`
+        : 'Kept in this browser tab and sent with each analysis.',
+      done: profile !== null,
       to: '/app/profile',
-      action: hasProfile ? 'Edit profile' : 'Add profile',
+      action: profile ? 'Edit profile' : 'Add profile',
     },
     {
-      title: 'Upload your policies',
+      title: policies.data ? `Policies uploaded (${readyPolicies})` : 'Policies uploaded',
       description: policies.data
         ? `${plural(readyPolicies, 'policy', 'policies')} ready.`
         : 'PDF policy documents, up to 25 MB each.',
@@ -48,7 +53,7 @@ export default function Dashboard() {
       action: readyPolicies > 0 ? 'Manage policies' : 'Upload a policy',
     },
     {
-      title: 'Run an analysis',
+      title: 'First analysis',
       description: 'Checks your risks against your policies and explains any gaps.',
       done: analyses.data ? analyses.data.length > 0 : analyses.isError ? false : null,
       to: '/app/analyses/new',
@@ -60,25 +65,37 @@ export default function Dashboard() {
 
   return (
     <section className="max-w-5xl">
-      <h1 className="text-2xl font-extrabold">Your workspace</h1>
-      <p className="mt-1 text-sm text-muted">
-        Signed in as <span className="font-medium text-ink-heading">{user?.email}</span>
-      </p>
+      {/* Welcome card */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-card border border-line bg-white p-5 shadow-card sm:p-6">
+        <div className="min-w-0">
+          <p className="text-meta font-semibold text-muted">Your workspace</p>
+          <h1 className="mt-1 truncate text-section font-extrabold sm:text-[1.75rem]">
+            {profile ? profile.business_name : 'Welcome to InsureIntel'}
+          </h1>
+          <p className="mt-1 text-sm text-muted">
+            Signed in as <span className="font-medium text-ink-heading">{user?.email}</span>
+          </p>
+        </div>
+        <Link to="/app/analyses/new" className={buttonClasses('ai')}>
+          <SparkleIcon className="h-4 w-4" />
+          Run new analysis
+        </Link>
+      </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
         <section
           aria-labelledby="getting-started"
-          className="rounded-card border border-line bg-white p-5 sm:p-6"
+          className="rounded-card border border-line bg-white p-5 shadow-soft sm:p-6"
         >
           <h2 id="getting-started" className="text-lg font-bold">
-            Getting started
+            Setup
           </h2>
           <ol className="mt-4 space-y-3" aria-label="Getting started steps">
             {steps.map((step, index) => (
               <li
-                key={step.title}
+                key={step.to}
                 aria-current={index === nextIndex ? 'step' : undefined}
-                className={`grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 rounded-lg border p-4 sm:grid-cols-[auto_1fr_auto] ${
+                className={`grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 rounded-panel border p-4 sm:grid-cols-[auto_1fr_auto] ${
                   index === nextIndex ? 'border-brand bg-brand-soft' : 'border-line'
                 }`}
               >
@@ -97,7 +114,7 @@ export default function Dashboard() {
                   className={`col-start-2 justify-self-start sm:col-start-auto ${
                     index === nextIndex
                       ? buttonClasses('primary', 'sm')
-                      : 'rounded-lg px-3 py-1.5 text-sm font-semibold text-brand hover:bg-brand-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand'
+                      : 'rounded-control px-3 py-1.5 text-sm font-semibold text-brand hover:bg-brand-soft'
                   }`}
                 >
                   {step.action}
@@ -109,7 +126,7 @@ export default function Dashboard() {
 
         <section
           aria-labelledby="latest-analysis"
-          className="h-fit rounded-card border border-line bg-white p-5 sm:p-6"
+          className="h-fit rounded-card border border-line bg-white p-5 shadow-soft sm:p-6"
         >
           <h2 id="latest-analysis" className="text-lg font-bold">
             Latest analysis
@@ -122,9 +139,7 @@ export default function Dashboard() {
             ) : latest ? (
               <LatestAnalysis analysis={latest} total={analyses.data.length} />
             ) : (
-              <p className="text-sm text-muted">
-                No analyses yet. Your latest result will appear here.
-              </p>
+              <EmptyLatest hasPolicies={readyPolicies > 0} />
             )}
           </div>
         </section>
@@ -152,7 +167,29 @@ function StepMarker({ number, done }: { number: number; done: boolean | null }) 
   );
 }
 
+function EmptyLatest({ hasPolicies }: { hasPolicies: boolean }) {
+  return (
+    <div className="rounded-panel border border-dashed border-line-strong bg-canvas px-4 py-6 text-center">
+      <DocumentIcon className="mx-auto h-6 w-6 text-brand" />
+      <p className="mt-2 font-semibold text-ink-heading">No analyses yet</p>
+      <p className="mt-1 text-sm text-muted">
+        {hasPolicies
+          ? 'Run your first analysis to see which risks your policies cover.'
+          : 'Upload your first policy, then run an analysis to see your coverage.'}
+      </p>
+      <Link
+        to={hasPolicies ? '/app/analyses/new' : '/app/policies'}
+        className={`mt-4 ${buttonClasses('primary', 'sm')}`}
+      >
+        {hasPolicies ? 'Run your first analysis' : 'Upload your first policy'}
+      </Link>
+    </div>
+  );
+}
+
 function LatestAnalysis({ analysis, total }: { analysis: AnalysisSummary; total: number }) {
+  // The summary has totals only; the full result gives the count per status for the bar.
+  const full = useAnalysis(analysis.request_id);
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2">
@@ -160,19 +197,20 @@ function LatestAnalysis({ analysis, total }: { analysis: AnalysisSummary; total:
         <span className="text-sm text-muted">{formatDateTime(analysis.created_at)}</span>
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-3">
-        <div className="rounded-lg bg-brand-soft p-3">
+        <div className="rounded-panel bg-brand-soft p-3">
           <dt className="text-xs text-muted">Risks checked</dt>
           <dd className="font-display text-2xl font-extrabold text-ink-heading">
             {analysis.total_findings}
           </dd>
         </div>
-        <div className="rounded-lg bg-status-excluded-bg p-3">
+        <div className="rounded-panel bg-status-excluded-bg p-3">
           <dt className="text-xs text-muted">Potential gaps</dt>
           <dd className="font-display text-2xl font-extrabold text-status-excluded">
             {analysis.potential_gaps}
           </dd>
         </div>
       </dl>
+      {full.data && <StatusBar counts={statusCounts(full.data)} className="mt-4" />}
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm font-semibold">
         <Link to={`/app/analyses/${analysis.request_id}`} className="text-brand hover:underline">
           Open results →

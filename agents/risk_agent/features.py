@@ -133,6 +133,10 @@ def extract_features(profile: BusinessProfile) -> FeatureMap:
     # 3. Free-text description ----------------------------------------------
     from_description: FeatureMap = {}
     description = getattr(profile, "description", None) or ""
+    # "Other" businesses name their kind of business; it can point to risks too.
+    detail = getattr(profile, "business_type_detail", None) or ""
+    if detail:
+        description = f"{detail}. {description}"
     for tag, phrases in match_keywords(description).items():
         for phrase in phrases[:MAX_DESCRIPTION_MATCHES_PER_TAG]:
             _add(from_description, tag, "description", phrase)

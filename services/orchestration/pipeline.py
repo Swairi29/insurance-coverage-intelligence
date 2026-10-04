@@ -24,7 +24,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Type, TypeVar
+from typing import Dict, List, Optional, Protocol, Type, TypeVar
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -69,6 +69,60 @@ class ErrorKind(str, Enum):
     REJECTED = "agent_rejected"  # 4xx: our request or our API key was wrong
     FAILED = "agent_failed"  # 5xx
     BAD_RESPONSE = "agent_bad_response"  # body did not match the contract
+
+
+# Which agent each analysis stage calls, and where; shown on the progress screen.
+STAGE_AGENTS: Dict[Stage, str] = {
+    Stage.RISK_PROFILE: "Risk Profiling Agent",
+    Stage.POLICY_EVIDENCE: "Policy Intelligence Agent",
+    Stage.COVERAGE: "Coverage & Gap Analysis Agent",
+    Stage.REPORT: "Explanation & Recommendation Agent",
+}
+STAGE_PATHS: Dict[Stage, str] = {
+    Stage.RISK_PROFILE: "/api/v1/risk-profile",
+    Stage.POLICY_EVIDENCE: "/api/v1/retrieve-policy-evidence",
+    Stage.COVERAGE: "/api/v1/analyse-coverage",
+    Stage.REPORT: "/api/v1/generate-report",
+}
+ANALYSIS_STAGES: List[Stage] = list(STAGE_AGENTS)
+
+_FAILURE_REASONS = {
+    ErrorKind.UNAVAILABLE: "Service not reachable",
+    ErrorKind.TIMEOUT: "Took too long to respond",
+    ErrorKind.REJECTED: "Request refused",
+    ErrorKind.FAILED: "Service error",
+    ErrorKind.BAD_RESPONSE: "Unexpected response",
+}
+
+
+class ProgressReporter(Protocol):
+    """Told about each agent call of a run. Summaries are counts only, never content."""
+
+    def started(self, stage: Stage, sent: str) -> None: ...
+
+    def finished(self, stage: Stage, received: str) -> None: ...
+
+    def failed(self, stage: Stage, reason: str) -> None: ...
+
+    def skipped(self, stage: Stage, reason: str) -> None: ...
+
+
+class _NoProgress:
+    def started(self, stage: Stage, sent: str) -> None:
+        pass
+
+    def finished(self, stage: Stage, received: str) -> None:
+        pass
+
+    def failed(self, stage: Stage, reason: str) -> None:
+        pass
+
+    def skipped(self, stage: Stage, reason: str) -> None:
+        pass
+
+
+def _count(number: int, noun: str, plural: Optional[str] = None) -> str:
+    return f"{number} {noun if number == 1 else plural or noun + 's'}"
 
 
 class AgentCallError(Exception):
@@ -188,39 +242,48 @@ class AnalysisPipeline:
     # --- analysis chain -------------------------------------------------------------------
 
     def run(self, *, request_id: str, business_id: str, business: BusinessProfile,
-            policy_ids: List[str]) -> PipelineResult:
+            policy_ids: List[str], progress: Optional[ProgressReporter] = None) -> PipelineResult:
         """Agents 1 -> 2 -> 3 -> 4. Raises `AgentCallError` if Agent 1, 2 or 3 fails.
 
         An Agent 4 failure is not raised: the result is returned without a report
         and with a warning, because the coverage results are still useful.
+        `progress` is told when each agent call starts and ends (counts only).
         """
         stage_ms: Dict[str, int] = {}
         warnings: List[str] = []
+        progress = progress or _NoProgress()
 
-        profile = self._timed(stage_ms, Stage.RISK_PROFILE, lambda: self._client.post_json(
-            Stage.RISK_PROFILE, f"{self._urls.risk}/api/v1/risk-profile",
+        progress.started(Stage.RISK_PROFILE, "business profile")
+        profile = self._timed(stage_ms, Stage.RISK_PROFILE, progress, lambda: self._client.post_json(
+            Stage.RISK_PROFILE, f"{self._urls.risk}{STAGE_PATHS[Stage.RISK_PROFILE]}",
             {"request_id": request_id, "business": business.model_dump(mode="json", exclude_none=True)},
             request_id=request_id, timeout=self._timeout, response_model=RiskProfileResponse,
         ))
-        _check_echo(Stage.RISK_PROFILE, profile.request_id, request_id)
+        _check_echo(Stage.RISK_PROFILE, profile.request_id, request_id, progress)
+        progress.finished(Stage.RISK_PROFILE, f"{_count(len(profile.risks), 'risk')} identified")
 
         if profile.risks:
-            coverage = self._coverage(request_id, business_id, policy_ids, profile, stage_ms)
+            coverage = self._coverage(request_id, business_id, policy_ids, profile, stage_ms, progress)
         else:
             # Agents 2 and 3 require at least one risk.
             warnings.append(NO_RISKS_WARNING)
+            for stage in (Stage.POLICY_EVIDENCE, Stage.COVERAGE):
+                progress.skipped(stage, "No risks to check")
             coverage = CoverageAnalysisResponse(
                 request_id=request_id, business_id=business_id, metadata=CoverageMetadata(llm_used=False),
             )
 
         report: Optional[ExplanationResponse] = None
+        progress.started(Stage.REPORT, _count(len(coverage.assessments), "assessment"))
         try:
-            report = self._timed(stage_ms, Stage.REPORT, lambda: self._client.post_json(
-                Stage.REPORT, f"{self._urls.explanation}/api/v1/generate-report",
+            report = self._timed(stage_ms, Stage.REPORT, progress, lambda: self._client.post_json(
+                Stage.REPORT, f"{self._urls.explanation}{STAGE_PATHS[Stage.REPORT]}",
                 build_explanation_request(risk_profile=profile, coverage=coverage).model_dump(mode="json"),
                 request_id=request_id, timeout=self._report_timeout, response_model=ExplanationResponse,
             ))
-            _check_echo(Stage.REPORT, report.request_id, request_id)
+            _check_echo(Stage.REPORT, report.request_id, request_id, progress)
+            progress.finished(Stage.REPORT, f"{_count(len(report.findings), 'finding')} written "
+                                            f"({report.metadata.llm_findings} by AI)")
         except AgentCallError as exc:
             logger.warning("Report stage failed (%s); returning a partial result (request %s).",
                            exc.kind.value, request_id)
@@ -238,19 +301,26 @@ class AnalysisPipeline:
         )
 
     def _coverage(self, request_id: str, business_id: str, policy_ids: List[str],
-                  profile: RiskProfileResponse, stage_ms: Dict[str, int]) -> CoverageAnalysisResponse:
+                  profile: RiskProfileResponse, stage_ms: Dict[str, int],
+                  progress: ProgressReporter) -> CoverageAnalysisResponse:
         risks = [risk.model_dump(mode="json") for risk in profile.risks]
 
-        evidence = self._timed(stage_ms, Stage.POLICY_EVIDENCE, lambda: self._client.post_json(
-            Stage.POLICY_EVIDENCE, f"{self._urls.policy}/api/v1/retrieve-policy-evidence",
+        progress.started(Stage.POLICY_EVIDENCE,
+                         f"{_count(len(risks), 'risk')}, {_count(len(policy_ids), 'policy', 'policies')}")
+        evidence = self._timed(stage_ms, Stage.POLICY_EVIDENCE, progress, lambda: self._client.post_json(
+            Stage.POLICY_EVIDENCE, f"{self._urls.policy}{STAGE_PATHS[Stage.POLICY_EVIDENCE]}",
             {"business_id": business_id, "policy_ids": policy_ids, "risks": risks},
             request_id=request_id, timeout=self._timeout, response_model=PolicyEvidenceResponse,
         ))
         if evidence.business_id != business_id:
+            progress.failed(Stage.POLICY_EVIDENCE, _FAILURE_REASONS[ErrorKind.BAD_RESPONSE])
             raise AgentCallError(Stage.POLICY_EVIDENCE, ErrorKind.BAD_RESPONSE)
+        clauses = sum(len(result.evidence) for result in evidence.results)
+        progress.finished(Stage.POLICY_EVIDENCE, f"{_count(clauses, 'clause')} found")
 
-        coverage = self._timed(stage_ms, Stage.COVERAGE, lambda: self._client.post_json(
-            Stage.COVERAGE, f"{self._urls.coverage}/api/v1/analyse-coverage",
+        progress.started(Stage.COVERAGE, f"{_count(len(risks), 'risk')} + {_count(clauses, 'clause')}")
+        coverage = self._timed(stage_ms, Stage.COVERAGE, progress, lambda: self._client.post_json(
+            Stage.COVERAGE, f"{self._urls.coverage}{STAGE_PATHS[Stage.COVERAGE]}",
             {
                 "request_id": request_id,
                 "business_id": business_id,
@@ -259,9 +329,13 @@ class AnalysisPipeline:
             },
             request_id=request_id, timeout=self._timeout, response_model=CoverageAnalysisResponse,
         ))
-        _check_echo(Stage.COVERAGE, coverage.request_id, request_id)
+        _check_echo(Stage.COVERAGE, coverage.request_id, request_id, progress)
         if coverage.business_id != business_id:
+            progress.failed(Stage.COVERAGE, _FAILURE_REASONS[ErrorKind.BAD_RESPONSE])
             raise AgentCallError(Stage.COVERAGE, ErrorKind.BAD_RESPONSE)
+        gaps = sum(1 for assessment in coverage.assessments if assessment.potential_gap)
+        progress.finished(Stage.COVERAGE, f"{_count(len(coverage.assessments), 'risk')} assessed, "
+                                          f"{_count(gaps, 'potential gap')}")
         return coverage
 
     # --- outside the chain ------------------------------------------------------------------
@@ -313,15 +387,21 @@ class AnalysisPipeline:
         }
 
     @staticmethod
-    def _timed(stage_ms: Dict[str, int], stage: Stage, call):
+    def _timed(stage_ms: Dict[str, int], stage: Stage, progress: ProgressReporter, call):
         started = time.perf_counter()
         try:
             return call()
+        except AgentCallError as exc:
+            progress.failed(stage, _FAILURE_REASONS[exc.kind])
+            raise
         finally:
             stage_ms[stage.value] = int((time.perf_counter() - started) * 1000)
 
 
-def _check_echo(stage: Stage, returned: str, expected: str) -> None:
+def _check_echo(stage: Stage, returned: str, expected: str,
+                progress: Optional[ProgressReporter] = None) -> None:
     if returned != expected:
         logger.error("Agent call %s returned a different request_id (expected %s).", stage.value, expected)
+        if progress is not None:
+            progress.failed(stage, _FAILURE_REASONS[ErrorKind.BAD_RESPONSE])
         raise AgentCallError(stage, ErrorKind.BAD_RESPONSE)

@@ -17,12 +17,12 @@ export function ShieldIcon({ className = 'h-6 w-6' }: { className?: string }) {
   );
 }
 
-/** `light` for light backgrounds, `dark` for the navy header. */
+/** `light` for light backgrounds, `dark` for navy ones. */
 export type Tone = 'light' | 'dark';
 
-const TONES: Record<Tone, { text: string; accent: string; focus: string }> = {
-  light: { text: 'text-ink-heading', accent: 'text-brand', focus: 'focus-visible:outline-brand' },
-  dark: { text: 'text-white', accent: 'text-ai-border', focus: 'focus-visible:outline-white' },
+const TONES: Record<Tone, { text: string; accent: string }> = {
+  light: { text: 'text-ink-heading', accent: 'text-brand' },
+  dark: { text: 'text-white', accent: 'text-ai-border' },
 };
 
 /** The InsureIntel name with the shield, linking to `to`. */
@@ -31,7 +31,7 @@ export function Brand({ to = '/', tone = 'light' }: { to?: string; tone?: Tone }
   return (
     <Link
       to={to}
-      className={`inline-flex items-center gap-2 rounded font-display text-xl font-extrabold focus-visible:outline focus-visible:outline-2 ${colours.text} ${colours.focus}`}
+      className={`inline-flex items-center gap-2 rounded font-display text-xl font-extrabold ${colours.text}`}
     >
       <ShieldIcon className={`h-6 w-6 ${colours.accent}`} />
       <span>
