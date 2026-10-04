@@ -47,8 +47,13 @@ class ExplanationLLMError(Exception):
 
 def get_client(
     settings: Optional[Settings] = None,
+    *,
+    ollama_timeout: Optional[float] = None,
 ) -> Tuple[Optional[TextGenerator], Optional[str], Optional[str]]:
-    """Return `(client, provider, model)`, or `(None, None, None)` if no LLM should be used."""
+    """Return `(client, provider, model)`, or `(None, None, None)` if no LLM should be used.
+
+    `ollama_timeout` limits one Ollama call; by default it is the report budget.
+    """
     settings = settings or get_settings()
 
     if not settings.explanation_use_llm:
@@ -61,7 +66,7 @@ def get_client(
         if settings.llm_provider == "ollama":
             # One call may not outlast the whole report budget (see ExplanationService).
             client: TextGenerator = OllamaClient(model=settings.ollama_model, host=settings.ollama_host,
-                                                 timeout=settings.explanation_llm_budget_seconds)
+                                                 timeout=ollama_timeout or settings.explanation_llm_budget_seconds)
             return client, "ollama", settings.ollama_model.strip()
 
         client = GeminiClient(settings=settings)

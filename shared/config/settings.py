@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     # wording. Keep it under half of EXPLANATION_TIMEOUT_SECONDS so the report
     # always reaches the gateway before the gateway gives up.
     explanation_llm_budget_seconds: float = Field(default=280.0, gt=0)
+    # Questions about an analysis: limit on one Ollama call. Someone is waiting for
+    # the answer, so it is much shorter than the report budget. (Gemini calls use
+    # LLM_TIMEOUT_SECONDS and LLM_MAX_RETRIES.) Past it, the rule-based answer is used.
+    qa_llm_timeout_seconds: float = Field(default=60.0, gt=0)
 
     # --- Orchestration gateway ---
     # 127.0.0.1 rather than localhost: on Windows "localhost" tries IPv6 first
