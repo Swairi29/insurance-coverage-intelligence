@@ -164,7 +164,7 @@ def build_findings_block(pairs: Sequence[FindingPair]) -> Tuple[str, Dict[str, S
 
         if shown:
             lines.append("evidence:")
-            lines.extend(_evidence_block(clause) for clause in shown)
+            lines.extend(evidence_block(clause) for clause in shown)
         elif not flagged:
             lines.append("evidence: No policy wording was found for this risk.")
         else:
@@ -182,7 +182,7 @@ def build_findings_block(pairs: Sequence[FindingPair]) -> Tuple[str, Dict[str, S
     return "\n\n".join(blocks), allowed
 
 
-def _evidence_block(clause: EvidenceClause) -> str:
+def evidence_block(clause: EvidenceClause) -> str:
     attributes = [f'chunk_id="{_attribute(clause.chunk_id, 80)}"', f'policy="{_attribute(clause.policy_id, 64)}"']
     if clause.section:
         attributes.append(f'section="{_attribute(clause.section)}"')
