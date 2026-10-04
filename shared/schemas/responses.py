@@ -254,6 +254,10 @@ class UserResponse(BaseModel):
     email: str
     business_id: str
     created_at: datetime
+    # The privacy notice the user agreed to, and when. None for accounts made before consent
+    # was recorded.
+    consent_version: Optional[str] = None
+    consented_at: Optional[datetime] = None
 
 
 class AnalysisStatus(str, Enum):

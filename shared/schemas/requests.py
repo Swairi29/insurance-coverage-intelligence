@@ -266,6 +266,9 @@ class QuestionRequest(BaseModel):
 
 _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 MIN_PASSWORD_LENGTH = 8
+# Version of the privacy and data-processing notice users agree to at sign-up. Must equal
+# CONSENT_VERSION in frontend/src/pages/Privacy.tsx; bump both when the notice changes.
+CURRENT_CONSENT_VERSION = "2026-10-04"
 MAX_PASSWORD_BYTES = 72  # bcrypt only uses the first 72 bytes
 
 
@@ -284,9 +287,21 @@ class LoginRequest(BaseModel):
 
 
 class RegisterRequest(LoginRequest):
-    """Body of `POST /api/v1/auth/register`."""
+    """Body of `POST /api/v1/auth/register`.
+
+    `consent_version` is the version of the privacy notice the user agreed to; sending it is
+    the agreement. An account cannot be created without agreeing to the current notice.
+    """
 
     password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_BYTES)
+    consent_version: str = Field(min_length=1, max_length=20)
+
+    @field_validator("consent_version")
+    @classmethod
+    def _check_consent(cls, value: str) -> str:
+        if value != CURRENT_CONSENT_VERSION:
+            raise ValueError("Please agree to the current privacy and data processing notice.")
+        return value
 
     @field_validator("email")
     @classmethod

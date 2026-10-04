@@ -25,6 +25,7 @@ from services.orchestration.api import get_pipeline
 from services.orchestration.database import Database, get_database
 from services.orchestration.pipeline import AgentClient, AnalysisPipeline
 from shared.config.settings import get_settings
+from shared.schemas.requests import CURRENT_CONSENT_VERSION
 from shared.models.coverage import CoverageStatus
 from tests.integration.test_agent3_to_agent4 import BUSINESS, EVIDENCE
 from scripts.gateway_client import AnalysisError, run_analysis
@@ -95,7 +96,7 @@ def gateway(monkeypatch, tmp_path, router):
 
 
 def _login(gateway) -> dict:
-    gateway.post("/api/v1/auth/register", json={"email": "owner@sunrise.test", "password": PASSWORD})
+    gateway.post("/api/v1/auth/register", json={"email": "owner@sunrise.test", "password": PASSWORD, "consent_version": CURRENT_CONSENT_VERSION})
     token = gateway.post("/api/v1/auth/login", json={"email": "owner@sunrise.test", "password": PASSWORD})
     return {"Authorization": f"Bearer {token.json()['access_token']}"}
 

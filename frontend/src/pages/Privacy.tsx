@@ -1,9 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Brand } from '../components/Brand';
-
-/** Bump when the notice changes in a way users must agree to again. */
-export const CONSENT_VERSION = '2026-10-04';
+import { CONSENT_VERSION } from '../lib/consent';
 
 /**
  * Privacy and data-processing notice that users agree to when they sign up. Every statement

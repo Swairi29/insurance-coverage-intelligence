@@ -21,6 +21,7 @@ import type {
 } from '../api/types';
 import { ANALYSIS_STAGES, COVERAGE_STATUSES } from '../api/types';
 import { db } from './db';
+import { CONSENT_VERSION } from '../lib/consent';
 import { DEMO_PASSWORD, demoUser } from './fixtures';
 
 let token: string | null = null;
@@ -101,10 +102,12 @@ describe('auth', () => {
   it('registers a new user, and the account can log in', async () => {
     const user = await api.post<UserResponse>(
       '/api/v1/auth/register',
-      { email: 'New@Shop.test', password: 'long-enough' },
+      { email: 'New@Shop.test', password: 'long-enough', consent_version: CONSENT_VERSION },
       { auth: false },
     );
     expect(user.email).toBe('new@shop.test');
+    expect(user.consent_version).toBe(CONSENT_VERSION);
+    expect(user.consented_at).toBeTruthy();
     await login('new@shop.test', 'long-enough');
   });
 
@@ -112,17 +115,39 @@ describe('auth', () => {
     const taken = await failure(
       api.post(
         '/api/v1/auth/register',
-        { email: 'taken@insureintel.test', password: 'long-enough' },
+        {
+          email: 'taken@insureintel.test',
+          password: 'long-enough',
+          consent_version: CONSENT_VERSION,
+        },
         { auth: false },
       ),
     );
     expect(taken.status).toBe(409);
 
     const invalid = await failure(
-      api.post('/api/v1/auth/register', { email: 'x@y.co', password: 'short' }, { auth: false }),
+      api.post(
+        '/api/v1/auth/register',
+        { email: 'x@y.co', password: 'short', consent_version: CONSENT_VERSION },
+        { auth: false },
+      ),
     );
     expect(invalid.status).toBe(422);
     expect(invalid.details[0].field).toBe('password');
+  });
+
+  it('refuses an account without consent to the current notice', async () => {
+    for (const consent of [undefined, '2020-01-01']) {
+      const err = await failure(
+        api.post(
+          '/api/v1/auth/register',
+          { email: 'new@shop.test', password: 'long-enough', consent_version: consent },
+          { auth: false },
+        ),
+      );
+      expect(err.status).toBe(422);
+      expect(err.details.map((d) => d.field)).toEqual(['consent_version']);
+    }
   });
 
   it('returns 401 for a missing or expired token', async () => {

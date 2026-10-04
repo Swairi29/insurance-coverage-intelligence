@@ -28,6 +28,7 @@ import httpx
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.demo_data import BUSINESSES, demo_policy_files  # noqa: E402
 from scripts.gateway_client import AnalysisError, run_analysis  # noqa: E402
+from shared.schemas.requests import CURRENT_CONSENT_VERSION  # noqa: E402
 
 DEFAULT_GATEWAY = "http://127.0.0.1:8000"
 DEFAULT_EMAIL = "demo@insureintel.test"
@@ -73,7 +74,8 @@ def seed(client: httpx.Client, email: str = DEFAULT_EMAIL, password: str = DEFAU
     if down:
         raise SeedError(f"These agents are not running: {', '.join(down)}. Start all services first.")
 
-    registered = client.post("/api/v1/auth/register", json={"email": email, "password": password})
+    registered = client.post("/api/v1/auth/register", json={"email": email, "password": password,
+                                                          "consent_version": CURRENT_CONSENT_VERSION})
     if registered.status_code not in (201, 409):
         raise SeedError(f"Could not create the demo account: {_detail(registered)}")
 

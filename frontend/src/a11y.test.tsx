@@ -67,4 +67,14 @@ describe('accessibility (axe)', () => {
     await screen.findByRole('dialog');
     await expectNoViolations();
   });
+
+  it('results with a question answered', async () => {
+    loginAsDemoUser();
+    const { user } = renderApp(`/app/analyses/${allStatusesAnalysis.request_id}`);
+    await user.click(
+      await screen.findByRole('button', { name: 'Which risks are potential gaps?' }),
+    );
+    await screen.findByRole('article', { name: /^Answer to:/ });
+    await expectNoViolations();
+  });
 });

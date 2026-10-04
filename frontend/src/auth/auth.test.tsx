@@ -2,6 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { api } from '../api/client';
+import { CONSENT_VERSION } from '../lib/consent';
 import { SESSION_KEYS } from '../lib/session';
 import { DEMO_PASSWORD, demoUser } from '../mocks/fixtures';
 import { server } from '../mocks/server';
@@ -210,6 +211,25 @@ describe('signup form', () => {
     const link = screen.getByRole('link', { name: 'privacy and data processing notice' });
     expect(link).toHaveAttribute('href', '/privacy');
     expect(link).toHaveAttribute('target', '_blank');
+  });
+
+  it('sends the version of the notice the user agreed to', async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      http.post('*/api/v1/auth/register', async ({ request }) => {
+        body = (await request.clone().json()) as Record<string, unknown>;
+        return undefined; // fall through to the normal mock handler
+      }),
+    );
+    const { user } = renderApp('/register');
+    await user.type(screen.getByLabelText('Email'), 'owner@newshop.test');
+    await user.type(screen.getByLabelText('Password'), 'long-enough');
+    await user.type(screen.getByLabelText('Confirm password'), 'long-enough');
+    await user.click(screen.getByRole('checkbox', { name: /privacy and data processing notice/ }));
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+
+    await screen.findByText('Your workspace');
+    expect(body).toMatchObject({ email: 'owner@newshop.test', consent_version: CONSENT_VERSION });
   });
 
   it('shows and hides the password with a real toggle button', async () => {

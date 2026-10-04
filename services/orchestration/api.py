@@ -145,13 +145,14 @@ def agents_health(pipeline: AnalysisPipeline = Depends(get_pipeline)):
 
 def _user_response(user: UserRecord) -> UserResponse:
     return UserResponse(user_id=user.user_id, email=user.email, business_id=user.business_id,
-                        created_at=user.created_at)
+                        created_at=user.created_at, consent_version=user.consent_version,
+                        consented_at=user.consented_at)
 
 
 @app.post("/api/v1/auth/register", response_model=UserResponse, status_code=201)
 def register(body: RegisterRequest, db: Database = Depends(get_database)):
     try:
-        user = register_user(db, body.email, body.password)
+        user = register_user(db, body.email, body.password, body.consent_version)
     except DuplicateEmailError:
         return _error(409, "email_taken", "An account with this email already exists.")
     return _user_response(user)

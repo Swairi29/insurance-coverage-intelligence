@@ -25,6 +25,7 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.gateway_client import AnalysisError, run_analysis  # noqa: E402
+from shared.schemas.requests import CURRENT_CONSENT_VERSION  # noqa: E402
 
 EMAIL = "smoke-test@sunrise.test"
 PASSWORD = "smoke-test-password"
@@ -95,7 +96,8 @@ def main() -> None:
     if any(state != "up" for state in agents.get("agents", agents).values()):
         fail("not every agent is up; check logs/.")
 
-    http.post("/api/v1/auth/register", json={"email": EMAIL, "password": PASSWORD})  # 409 if it exists
+    http.post("/api/v1/auth/register", json={"email": EMAIL, "password": PASSWORD,
+                                        "consent_version": CURRENT_CONSENT_VERSION})  # 409 if it exists
     login = http.post("/api/v1/auth/login", json={"email": EMAIL, "password": PASSWORD})
     if login.status_code != 200:
         fail("login failed - is JWT_SECRET_KEY set in .env?", login)

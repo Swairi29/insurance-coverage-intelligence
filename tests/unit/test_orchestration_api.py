@@ -14,6 +14,7 @@ from services.orchestration.database import Database, get_database
 from services.orchestration.jobs import JobStore, get_job_store
 from services.orchestration.pipeline import REPORT_FAILED_WARNING
 from shared.config.settings import get_settings
+from shared.schemas.requests import CURRENT_CONSENT_VERSION as CONSENT
 from tests.orchestration_fakes import (
     BUSINESS,
     BUSINESS_NAME,
@@ -64,7 +65,7 @@ def client(monkeypatch, agents, db):
 
 
 def login(client, email="owner@example.com") -> dict:
-    assert client.post("/api/v1/auth/register", json={"email": email, "password": PASSWORD}).status_code == 201
+    assert client.post("/api/v1/auth/register", json={"email": email, "password": PASSWORD, "consent_version": CONSENT}).status_code == 201
     response = client.post("/api/v1/auth/login", json={"email": email, "password": PASSWORD})
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
@@ -118,15 +119,55 @@ def test_register_login_and_me(client):
     assert "password" not in str(me) and "hash" not in str(me)
 
 
+def test_registration_records_the_consent_given(client):
+    headers = login(client)
+
+    me = client.get("/api/v1/auth/me", headers=headers).json()
+    assert me["consent_version"] == CONSENT
+    assert me["consented_at"] is not None
+
+
+@pytest.mark.parametrize("consent", [None, "", "2020-01-01"])
+def test_no_account_without_consent_to_the_current_notice(client, consent):
+    body = {"email": "owner@example.com", "password": PASSWORD}
+    if consent is not None:
+        body["consent_version"] = consent
+
+    response = client.post("/api/v1/auth/register", json=body)
+
+    assert response.status_code == 422
+    assert response.json()["details"][0]["field"] == "consent_version"
+    login_attempt = client.post("/api/v1/auth/login", json={"email": "owner@example.com", "password": PASSWORD})
+    assert login_attempt.status_code == 401  # no account was created
+
+
+def test_existing_database_gets_the_consent_columns(tmp_path):
+    path = tmp_path / "old.db"
+    with sqlite3.connect(path) as conn:  # the users table as it was before consent was recorded
+        conn.execute("CREATE TABLE users (user_id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, "
+                     "password_hash TEXT NOT NULL, business_id TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL)")
+        conn.execute("INSERT INTO users VALUES ('u1', 'old@example.com', 'x', 'B-1', '2026-01-01T00:00:00+00:00')")
+    conn.close()
+
+    db = Database(path)
+    db.init_schema()
+    db.init_schema()  # running it again changes nothing
+
+    old = db.get_user("u1")
+    assert old.email == "old@example.com" and old.consent_version is None and old.consented_at is None
+    new = db.create_user("new@example.com", "hash", consent_version=CONSENT)
+    assert db.get_user(new.user_id).consent_version == CONSENT
+
+
 def test_duplicate_registration_is_409(client):
     login(client)
 
-    response = client.post("/api/v1/auth/register", json={"email": "OWNER@example.com", "password": PASSWORD})
+    response = client.post("/api/v1/auth/register", json={"email": "OWNER@example.com", "password": PASSWORD, "consent_version": CONSENT})
     assert response.status_code == 409 and response.json()["error"] == "email_taken"
 
 
 def test_invalid_registration_does_not_echo_the_password(client):
-    response = client.post("/api/v1/auth/register", json={"email": "owner@example.com", "password": "hunter2"})
+    response = client.post("/api/v1/auth/register", json={"email": "owner@example.com", "password": "hunter2", "consent_version": CONSENT})
 
     assert response.status_code == 422
     assert response.json()["details"][0]["field"] == "password"
@@ -143,7 +184,7 @@ def test_wrong_password_and_unknown_email_look_the_same(client):
 
 
 def test_repeated_failed_logins_are_blocked(client):
-    client.post("/api/v1/auth/register", json={"email": "owner@example.com", "password": PASSWORD})
+    client.post("/api/v1/auth/register", json={"email": "owner@example.com", "password": PASSWORD, "consent_version": CONSENT})
     wrong = {"email": "owner@example.com", "password": "wrong password"}
     assert [client.post("/api/v1/auth/login", json=wrong).status_code for _ in range(5)] == [401] * 5
 
@@ -153,7 +194,7 @@ def test_repeated_failed_logins_are_blocked(client):
     assert blocked.json()["error"] == "too_many_attempts"
     assert int(blocked.headers["Retry-After"]) > 0
     # Other accounts are not affected.
-    client.post("/api/v1/auth/register", json={"email": "other@example.com", "password": PASSWORD})
+    client.post("/api/v1/auth/register", json={"email": "other@example.com", "password": PASSWORD, "consent_version": CONSENT})
     assert client.post("/api/v1/auth/login", json={"email": "other@example.com",
                                                    "password": PASSWORD}).status_code == 200
 
@@ -165,7 +206,7 @@ def test_unknown_emails_are_limited_the_same_way(client):
 
 
 def test_login_without_jwt_secret_is_503(client, monkeypatch):
-    client.post("/api/v1/auth/register", json={"email": "owner@example.com", "password": PASSWORD})
+    client.post("/api/v1/auth/register", json={"email": "owner@example.com", "password": PASSWORD, "consent_version": CONSENT})
     monkeypatch.delenv("JWT_SECRET_KEY")
     get_settings.cache_clear()
 

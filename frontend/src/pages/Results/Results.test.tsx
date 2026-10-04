@@ -1,9 +1,11 @@
 import { screen, within } from '@testing-library/react';
+import { http } from 'msw';
 import type { AnalysisResponse } from '../../api/types';
 import { COVERAGE_STATUSES } from '../../api/types';
 import { STATUS_LABELS } from '../../lib/labels';
 import { FLAGGED_MESSAGE } from '../../components/EvidenceList';
 import { allStatusesAnalysis, analysisByType, partialAnalysis } from '../../mocks/fixtures';
+import { server } from '../../mocks/server';
 import { renderApp } from '../../test/renderApp';
 import { loginAsDemoUser } from '../../test/session';
 
@@ -237,5 +239,92 @@ describe('printing', () => {
     )!;
     expect(copy).toHaveClass('print:block');
     expect(copy.querySelectorAll('li').length).toBeGreaterThan(0);
+  });
+});
+
+describe('ask about this analysis', () => {
+  const askPanel = () => screen.getByRole('region', { name: 'Ask about this analysis' });
+
+  it('answers an example question with the clauses and risks behind it', async () => {
+    const { user } = await openResults(allStatusesAnalysis.request_id);
+    const panel = askPanel();
+    const examples = within(panel).getByRole('group', { name: 'Example questions' });
+
+    await user.click(
+      within(examples).getByRole('button', { name: 'Which risks are potential gaps?' }),
+    );
+
+    const answer = await within(panel).findByRole('article', {
+      name: 'Answer to: Which risks are potential gaps?',
+    });
+    expect(answer).toHaveTextContent(
+      'Here is what this analysis found for the risks your question seems to be about:',
+    );
+    expect(within(answer).getByText('Template')).toBeInTheDocument();
+    expect(
+      within(answer).getByRole('list', { name: 'Risks this answer is about' }),
+    ).toBeInTheDocument();
+    expect(
+      within(answer).getByRole('heading', { name: 'Policy wording used' }),
+    ).toBeInTheDocument();
+    expect(answer).toHaveTextContent('decision support, not a legal or binding coverage decision');
+    // After the first answer the examples make room for the conversation.
+    expect(
+      within(panel).queryByRole('group', { name: 'Example questions' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('says plainly when the analysis does not answer a question', async () => {
+    const { user } = await openResults(allStatusesAnalysis.request_id);
+    await user.type(
+      within(askPanel()).getByLabelText('Your question'),
+      'Who won the football?{Enter}',
+    );
+
+    const answer = await screen.findByRole('article', { name: 'Answer to: Who won the football?' });
+    expect(answer).toHaveTextContent('Not answered by this analysis');
+    expect(answer).toHaveTextContent('This analysis does not seem to answer that.');
+    expect(
+      within(answer).queryByRole('heading', { name: 'Policy wording used' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('checks the question before sending it', async () => {
+    let sent = 0;
+    server.use(
+      http.post('*/api/v1/analyses/:id/questions', () => {
+        sent++;
+        return undefined;
+      }),
+    );
+    const { user } = await openResults(allStatusesAnalysis.request_id);
+    const input = within(askPanel()).getByLabelText('Your question');
+
+    await user.type(input, '?!{Enter}');
+
+    expect(await screen.findByText('Type a question of at least a few words.')).toBeInTheDocument();
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(sent).toBe(0);
+  });
+
+  it('explains the question limit (429)', async () => {
+    const { user } = await openResults(allStatusesAnalysis.request_id);
+    await user.type(
+      within(askPanel()).getByLabelText('Your question'),
+      'too many questions{Enter}',
+    );
+
+    expect(await within(askPanel()).findByRole('alert')).toHaveTextContent(
+      'Please wait 42 seconds and try again.',
+    );
+  });
+
+  it('names the failed step when the answering service is down', async () => {
+    const { user } = await openResults(allStatusesAnalysis.request_id);
+    await user.type(within(askPanel()).getByLabelText('Your question'), 'agent down test{Enter}');
+
+    const alert = await within(askPanel()).findByRole('alert');
+    expect(alert).toHaveTextContent('The question could not be answered');
+    expect(alert).toHaveTextContent('Question answering');
   });
 });

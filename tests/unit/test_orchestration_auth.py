@@ -18,7 +18,7 @@ from services.orchestration.auth import (
 from services.orchestration.database import Database, DuplicateEmailError
 from shared.config.settings import Settings
 from shared.models.policy import PolicyDocument, PolicyStatus
-from shared.schemas.requests import AnalysisRequest, LoginRequest, RegisterRequest
+from shared.schemas.requests import CURRENT_CONSENT_VERSION, AnalysisRequest, LoginRequest, RegisterRequest
 from shared.schemas.responses import AnalysisStatus, AnalysisSummary
 from tests.orchestration_fakes import BUSINESS
 
@@ -53,7 +53,7 @@ def test_malformed_hash_is_a_failed_check_not_a_crash():
 
 
 def test_authenticate(db):
-    register_user(db, "owner@example.com", "correct horse")
+    register_user(db, "owner@example.com", "correct horse", CURRENT_CONSENT_VERSION)
 
     assert authenticate(db, "owner@example.com", "correct horse").email == "owner@example.com"
     assert authenticate(db, "owner@example.com", "wrong horse") is None
@@ -104,15 +104,15 @@ def test_missing_or_short_secret_is_a_config_error(secret):
 
 
 def test_duplicate_email_is_refused(db):
-    register_user(db, "owner@example.com", "correct horse")
+    register_user(db, "owner@example.com", "correct horse", CURRENT_CONSENT_VERSION)
 
     with pytest.raises(DuplicateEmailError):
-        register_user(db, "owner@example.com", "another password")
+        register_user(db, "owner@example.com", "another password", CURRENT_CONSENT_VERSION)
 
 
 def test_each_user_gets_their_own_business_id(db):
-    first = register_user(db, "a@example.com", "password1")
-    second = register_user(db, "b@example.com", "password2")
+    first = register_user(db, "a@example.com", "password1", CURRENT_CONSENT_VERSION)
+    second = register_user(db, "b@example.com", "password2", CURRENT_CONSENT_VERSION)
 
     assert first.business_id != second.business_id
     assert first.business_id.startswith("B-") and len(first.business_id) <= 64
@@ -126,8 +126,8 @@ def _policy(policy_id, business_id):
 
 
 def test_policies_are_scoped_to_their_business(db):
-    a = register_user(db, "a@example.com", "password1")
-    b = register_user(db, "b@example.com", "password2")
+    a = register_user(db, "a@example.com", "password1", CURRENT_CONSENT_VERSION)
+    b = register_user(db, "b@example.com", "password2", CURRENT_CONSENT_VERSION)
     db.add_policy(_policy("POL-A", a.business_id))
     db.add_policy(_policy("POL-B", b.business_id))
 
@@ -136,8 +136,8 @@ def test_policies_are_scoped_to_their_business(db):
 
 
 def test_analyses_are_scoped_to_their_user(db):
-    a = register_user(db, "a@example.com", "password1")
-    b = register_user(db, "b@example.com", "password2")
+    a = register_user(db, "a@example.com", "password1", CURRENT_CONSENT_VERSION)
+    b = register_user(db, "b@example.com", "password2", CURRENT_CONSENT_VERSION)
     for i, day in enumerate((1, 2)):
         summary = AnalysisSummary(request_id=f"run-{i}", status=AnalysisStatus.COMPLETE,
                                   created_at=datetime(2026, 9, day, tzinfo=timezone.utc),
@@ -154,7 +154,8 @@ def test_analyses_are_scoped_to_their_user(db):
 
 
 def test_register_email_is_normalised():
-    assert RegisterRequest(email="  Owner@Example.COM ", password="password1").email == "owner@example.com"
+    assert RegisterRequest(email="  Owner@Example.COM ", password="password1",
+                           consent_version=CURRENT_CONSENT_VERSION).email == "owner@example.com"
     assert LoginRequest(email="Owner@Example.com", password="x").email == "owner@example.com"
 
 
@@ -165,7 +166,8 @@ def test_register_email_is_normalised():
 ])
 def test_register_rejects_bad_input(email, password):
     with pytest.raises(ValidationError):
-        RegisterRequest(email=email, password=password)
+        # Valid consent, so only the email or password can be what fails.
+        RegisterRequest(email=email, password=password, consent_version=CURRENT_CONSENT_VERSION)
 
 
 @pytest.mark.parametrize("extra", [

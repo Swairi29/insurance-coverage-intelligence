@@ -8,13 +8,14 @@ import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { PasswordField } from '../../components/ui/PasswordField';
 import { TextField } from '../../components/ui/TextField';
+import { CONSENT_VERSION } from '../../lib/consent';
 import { fieldErrorsFrom } from '../../lib/formErrors';
 import { MAX_PASSWORD_BYTES, MIN_PASSWORD_LENGTH, passwordBytes } from '../../lib/password';
 import { AuthCard } from './AuthCard';
 
 // Same rules as RegisterRequest in shared/schemas/requests.py.
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const FIELDS = ['email', 'password'] as const;
+const FIELDS = ['email', 'password', 'consent_version'] as const;
 
 function validate(
   email: string,
@@ -57,7 +58,7 @@ export default function Register() {
     setSubmitting(true);
     try {
       // Registers and logs in; <PublicOnly> then opens the app.
-      await register(email.trim(), password);
+      await register(email.trim(), password, CONSENT_VERSION);
     } catch (err) {
       setSubmitting(false);
       if (!isApiError(err)) {
@@ -66,7 +67,9 @@ export default function Register() {
         setFieldErrors({ email: err.message });
       } else if (err.status === 422) {
         const { fields, other } = fieldErrorsFrom(err.details, FIELDS);
-        setFieldErrors(fields);
+        // The server checks consent too (e.g. after the notice changed): show it at the box.
+        const { consent_version: consentError, ...rest } = fields;
+        setFieldErrors(consentError ? { ...rest, consent: consentError } : rest);
         setFormError(other[0] ?? null);
       } else {
         setFormError(err.message);

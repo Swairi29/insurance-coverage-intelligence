@@ -62,6 +62,7 @@ from services.orchestration.api import app as gateway_app  # noqa: E402
 from services.orchestration.api import get_pipeline  # noqa: E402
 from services.orchestration.database import Database, get_database  # noqa: E402
 from shared.config.settings import get_settings  # noqa: E402
+from shared.schemas.requests import CURRENT_CONSENT_VERSION  # noqa: E402
 from shared.schemas.responses import AnalysisResponse  # noqa: E402
 from scripts.demo_data import BUSINESS_PACK, BUSINESSES, demo_policy_files  # noqa: E402
 from scripts.gateway_client import run_analysis  # noqa: E402
@@ -164,7 +165,8 @@ def main() -> None:
     gateway = TestClient(gateway_app)
 
     creds = {"email": "demo@insureintel.test", "password": "demo-password-1"}
-    user = gateway.post("/api/v1/auth/register", json=creds).json()
+    user = gateway.post("/api/v1/auth/register",
+                        json={**creds, "consent_version": CURRENT_CONSENT_VERSION}).json()
     token = gateway.post("/api/v1/auth/login", json=creds).json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 

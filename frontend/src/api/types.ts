@@ -110,7 +110,10 @@ export interface LoginRequest {
   password: string;
 }
 
-export type RegisterRequest = LoginRequest;
+export interface RegisterRequest extends LoginRequest {
+  /** The privacy notice version the user agreed to; sending it is the agreement. */
+  consent_version: string;
+}
 
 export interface TokenResponse {
   access_token: string;
@@ -124,6 +127,9 @@ export interface UserResponse {
   email: string;
   business_id: string;
   created_at: string;
+  /** The privacy notice agreed to at sign-up, and when; null for older accounts. */
+  consent_version?: string | null;
+  consented_at?: string | null;
 }
 
 // --- policies (shared/models/policy.py) ------------------------------------------------------
@@ -311,6 +317,38 @@ export interface AnalysisSummary {
   created_at: string;
   total_findings: number;
   potential_gaps: number;
+}
+
+// --- questions about one analysis (Agent 4, via the gateway) -------------------------------
+
+export interface AskQuestionRequest {
+  /** 3-500 characters; must contain words. */
+  question: string;
+}
+
+export interface AnswerMetadata {
+  /** False when the rule-based answer was used. */
+  llm_used: boolean;
+  /** Set when the AI was tried, even if its answer was not kept. */
+  llm_provider: 'ollama' | 'gemini' | null;
+  llm_model: string | null;
+  processing_ms: number | null;
+}
+
+/** Body of POST /analyses/{id}/questions. Nothing is stored on the server. */
+export interface QuestionAnswerResponse {
+  schema_version: string;
+  request_id: string;
+  /** False: the analysis does not answer this question, and `answer` says so. */
+  answerable: boolean;
+  /** Plain text; rule-based answers use "- " lines, so keep line breaks. */
+  answer: string;
+  /** Policy wording the answer is based on (0-6); always empty when not answerable. */
+  citations: EvidenceCitation[];
+  related_risk_ids: string[];
+  generated_by: GeneratedBy;
+  disclaimer: string;
+  metadata: AnswerMetadata;
 }
 
 // --- analysis progress (gateway, while the agents run) ----------------------------------
