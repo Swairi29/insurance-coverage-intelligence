@@ -19,6 +19,31 @@ async function openProfile(route: Parameters<typeof renderApp>[0] = '/app/profil
 }
 
 describe('business profile form', () => {
+  it('offers the main business types in groups, and asks what an "Other" business is', async () => {
+    const { user } = await openProfile();
+    const select = screen.getByLabelText(/Type of business/);
+    expect(within(select).getByRole('group', { name: 'Shops' })).toBeInTheDocument();
+    expect(within(select).getByRole('option', { name: 'Pharmacy' })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/What kind of business is it/)).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/Business name/), 'Lanka Prints');
+    await user.selectOptions(select, 'other');
+    const detail = await screen.findByLabelText(/What kind of business is it/);
+    await user.click(screen.getByRole('button', { name: 'Save and continue to policies' }));
+    expect(
+      await screen.findByText('Describe the type of business in a few words.'),
+    ).toBeInTheDocument();
+    expect(savedDraft()).toBeNull();
+
+    await user.type(detail, 'Printing shop');
+    await user.click(screen.getByRole('button', { name: 'Save and continue to policies' }));
+    expect(await screen.findByRole('heading', { name: 'Policies' })).toBeInTheDocument();
+    expect(savedDraft()).toMatchObject({
+      business_type: 'other',
+      business_type_detail: 'Printing shop',
+    });
+  });
+
   it('requires the name and the type, and saves nothing until they are given', async () => {
     const { user } = await openProfile();
     await user.click(screen.getByRole('button', { name: 'Save and continue to policies' }));

@@ -110,7 +110,7 @@ def _evaluate(
     elif business_type is not None and business_type in definition.baseline_for:
         evidence = []
         confidence = BASELINE_CONFIDENCE
-        label = business_type.value.replace("_", " ")
+        label = "business" if business_type is BusinessType.OTHER else business_type.value.replace("_", " ")
         reason = (
             f"{definition.reason} (assumed for a {label}; no matching details were provided)"
         )

@@ -22,3 +22,12 @@ export function formatBytes(bytes: number): string {
 export function plural(count: number, word: string, pluralWord = `${word}s`): string {
   return `${count} ${count === 1 ? word : pluralWord}`;
 }
+
+/** "840 ms", "4.2 s", "1 min 05 s". */
+export function formatDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)} s`;
+  const whole = Math.round(seconds);
+  return `${Math.floor(whole / 60)} min ${String(whole % 60).padStart(2, '0')} s`;
+}

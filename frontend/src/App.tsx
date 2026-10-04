@@ -2,7 +2,9 @@
 import { Route, Routes } from 'react-router-dom';
 import { PublicOnly, RequireAuth } from './auth/RequireAuth';
 import { AppLayout } from './components/Layout/AppLayout';
+import AnalysisWorkspace from './pages/AnalysisWorkspace';
 import Landing from './pages/Landing';
+import Privacy from './pages/Privacy';
 import NotFound from './pages/NotFound';
 import BusinessProfile from './pages/BusinessProfile';
 import Dashboard from './pages/Dashboard';
@@ -17,6 +19,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route path="/privacy" element={<Privacy />} />
       <Route
         path="/login"
         element={
@@ -47,6 +50,7 @@ export default function App() {
         <Route path="analyses/new" element={<NewAnalysis />} />
         <Route path="analyses" element={<History />} />
         <Route path="analyses/:requestId" element={<ResultsPage />} />
+        <Route path="analyses/:requestId/progress" element={<AnalysisWorkspace />} />
         <Route path="*" element={<NotFound />} />
       </Route>
       <Route path="*" element={<NotFound />} />

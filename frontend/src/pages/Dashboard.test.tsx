@@ -9,7 +9,7 @@ import { loginAsDemoUser } from '../test/session';
 async function openDashboard() {
   loginAsDemoUser();
   const result = renderApp('/app');
-  await screen.findByRole('heading', { name: 'Your workspace' });
+  await screen.findByText('Your workspace');
   return result;
 }
 

@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { ApiError, api, configureApiClient } from '../api/client';
 import type {
   AgentsHealth,
+  AnalysisProgress,
   AnalysisResponse,
   AnalysisSummary,
   BusinessProfile,
@@ -19,6 +20,7 @@ import type {
   UserResponse,
 } from '../api/types';
 import { ANALYSIS_STAGES, COVERAGE_STATUSES } from '../api/types';
+import { db } from './db';
 import { DEMO_PASSWORD, demoUser } from './fixtures';
 
 let token: string | null = null;
@@ -162,60 +164,89 @@ describe('policies', () => {
 describe('analyses', () => {
   beforeEach(() => login());
 
+  /** Start a run (202), read its status, then fetch the result like the frontend does. */
+  async function run(overrides: Partial<BusinessProfile>) {
+    const started = await api.post<AnalysisProgress>('/api/v1/analyses', {
+      business: business(overrides),
+      policy_ids: await policyIds(),
+    });
+    expect(started.state).toBe('running');
+    const status = await api.get<AnalysisProgress>(`/api/v1/analyses/${started.request_id}/status`);
+    return { started, status };
+  }
+
   it.each(['bakery', 'restaurant', 'retail_shop'] as const)(
     'runs a complete %s analysis and adds it to the history',
     async (type) => {
-      const ids = await policyIds();
-      const result = await api.post<AnalysisResponse>('/api/v1/analyses', {
-        business: business({ business_type: type, business_name: 'My Business' }),
-        policy_ids: ids,
-      });
+      const { started, status } = await run({ business_type: type, business_name: 'My Business' });
+      expect(started.stages.map((s) => s.state)).toEqual(['queued', 'queued', 'queued', 'queued']);
+      expect(status.state).toBe('complete');
+      expect(status.stages.map((s) => s.state)).toEqual(['done', 'done', 'done', 'done']);
+      expect(status.stages[0].received).toMatch(/risks? identified$/);
 
+      const result = await api.get<AnalysisResponse>(`/api/v1/analyses/${started.request_id}`);
       expect(result.status).toBe('complete');
       expect(result.report).not.toBeNull();
       expect(result.risk_profile.business_type).toBe(type);
       expect(result.risk_profile.business_name).toBe('My Business');
 
       const history = await api.get<AnalysisSummary[]>('/api/v1/analyses');
-      expect(history[0].request_id).toBe(result.request_id);
-      const stored = await api.get<AnalysisResponse>(`/api/v1/analyses/${result.request_id}`);
-      expect(stored.request_id).toBe(result.request_id);
+      expect(history[0].request_id).toBe(started.request_id);
     },
   );
 
   it('returns a partial result for "Partial Ltd"', async () => {
-    const result = await api.post<AnalysisResponse>('/api/v1/analyses', {
-      business: business({ business_name: 'Partial Ltd' }),
-      policy_ids: await policyIds(),
-    });
+    const { started, status } = await run({ business_name: 'Partial Ltd' });
+    expect(status.state).toBe('partial');
+    expect(status.stages.at(-1)!.state).toBe('failed');
+    const result = await api.get<AnalysisResponse>(`/api/v1/analyses/${started.request_id}`);
     expect(result.status).toBe('partial');
     expect(result.report).toBeNull();
     expect(result.warnings.length).toBeGreaterThan(0);
   });
 
   it('returns every coverage status for "All Statuses"', async () => {
-    const result = await api.post<AnalysisResponse>('/api/v1/analyses', {
-      business: business({ business_name: 'All Statuses' }),
-      policy_ids: await policyIds(),
-    });
+    const { started } = await run({ business_name: 'All Statuses' });
+    const result = await api.get<AnalysisResponse>(`/api/v1/analyses/${started.request_id}`);
     const statuses = new Set(result.coverage.assessments.map((a) => a.status));
     expect([...statuses].sort()).toEqual([...COVERAGE_STATUSES].sort());
     expect(result.report!.findings.some((f) => f.generated_by === 'llm')).toBe(true);
   });
 
   it.each([
-    ['Down Ltd', 503, 'agent_unavailable', 'risk_profile'],
-    ['Timeout Ltd', 504, 'agent_timeout', 'coverage'],
-    ['Broken Ltd', 502, 'agent_bad_response', 'policy_evidence'],
-  ])('fails "%s" with %i %s at %s', async (name, status, error, stage) => {
-    const err = await failure(
-      api.post('/api/v1/analyses', {
-        business: business({ business_name: name }),
-        policy_ids: await policyIds(),
-      }),
-    );
-    expect(err).toMatchObject({ status, error, stage });
-    expect(err.requestId).toBeTruthy();
+    ['Down Ltd', 'agent_unavailable', 'risk_profile', ['failed', 'skipped', 'skipped', 'skipped']],
+    ['Timeout Ltd', 'agent_timeout', 'coverage', ['done', 'done', 'failed', 'skipped']],
+    [
+      'Broken Ltd',
+      'agent_bad_response',
+      'policy_evidence',
+      ['done', 'failed', 'skipped', 'skipped'],
+    ],
+  ])('fails "%s" with %s at %s', async (name, error, stage, states) => {
+    const { started, status } = await run({ business_name: name });
+    expect(status.state).toBe('failed');
+    expect(status.error).toMatchObject({ error, stage, request_id: started.request_id });
+    expect(status.stages.map((s) => s.state)).toEqual(states);
+    const err = await failure(api.get(`/api/v1/analyses/${started.request_id}`));
+    expect(err).toMatchObject({ status: 404, error: 'analysis_not_found' });
+  });
+
+  it('answers 409 for the result of a run that is still going', async () => {
+    const started = await api.post<AnalysisProgress>('/api/v1/analyses', {
+      business: business(),
+      policy_ids: await policyIds(),
+    });
+    // Make the run take an hour.
+    db.jobs.get(started.request_id)!.durations = [3_600_000, 0, 0, 0];
+    const err = await failure(api.get(`/api/v1/analyses/${started.request_id}`));
+    expect(err).toMatchObject({ status: 409, error: 'analysis_running' });
+  });
+
+  it('rebuilds the status of a seeded analysis from its result', async () => {
+    const seeded = (await api.get<AnalysisSummary[]>('/api/v1/analyses'))[0];
+    const status = await api.get<AnalysisProgress>(`/api/v1/analyses/${seeded.request_id}/status`);
+    expect(['complete', 'partial']).toContain(status.state);
+    expect(status.stages[0].state).toBe('done');
   });
 
   it('returns 422 for too many employees and 404 for an unknown policy', async () => {

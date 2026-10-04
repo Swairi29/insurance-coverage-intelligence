@@ -7,10 +7,11 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from agents.explanation_agent.llm import get_client
+from agents.explanation_agent.qa_answer import QuestionService
 from agents.explanation_agent.service import ExplanationService
 from shared.config.settings import get_settings
-from shared.schemas.requests import ExplanationRequest
-from shared.schemas.responses import ExplanationResponse
+from shared.schemas.requests import ExplanationRequest, QuestionRequest
+from shared.schemas.responses import ExplanationResponse, QuestionAnswerResponse
 from shared.utils.security import require_internal_api_key
 
 logger = logging.getLogger(__name__)
@@ -45,3 +46,24 @@ def generate_report(
         # Type only: details could contain policy text.
         logger.error("Report generation failed (%s).", type(exc).__name__)
         raise HTTPException(status_code=500, detail="Report generation could not be completed.") from None
+
+
+def get_question_service() -> QuestionService:
+    """Builds the service from settings; replaced with a fake in tests."""
+    settings = get_settings()
+    # Someone is waiting for the answer: a short limit per call, not the report budget.
+    client, provider, model = get_client(settings, ollama_timeout=settings.qa_llm_timeout_seconds)
+    return QuestionService(client=client, provider=provider, model=model, use_llm=settings.explanation_use_llm)
+
+
+@router.post("/api/v1/answer-question", response_model=QuestionAnswerResponse)
+def answer_question(
+    request: QuestionRequest,
+    service: QuestionService = Depends(get_question_service),
+) -> QuestionAnswerResponse:
+    try:
+        return service.answer(request)
+    except Exception as exc:
+        # Type only: details could contain the question or policy text.
+        logger.error("Question answering failed (%s).", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="The question could not be answered.") from None

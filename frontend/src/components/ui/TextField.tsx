@@ -5,7 +5,8 @@ import {
   type ReactNode,
   type TextareaHTMLAttributes,
 } from 'react';
-import { INPUT_CLASSES, inputBorder } from './fieldStyles';
+import { WarningIcon } from '../icons';
+import { INPUT_CLASSES, TEXTAREA_CLASSES, describedBy, inputBorder } from './fieldStyles';
 
 interface FieldProps {
   label: string;
@@ -17,7 +18,7 @@ interface FieldProps {
 }
 
 /** Label, hint and error around one control, with the aria wiring done once. */
-function FieldFrame({
+export function FieldFrame({
   label,
   error,
   hint,
@@ -39,22 +40,21 @@ function FieldFrame({
       </label>
       {children}
       {hint && !error && (
-        <p id={`${inputId}-hint`} className="mt-1 text-xs text-muted">
+        <p id={`${inputId}-hint`} className="mt-1.5 text-xs text-muted">
           {hint}
         </p>
       )}
       {error && (
-        <p id={`${inputId}-error`} className="mt-1 text-xs font-medium text-status-excluded">
+        <p
+          id={`${inputId}-error`}
+          className="mt-1.5 flex items-start gap-1 text-xs font-medium text-status-excluded"
+        >
+          <WarningIcon className="mt-px h-3.5 w-3.5 shrink-0" />
           {error}
         </p>
       )}
     </div>
   );
-}
-
-function describedBy(inputId: string, hint: ReactNode, error?: string | null) {
-  if (error) return `${inputId}-error`;
-  return hint ? `${inputId}-hint` : undefined;
 }
 
 type TextFieldProps = FieldProps & InputHTMLAttributes<HTMLInputElement>;
@@ -96,7 +96,7 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function 
         aria-invalid={error ? true : undefined}
         aria-required={required || undefined}
         aria-describedby={describedBy(inputId, hint, error)}
-        className={`${INPUT_CLASSES} ${inputBorder(error)} min-h-[96px]`}
+        className={`${TEXTAREA_CLASSES} ${inputBorder(error)}`}
         {...rest}
       />
     </FieldFrame>

@@ -12,7 +12,7 @@ from typing import Any, Iterable, List, Mapping, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from shared.models.analysis import Finding, ReportSummary
+from shared.models.analysis import EvidenceCitation, Finding, GeneratedBy, ReportSummary
 from shared.models.business import BusinessType
 from shared.models.policy import PolicyDocument, RiskEvidenceResult
 from shared.models.risk import IdentifiedRisk
@@ -200,6 +200,46 @@ class ExplanationResponse(BaseModel):
     metadata: ExplanationMetadata
 
 
+# --- Questions about one saved analysis (Agent 4) ---
+
+MAX_ANSWER_CHARS = 1200
+MAX_CITATIONS_PER_ANSWER = 6
+
+
+class AnswerMetadata(BaseModel):
+    llm_used: bool  # False when the rule-based answer was used
+    llm_provider: Optional[str] = None  # "ollama" | "gemini"
+    llm_model: Optional[str] = None
+    processing_ms: Optional[int] = Field(default=None, ge=0)
+
+
+class QuestionAnswerResponse(BaseModel):
+    """Result of Agent 4's `POST /api/v1/answer-question`; the gateway returns it unchanged."""
+
+    schema_version: str = SCHEMA_VERSION
+    request_id: str
+    # False: the analysis does not answer this question, and `answer` says so.
+    answerable: bool
+    answer: str = Field(min_length=1, max_length=MAX_ANSWER_CHARS)
+    # The policy wording the answer is based on.
+    citations: List[EvidenceCitation] = Field(default_factory=list, max_length=MAX_CITATIONS_PER_ANSWER)
+    # Risks of this analysis the answer is about, so the frontend can link to them.
+    related_risk_ids: List[str] = Field(default_factory=list, max_length=50)
+    generated_by: GeneratedBy
+    disclaimer: str
+    metadata: AnswerMetadata
+
+    @model_validator(mode="after")
+    def _check_citations(self) -> "QuestionAnswerResponse":
+        # An answer that says "this analysis can't tell you" must not look as if it had sources.
+        if not self.answerable and self.citations:
+            raise ValueError("an unanswerable question must not have citations.")
+        chunk_ids = [citation.chunk_id for citation in self.citations]
+        if len(chunk_ids) != len(set(chunk_ids)):
+            raise ValueError("citations must not repeat a chunk_id.")
+        return self
+
+
 # --- Orchestration gateway (consumed by the frontend) ---
 
 
@@ -253,3 +293,47 @@ class GatewayError(BaseModel):
     message: str
     stage: Optional[str] = None
     request_id: Optional[str] = None
+
+
+# --- Analysis progress (gateway, while the agents run) ---
+
+
+class StageState(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class StageProgress(BaseModel):
+    """One agent call made by the gateway. Summaries are counts only, never content."""
+
+    stage: str  # "risk_profile" | "policy_evidence" | "coverage" | "report"
+    agent: str  # e.g. "Risk Profiling Agent"
+    endpoint: str  # e.g. "POST /api/v1/risk-profile"
+    state: StageState = StageState.QUEUED
+    sent: Optional[str] = None  # what the gateway sent, e.g. "business profile"
+    received: Optional[str] = None  # what came back, e.g. "14 risks identified"
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    duration_ms: Optional[int] = Field(default=None, ge=0)
+
+
+class RunState(str, Enum):
+    RUNNING = "running"
+    COMPLETE = "complete"
+    PARTIAL = "partial"  # finished without the written report
+    FAILED = "failed"
+
+
+class AnalysisProgress(BaseModel):
+    """Body of `POST /api/v1/analyses` (202) and `GET /api/v1/analyses/{id}/status`."""
+
+    schema_version: str = SCHEMA_VERSION
+    request_id: str
+    state: RunState
+    created_at: datetime
+    updated_at: datetime
+    stages: List[StageProgress]
+    error: Optional[GatewayError] = None  # set when state is "failed"

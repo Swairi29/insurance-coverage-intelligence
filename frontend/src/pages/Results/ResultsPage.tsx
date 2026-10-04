@@ -4,16 +4,16 @@ import { useAnalysis } from '../../api/analyses';
 import { isApiError } from '../../api/client';
 import { usePolicies } from '../../api/policies';
 import type { AnalysisResponse } from '../../api/types';
-import { COVERAGE_STATUSES } from '../../api/types';
 import { Disclaimer } from '../../components/Disclaimer';
 import { ErrorMessage } from '../../components/ErrorMessage';
 import { SparkleIcon } from '../../components/icons';
-import { AnalysisStatusBadge, StatusBadge } from '../../components/StatusBadge';
+import { AnalysisStatusBadge } from '../../components/StatusBadge';
+import { StatusBar } from '../../components/StatusBar';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
 import { SkeletonReport } from '../../components/ui/Skeleton';
 import { formatDateTime } from '../../lib/format';
-import { BUSINESS_TYPE_LABELS } from '../../lib/profile';
+import { businessTypeLabel } from '../../lib/profile';
 import { aiUsage, analysisWarnings, headline, statusCounts } from '../../lib/results';
 import { CoverageTab } from './CoverageTab';
 import { ReportTab } from './ReportTab';
@@ -35,6 +35,23 @@ export default function ResultsPage() {
     return <SkeletonReport label="Loading the analysis" />;
   }
   if (analysis.isError) {
+    if (isApiError(analysis.error) && analysis.error.status === 409) {
+      // Still running: the workspace shows the agents at work.
+      return (
+        <section className="max-w-xl rounded-card border border-line bg-white p-6 shadow-card">
+          <h1 className="text-section font-extrabold">This analysis is still running</h1>
+          <p className="mt-2 text-sm text-muted">
+            The results appear here when all four agents finish.
+          </p>
+          <Link
+            to={`/app/analyses/${requestId}/progress`}
+            className="mt-4 inline-block text-sm font-semibold text-brand hover:underline"
+          >
+            Watch the agents work →
+          </Link>
+        </section>
+      );
+    }
     if (isApiError(analysis.error) && analysis.error.status === 404) {
       return (
         <section className="max-w-xl rounded-card border border-line bg-white p-6">
@@ -108,34 +125,33 @@ function Results({ analysis }: { analysis: AnalysisResponse }) {
         <Link to="/app/analyses" className="text-sm font-semibold text-brand hover:underline">
           ← History
         </Link>
-        <Button variant="secondary" onClick={() => window.print()}>
-          Print report
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to={`/app/analyses/${analysis.request_id}/progress`}
+            className="rounded-pill px-3 py-2 text-sm font-semibold text-ai hover:bg-ai-tint"
+          >
+            How the agents ran
+          </Link>
+          <Button onClick={() => window.print()}>Print report</Button>
+        </div>
       </div>
       <p className="hidden font-display text-lg font-extrabold text-ink-heading print:block">
         InsureIntel coverage report
       </p>
 
-      <header className="mt-3 rounded-card border border-line bg-white p-5 sm:p-6 print:border-0 print:p-0">
+      <header className="mt-3 rounded-card border border-line bg-white p-5 shadow-card sm:p-6 print:border-0 print:p-0 print:shadow-none">
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
           <AnalysisStatusBadge status={analysis.status} />
           <span>{formatDateTime(analysis.created_at)}</span>
           <span aria-hidden="true">·</span>
           <span>
-            {profile.business_name} ({BUSINESS_TYPE_LABELS[profile.business_type]})
+            {profile.business_name} ({businessTypeLabel(profile)})
           </span>
         </div>
         <h1 className="mt-3 text-2xl font-extrabold leading-snug">{headline(analysis)}</h1>
-        <ul className="mt-4 flex flex-wrap gap-2" aria-label="Findings by status">
-          {COVERAGE_STATUSES.filter((status) => counts[status] > 0).map((status) => (
-            <li key={status} className="flex items-center gap-1.5 text-sm">
-              <StatusBadge status={status} />
-              <span className="font-semibold text-ink-heading">{counts[status]}</span>
-            </li>
-          ))}
-        </ul>
+        <StatusBar counts={counts} className="mt-4" />
         <p className="mt-4 flex items-start gap-1.5 text-xs text-muted-strong">
-          <SparkleIcon className="mt-px h-3.5 w-3.5 shrink-0 text-brand" />
+          <SparkleIcon className="mt-px h-3.5 w-3.5 shrink-0 text-ai" />
           {aiUsage(analysis)}
         </p>
       </header>
@@ -172,7 +188,7 @@ function Results({ analysis }: { analysis: AnalysisResponse }) {
               aria-controls={`panel-${t.id}`}
               tabIndex={selected ? 0 : -1}
               onClick={() => selectTab(t.id)}
-              className={`-mb-px shrink-0 border-b-2 px-4 py-2.5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand ${
+              className={`-mb-px shrink-0 border-b-2 px-4 py-2.5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 ${
                 selected
                   ? 'border-brand text-brand'
                   : 'border-transparent text-muted-strong hover:text-ink-heading'
@@ -203,13 +219,7 @@ function Results({ analysis }: { analysis: AnalysisResponse }) {
         >
           <h2 className="mb-4 hidden text-xl font-extrabold print:block">{t.label}</h2>
           {t.id === 'report' && <ReportTab analysis={analysis} policyNames={policyNames} />}
-          {t.id === 'coverage' && (
-            <CoverageTab
-              assessments={analysis.coverage.assessments}
-              model={analysis.coverage.metadata.llm_model}
-              policyNames={policyNames}
-            />
-          )}
+          {t.id === 'coverage' && <CoverageTab analysis={analysis} policyNames={policyNames} />}
           {t.id === 'risks' && <RiskProfileTab profile={analysis.risk_profile} />}
         </div>
       ))}

@@ -27,6 +27,7 @@ from services.orchestration.pipeline import AgentClient, AnalysisPipeline
 from shared.config.settings import get_settings
 from shared.models.coverage import CoverageStatus
 from tests.integration.test_agent3_to_agent4 import BUSINESS, EVIDENCE
+from scripts.gateway_client import AnalysisError, run_analysis
 from tests.orchestration_fakes import URLS, multipart_field
 
 API_KEY = "integration-key"
@@ -106,11 +107,8 @@ def test_full_run_through_the_gateway(gateway, router):
     assert policy.status_code == 200, policy.text
     router.calls.clear()
 
-    response = gateway.post("/api/v1/analyses", headers=headers,
-                            json={"business": BUSINESS, "policy_ids": [policy.json()["policy_id"]]})
+    body = run_analysis(gateway, headers, {"business": BUSINESS, "policy_ids": [policy.json()["policy_id"]]})
 
-    assert response.status_code == 200, response.text
-    body = response.json()
     assert body["status"] == "complete", body["warnings"]
     request_id = body["request_id"]
 
@@ -143,11 +141,10 @@ def test_real_agent_1_refuses_a_wrong_api_key(gateway, router):
     gateway_app.dependency_overrides[get_pipeline] = lambda: router.pipeline(api_key="wrong-key")
     router.calls.clear()
 
-    response = gateway.post("/api/v1/analyses", headers=headers,
-                            json={"business": BUSINESS, "policy_ids": ["POL-SUN-01"]})
+    with pytest.raises(AnalysisError) as failure:
+        run_analysis(gateway, headers, {"business": BUSINESS, "policy_ids": ["POL-SUN-01"]})
 
-    assert response.status_code == 502
-    assert response.json() | {"request_id": None} == {
+    assert failure.value.progress["error"] | {"request_id": None} == {
         "error": "agent_rejected", "message": "An analysis service could not complete the request.",
         "stage": "risk_profile", "request_id": None}
     assert [r.url.host for r in router.calls] == ["risk.test"]

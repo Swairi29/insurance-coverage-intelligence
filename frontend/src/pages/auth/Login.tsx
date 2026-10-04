@@ -4,6 +4,7 @@ import { GENERIC_ERROR_MESSAGE, isApiError } from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
 import { Alert } from '../../components/ui/Alert';
 import { Button } from '../../components/ui/Button';
+import { PasswordField } from '../../components/ui/PasswordField';
 import { TextField } from '../../components/ui/TextField';
 import { fieldErrorsFrom, formatWait } from '../../lib/formErrors';
 import { AuthCard } from './AuthCard';
@@ -78,6 +79,7 @@ export default function Login() {
     <AuthCard
       title="Welcome back"
       subtitle="Log in to see your business risks and insurance coverage."
+      aside="Pick up where your last analysis left off."
       footer={
         <>
           New to InsureIntel?{' '}
@@ -92,10 +94,18 @@ export default function Login() {
           <Alert tone="info">Your session has expired. Please log in again.</Alert>
         )}
         {formError && (
-          <Alert tone="error">
+          <Alert tone="error" title={secondsLeft > 0 ? 'Too many attempts' : undefined}>
             {formError}
             {secondsLeft > 0 && (
-              <span className="mt-1 block">You can try again in {formatWait(secondsLeft)}.</span>
+              <span className="mt-2 flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="rounded-control bg-white px-2 py-0.5 font-mono text-sm font-bold tabular-nums"
+                >
+                  {countdown(secondsLeft)}
+                </span>
+                <span>You can try again in {formatWait(secondsLeft)}.</span>
+              </span>
             )}
           </Alert>
         )}
@@ -107,18 +117,22 @@ export default function Login() {
           onChange={(e) => setEmail(e.target.value)}
           error={fieldErrors.email}
         />
-        <TextField
+        <PasswordField
           label="Password"
-          type="password"
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={fieldErrors.password}
         />
         <Button type="submit" className="w-full" loading={submitting} disabled={secondsLeft > 0}>
-          Log in
+          {secondsLeft > 0 ? `Try again in ${countdown(secondsLeft)}` : 'Log in'}
         </Button>
       </form>
     </AuthCard>
   );
+}
+
+/** "14:59" for a lockout countdown. */
+function countdown(seconds: number): string {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }

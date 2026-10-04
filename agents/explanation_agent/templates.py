@@ -67,7 +67,16 @@ _CATEGORY_COVER = {
 _BUSINESS_LABEL = {
     BusinessType.BAKERY: "a bakery",
     BusinessType.RESTAURANT: "a restaurant",
+    BusinessType.CAFE: "a cafe",
     BusinessType.RETAIL_SHOP: "a retail shop",
+    BusinessType.GROCERY_STORE: "a grocery store",
+    BusinessType.PHARMACY: "a pharmacy",
+    BusinessType.CLOTHING_STORE: "a clothing store",
+    BusinessType.HARDWARE_STORE: "a hardware store",
+    BusinessType.SALON: "a salon",
+    BusinessType.REPAIR_WORKSHOP: "a repair workshop",
+    BusinessType.PROFESSIONAL_SERVICES: "a professional services business",
+    # OTHER falls through to "a business like yours".
 }
 
 # Headline labels in priority order: (status, singular, plural).

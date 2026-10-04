@@ -8,7 +8,20 @@
 
 // --- enums ----------------------------------------------------------------------------------
 
-export const BUSINESS_TYPES = ['bakery', 'restaurant', 'retail_shop'] as const;
+export const BUSINESS_TYPES = [
+  'bakery',
+  'restaurant',
+  'cafe',
+  'retail_shop',
+  'grocery_store',
+  'pharmacy',
+  'clothing_store',
+  'hardware_store',
+  'salon',
+  'repair_workshop',
+  'professional_services',
+  'other',
+] as const;
 export type BusinessType = (typeof BUSINESS_TYPES)[number];
 
 export const SALES_CHANNELS = ['in_store', 'online', 'delivery', 'wholesale'] as const;
@@ -57,7 +70,7 @@ export type AnalysisStatus = 'complete' | 'partial';
 /** Pipeline steps; used in `GatewayError.stage`, `stage_ms` and `/health/agents`. */
 export const ANALYSIS_STAGES = ['risk_profile', 'policy_evidence', 'coverage', 'report'] as const;
 export type AnalysisStage = (typeof ANALYSIS_STAGES)[number];
-export type Stage = AnalysisStage | 'policy_upload';
+export type Stage = AnalysisStage | 'policy_upload' | 'question';
 
 // --- business profile (request input, shared/models/business.py) ---------------------------
 
@@ -81,6 +94,8 @@ export interface Operations {
 export interface BusinessProfile {
   business_name: string;
   business_type: BusinessType;
+  /** What the business is when `business_type` is "other", e.g. "printing shop". */
+  business_type_detail?: string | null;
   description?: string | null;
   employee_count?: number | null;
   equipment?: string[];
@@ -296,6 +311,40 @@ export interface AnalysisSummary {
   created_at: string;
   total_findings: number;
   potential_gaps: number;
+}
+
+// --- analysis progress (gateway, while the agents run) ----------------------------------
+
+export type StageState = 'queued' | 'running' | 'done' | 'failed' | 'skipped';
+export type RunState = 'running' | 'complete' | 'partial' | 'failed';
+
+/** One agent call made by the gateway. Summaries are counts only, never content. */
+export interface StageProgress {
+  stage: AnalysisStage;
+  /** e.g. "Risk Profiling Agent" */
+  agent: string;
+  /** e.g. "POST /api/v1/risk-profile" */
+  endpoint: string;
+  state: StageState;
+  /** What the gateway sent, e.g. "business profile". */
+  sent: string | null;
+  /** What came back, e.g. "14 risks identified", or why it failed or was skipped. */
+  received: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  duration_ms: number | null;
+}
+
+/** Body of POST /analyses (202) and GET /analyses/{id}/status. */
+export interface AnalysisProgress {
+  schema_version: string;
+  request_id: string;
+  state: RunState;
+  created_at: string;
+  updated_at: string;
+  stages: StageProgress[];
+  /** Set when state is "failed". */
+  error: GatewayError | null;
 }
 
 // --- health ----------------------------------------------------------------------------------

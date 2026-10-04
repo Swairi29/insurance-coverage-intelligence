@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { Controller, useForm, useWatch, type Path } from 'react-hook-form';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { ValidationErrorDetail } from '../api/types';
-import { BUSINESS_TYPES, SALES_CHANNELS } from '../api/types';
+import { SALES_CHANNELS } from '../api/types';
 import { TagInput } from '../components/form/TagInput';
 import { TriStateField } from '../components/form/TriStateField';
 import { Alert } from '../components/ui/Alert';
@@ -10,6 +10,7 @@ import { Button } from '../components/ui/Button';
 import { INPUT_CLASSES, inputBorder } from '../components/ui/fieldStyles';
 import { TextArea, TextField } from '../components/ui/TextField';
 import {
+  BUSINESS_TYPE_GROUPS,
   BUSINESS_TYPE_LABELS,
   EMPTY_PROFILE_FORM,
   PROFILE_LIMITS as LIMITS,
@@ -74,6 +75,7 @@ export default function BusinessProfile() {
   };
 
   const descriptionLength = useWatch({ control, name: 'description' }).length;
+  const businessType = useWatch({ control, name: 'business_type' });
   const errorCount = Object.keys(errors).length;
 
   return (
@@ -118,7 +120,7 @@ export default function BusinessProfile() {
             label="Type of business"
             required
             error={errors.business_type?.message}
-            hint="The risk checks currently support these three types."
+            hint="Pick the closest match. If none fits, choose “Other” and describe it."
           >
             {(props) => (
               <select
@@ -126,14 +128,37 @@ export default function BusinessProfile() {
                 {...register('business_type', { required: 'Choose the type of business.' })}
               >
                 <option value="">Choose…</option>
-                {BUSINESS_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {BUSINESS_TYPE_LABELS[type]}
-                  </option>
+                {BUSINESS_TYPE_GROUPS.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.types.map((type) => (
+                      <option key={type} value={type}>
+                        {BUSINESS_TYPE_LABELS[type]}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             )}
           </SelectField>
+
+          {businessType === 'other' && (
+            <TextField
+              label="What kind of business is it?"
+              required
+              className="sm:max-w-md"
+              placeholder="e.g. Printing shop"
+              hint="Only general risks are assumed for other businesses; your description and details below add the rest."
+              error={errors.business_type_detail?.message}
+              {...register('business_type_detail', {
+                validate: (v) =>
+                  v.trim().length > 0 || 'Describe the type of business in a few words.',
+                maxLength: {
+                  value: LIMITS.typeDetailLength,
+                  message: `Use at most ${LIMITS.typeDetailLength} characters.`,
+                },
+              })}
+            />
+          )}
 
           <TextArea
             label="What does the business do?"
@@ -291,7 +316,7 @@ function SelectField({
 }) {
   const id = 'business-type';
   return (
-    <div className="sm:max-w-xs">
+    <div className="sm:max-w-md">
       <label htmlFor={id} className="block text-sm font-semibold text-ink-heading">
         {label}
         {required && (

@@ -11,6 +11,7 @@ import {
   partialAnalysis,
   policiesFixture,
 } from './fixtures';
+import type { MockJob } from './jobs';
 
 interface MockDb {
   users: Map<string, { password: string; user: UserResponse }>;
@@ -18,6 +19,8 @@ interface MockDb {
   policies: PolicyDocument[];
   analyses: Map<string, AnalysisResponse>;
   summaries: AnalysisSummary[];
+  /** Analyses started in this session, by request_id. */
+  jobs: Map<string, MockJob>;
 }
 
 function seed(): MockDb {
@@ -33,6 +36,7 @@ function seed(): MockDb {
     policies: structuredClone(policiesFixture),
     analyses,
     summaries: sortNewestFirst(structuredClone(analysesFixture)),
+    jobs: new Map(),
   };
 }
 

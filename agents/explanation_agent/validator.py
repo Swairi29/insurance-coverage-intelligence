@@ -154,6 +154,22 @@ def validate_item(
     return ValidationResult(ok=not problems, problems=problems)
 
 
+def text_safety_problems(text: str) -> List[str]:
+    """V5, V7 and V8 for any LLM text; also used for answers to questions."""
+    text = _normalise(text)
+    checks = (("V5", _BLOCKED), ("V7", _INJECTION_ECHO), ("V8", _MARKUP))
+    return [code for code, pattern in checks if pattern.search(text)]
+
+
+def claims_cover(text: str) -> bool:
+    """Says something "is covered" (only allowed for covered / conditional risks)."""
+    return bool(_CLAIMS_COVER.search(_normalise(text)))
+
+
+def too_long_or_empty(text: str, max_words: int, max_chars: int) -> bool:
+    return _too_long_or_empty(text, max_words, max_chars)
+
+
 def _normalise(text: str) -> str:
     """Lower-case, straight apostrophes, single spaces - so phrase checks can't be dodged."""
     text = text.lower().replace("’", "'").replace("‘", "'")

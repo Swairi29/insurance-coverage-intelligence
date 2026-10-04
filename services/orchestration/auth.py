@@ -122,6 +122,22 @@ def get_login_limiter() -> LoginLimiter:
     return LoginLimiter()
 
 
+class QuestionLimiter(LoginLimiter):
+    """Questions per user in a sliding window: each one may call an LLM."""
+
+    def __init__(self, max_questions: int = 10, window_seconds: float = 60,
+                 clock: Callable[[], float] = time.monotonic):
+        super().__init__(max_failures=max_questions, window_seconds=window_seconds, clock=clock)
+
+    def record(self, user_id: str) -> None:
+        self.record_failure(user_id)
+
+
+@lru_cache
+def get_question_limiter() -> QuestionLimiter:
+    return QuestionLimiter()
+
+
 # --- tokens ---------------------------------------------------------------------------
 
 

@@ -3,7 +3,7 @@ import { useAnalyses } from '../api/analyses';
 import type { AnalysisSummary } from '../api/types';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { AnalysisStatusBadge } from '../components/StatusBadge';
-import { buttonClasses } from '../components/ui/Button';
+import { buttonClasses } from '../components/ui/buttonClasses';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { formatDateTime, plural } from '../lib/format';
 
@@ -37,14 +37,14 @@ export default function History() {
             onRetry={() => void analyses.refetch()}
           />
         ) : analyses.data.length === 0 ? (
-          <div className="rounded-card border border-line bg-white px-6 py-10 text-center">
+          <div className="rounded-card border border-dashed border-line-strong bg-white px-6 py-10 text-center">
             <p className="font-semibold text-ink-heading">No analyses yet</p>
             <p className="mt-1 text-sm text-muted">
-              <Link to="/app/analyses/new" className="font-semibold text-brand hover:underline">
-                Run your first analysis
-              </Link>{' '}
-              to see your coverage gaps here.
+              Every analysis you run is saved here, encrypted, so you can come back to it.
             </p>
+            <Link to="/app/analyses/new" className={`mt-4 ${buttonClasses('ai', 'sm')}`}>
+              Run your first analysis
+            </Link>
           </div>
         ) : (
           <ul className="space-y-3" aria-label="Past analyses">
@@ -63,7 +63,7 @@ function HistoryItem({ analysis }: { analysis: AnalysisSummary }) {
     <li>
       <Link
         to={`/app/analyses/${analysis.request_id}`}
-        className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-white p-4 hover:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+        className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-white p-4 hover:border-brand focus-visible:outline focus-visible:outline-2"
       >
         <div className="min-w-0">
           <p className="font-semibold text-ink-heading">{formatDateTime(analysis.created_at)}</p>

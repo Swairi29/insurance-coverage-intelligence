@@ -36,14 +36,17 @@ describe('protected pages', () => {
 
     expect(await screen.findByRole('heading', { name: 'Policies' })).toBeInTheDocument();
     expect(location()).toBe('/app/policies');
-    expect(screen.getByText(demoUser.email)).toBeInTheDocument();
+    // The email is in the account menu in the header.
+    expect(
+      screen.getByRole('button', { name: `Account menu for ${demoUser.email}` }),
+    ).toBeInTheDocument();
   });
 
   it('keeps the user logged in after a reload (token in sessionStorage)', async () => {
     storedToken(`mock-token-${demoUser.email}`);
     renderApp('/app');
 
-    expect(await screen.findByRole('heading', { name: 'Your workspace' })).toBeInTheDocument();
+    expect(await screen.findByText('Your workspace')).toBeInTheDocument();
   });
 
   it('logs out and asks to log in again when the stored token is rejected', async () => {
@@ -79,7 +82,7 @@ describe('protected pages', () => {
     storedToken(`mock-token-${demoUser.email}`);
     renderApp('/login');
 
-    await screen.findByRole('heading', { name: 'Your workspace' });
+    await screen.findByText('Your workspace');
     expect(location()).toBe('/app');
   });
 });
@@ -124,7 +127,8 @@ describe('login', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Too many failed logins');
     expect(alert).toHaveTextContent('You can try again in about 15 minutes.');
-    expect(screen.getByRole('button', { name: 'Log in' })).toBeDisabled();
+    // The button counts down the lockout.
+    expect(screen.getByRole('button', { name: /^Try again in \d+:\d\d$/ })).toBeDisabled();
   });
 
   it('explains when login is unavailable (503)', async () => {
@@ -153,6 +157,7 @@ describe('register and logout', () => {
     await user.type(screen.getByLabelText('Email'), 'taken@insureintel.test');
     await user.type(screen.getByLabelText('Password'), 'long-enough');
     await user.type(screen.getByLabelText('Confirm password'), 'long-enough');
+    await user.click(screen.getByRole('checkbox', { name: /privacy and data processing notice/ }));
     await user.click(screen.getByRole('button', { name: 'Create account' }));
 
     expect(
@@ -166,14 +171,19 @@ describe('register and logout', () => {
     await user.type(screen.getByLabelText('Email'), 'owner@newshop.test');
     await user.type(screen.getByLabelText('Password'), 'long-enough');
     await user.type(screen.getByLabelText('Confirm password'), 'long-enough');
+    await user.click(screen.getByRole('checkbox', { name: /privacy and data processing notice/ }));
     await user.click(screen.getByRole('button', { name: 'Create account' }));
 
-    await screen.findByRole('heading', { name: 'Your workspace' });
+    await screen.findByText('Your workspace');
     const header = screen.getByRole('banner');
-    expect(within(header).getByText('owner@newshop.test')).toBeInTheDocument();
+    const menu = within(header).getByRole('button', {
+      name: 'Account menu for owner@newshop.test',
+    });
     expect(window.sessionStorage.getItem(SESSION_KEYS.token)).not.toBeNull();
 
     window.sessionStorage.setItem(SESSION_KEYS.profileDraft, '{"business_name":"x"}');
+    await user.click(menu);
+    expect(within(header).getByText('owner@newshop.test')).toBeInTheDocument();
     await user.click(within(header).getByRole('button', { name: 'Log out' }));
 
     await screen.findByRole('heading', { name: 'Welcome back' });
@@ -182,6 +192,39 @@ describe('register and logout', () => {
     expect(window.sessionStorage.getItem(SESSION_KEYS.profileDraft)).toBeNull();
     // A normal logout is not an expired session.
     expect(screen.queryByText(/session has expired/)).not.toBeInTheDocument();
+  });
+});
+
+describe('signup form', () => {
+  it('requires consent to the privacy notice, which opens in a new tab', async () => {
+    const { user } = renderApp('/register');
+    await user.type(screen.getByLabelText('Email'), 'owner@newshop.test');
+    await user.type(screen.getByLabelText('Password'), 'long-enough');
+    await user.type(screen.getByLabelText('Confirm password'), 'long-enough');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+
+    expect(
+      await screen.findByText('Please agree to the privacy and data processing notice.'),
+    ).toBeInTheDocument();
+    expect(location()).toBe('/register');
+    const link = screen.getByRole('link', { name: 'privacy and data processing notice' });
+    expect(link).toHaveAttribute('href', '/privacy');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
+  it('shows and hides the password with a real toggle button', async () => {
+    const { user } = renderApp('/login');
+    const password = screen.getByLabelText('Password');
+    expect(password).toHaveAttribute('type', 'password');
+
+    const toggle = screen.getByRole('button', { name: 'Show password' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await user.click(toggle);
+    expect(password).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('button', { name: 'Hide password' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 });
 
@@ -194,7 +237,7 @@ describe('navigation', () => {
       JSON.stringify({ business_name: 'Test Bakery', business_type: 'bakery' }),
     );
     const { user } = renderApp('/app');
-    await screen.findByRole('heading', { name: 'Your workspace' });
+    await screen.findByText('Your workspace');
 
     const nav = screen.getByRole('navigation', { name: 'Main' });
     await user.click(within(nav).getByRole('link', { name: 'New analysis' }));

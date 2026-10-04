@@ -107,7 +107,7 @@ def test_business_type_is_normalised(raw, expected):
     assert profile(business_type=raw).business_type is expected
 
 
-@pytest.mark.parametrize("raw", ["pharmacy", "", "   ", "bakery shop!!", 5, None, ["bakery"]])
+@pytest.mark.parametrize("raw", ["spaceport", "", "   ", "bakery shop!!", 5, None, ["bakery"]])
 def test_unsupported_business_type_is_rejected(raw):
     with pytest.raises(ValidationError) as excinfo:
         profile(business_type=raw)

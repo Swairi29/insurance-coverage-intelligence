@@ -103,7 +103,12 @@ or stack traces either.
 
 ### 3.4 The analysis request is slow
 
-`POST /api/v1/analyses` is **one synchronous request**. With the local LLM on CPU, Agent 4 can take
+> **Superseded (Aurora light redesign):** `POST /api/v1/analyses` now answers **202** at once and
+> runs the agents in the background. The agent workspace (`/app/analyses/:id/progress`) polls
+> `GET /api/v1/analyses/{id}/status` every 1.5 s and shows each agent's real state, what the
+> gateway sent it and what came back. The original design below is kept for the record.
+
+`POST /api/v1/analyses` was **one synchronous request**. With the local LLM on CPU, Agent 4 can take
 **several minutes** (the gateway waits up to 600 s). The UI must handle this:
 
 - Use a full-page progress screen with the four steps (Risk profiling → Policy evidence → Coverage
@@ -190,6 +195,25 @@ Never show it as a percentage like "92% covered".
 Evidence that has `flagged: true` gets a warning icon: "This clause contained unusual instructions
 and was not used by the AI." Render all policy text **as plain text**. Never use
 `dangerouslySetInnerHTML`, because policy PDFs are untrusted input.
+
+### Aurora light design rules (redesign)
+
+All tokens are in `frontend/tailwind.config.ts`; components never use hex values.
+
+| Role | Token | Rule |
+|---|---|---|
+| Product, main actions, final report | `brand` (navy #1e3a8a) | Buttons, active nav pill, "Print report" |
+| The AI at work | `ai` (#4f46e5 text/buttons), `ai-bright` (#6366f1 bars, spinners, focus ring) | "Run analysis", running agent, AI labels; `ai-bright` is never used for text (4.47:1) |
+| Page background | `canvas` (#f6f8fc) | Cards are white with `shadow-soft` / `shadow-card` / `shadow-lift` |
+| Aurora glows | `aurora.*`, `.bg-aurora` | Landing hero and auth side panel only, never behind data; text on them uses `muted-strong` or darker (the lightest grey is 4.42:1 there) |
+| Status colours | `status.*` | Text uses the dark shade; `dot` shades are for bars and dots only; white ticks sit on the dark green (5.0:1), never on the bright one (2.5:1) |
+| Radii | `card` 20 px, `panel` 14 px, `control` 10 px, `pill` | Inputs are 44 px tall with a 10 px radius |
+
+- One focus ring for everything: 2 px `ai-bright` outline, set once in `index.css`.
+- All motion is behind `motion-safe:` (running-agent pulse, landing fade-up).
+- `src/a11y.test.tsx` runs axe-core on every redesigned page (colour contrast is not measurable in
+  jsdom, so contrast pairs are checked with a script against the ratios above).
+- The handoff log shows the real architecture: every line is gateway → agent or agent → gateway.
 
 ---
 

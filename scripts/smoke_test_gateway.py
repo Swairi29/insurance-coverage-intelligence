@@ -23,6 +23,9 @@ from pathlib import Path
 
 import httpx
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from scripts.gateway_client import AnalysisError, run_analysis  # noqa: E402
+
 EMAIL = "smoke-test@sunrise.test"
 PASSWORD = "smoke-test-password"
 
@@ -107,10 +110,13 @@ def main() -> None:
     print(f"Uploaded {policy['policy_id']}: status={policy['status']}, "
           f"{policy['page_count']} pages, {policy['chunk_count']} chunks")
 
-    run = http.post("/api/v1/analyses", json={"business": BUSINESS, "policy_ids": [policy["policy_id"]]})
-    if run.status_code != 200:
-        fail("analysis failed", run)
-    body = run.json()
+    try:
+        body = run_analysis(http, {}, {"business": BUSINESS, "policy_ids": [policy["policy_id"]]})
+    except AnalysisError as exc:
+        print(f"FAILED: {exc}", exc.progress.get("error") if exc.progress else "")
+        if exc.response is not None:
+            fail("analysis failed", exc.response)
+        sys.exit(1)
 
     print(f"\nAnalysis {body['request_id']}: {body['status']}  stage times (ms): {body['stage_ms']}")
     for warning in body["warnings"]:

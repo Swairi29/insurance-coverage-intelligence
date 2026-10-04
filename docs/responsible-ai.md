@@ -121,3 +121,102 @@ comparison is to be added after the v2 evaluation run.
   machine some findings use template wording (with a warning) instead of the report being lost.
 - Readability is measured with a heuristic Flesch score, not with real users.
 - All fixture policy wording is synthetic, written by the team.
+
+## Questions about an analysis (Agent 4)
+
+After an analysis, the business owner can ask a question about it ("If someone steals my stock,
+am I covered?"). This is the riskiest place for an LLM in the system: a free-text question invites
+a free-text answer, and a confident "yes, you're covered" would be exactly the kind of advice the
+report avoids. The controls follow the report's design.
+
+### 1. Answers only from the analysis
+
+- The answer may use only the saved analysis: the overview of every risk with its **final**
+  status, and up to 6 of its clauses chosen for the question. Nothing is retrieved again and the
+  model is told not to answer from general knowledge.
+- If the analysis does not answer the question, the answer says so (`answerable: false`) and
+  points to the policy document or the insurer. Such an answer never carries citations.
+- The model is told never to predict whether a claim will be paid, and to say that only the
+  insurer can confirm cover. Every answer carries a disclaimer.
+
+### 2. Checks on every LLM answer
+
+Same approach as the report: the answer is dropped if it fails any check, and a rule-based
+answer is used instead.
+
+| Check | Code |
+|---|---|
+| Expected JSON shape | V1 |
+| Every risk it names is a risk of this analysis | V2 |
+| Every clause it cites was shown to it | V3 |
+| No blocked phrases ("definitely", "fully covered", "not covered", "you are protected", ...) | V5 |
+| "Is covered" only about a `covered` or `conditional` risk | V6 |
+| No echo of injected instructions | V7 |
+| No markup or links | V8 |
+| Not empty, at most 130 words | V9 |
+
+The rule-based answer lists the related risks with the plain meaning of their status and their
+best clause, gives glossary definitions for "what does X mean?", or says the analysis does not
+answer the question. A test checks that rule-based answers pass the same checks.
+
+### 3. Prompt injection
+
+- **Through a policy:** flagged clauses are withheld from the question context, exactly as from
+  the report; a clause flagged under one risk is withheld everywhere.
+- **Through the question:** the question is scanned with the same `scan_for_prompt_injection`.
+  A suspicious question never reaches the model and gets a fixed reply. Otherwise it is collapsed
+  to one line, sanitised and placed in a `<<<QUESTION>>>` block that the system prompt says is
+  data, never instructions.
+
+### 4. Privacy and abuse
+
+- Only the business type, the question and the analysis's assessments are sent to Agent 4;
+  never the business name.
+- With `LLM_PROVIDER=gemini`, the question and the chosen clauses are sent to **Google's Gemini
+  API**, as the report's evidence already is. With `LLM_PROVIDER=ollama` nothing leaves the
+  machine.
+- Questions and answers are not stored, and the question text is never logged (only the
+  analysis ID, timings, `generated_by` and validator codes).
+- Each user may ask 10 questions per minute; an analysis belonging to another user returns 404
+  and does not reach Agent 4.
+
+### 5. Live check
+
+Run: 2026-10-04, `gemini-3.5-flash`, prompt `qa_v1`, the synthetic `bakery_mixed.json` and
+`injection.json` fixtures, 12 different questions asked 16 times in two runs (named risks, everyday wording, gaps, conditions, a claim
+question, a term definition, an off-topic question, the injection fixture, an injection attempt
+in the question, and "Am I fully protected against everything?").
+
+| Result | |
+|---|---|
+| Answers accepted from Gemini | 11 of 15 LLM attempts; the other 4 hit the rate limit (below) and got rule-based answers. None was rejected by the checks |
+| Grounding | Every statement checked against the clause text; sections and pages correct |
+| Status wording | Excluded and not-found risks described as potential gaps; never "covered" |
+| Claim question | "Only your insurer can confirm if a specific claim will be paid" |
+| Off-topic question | `answerable: false`, no citations |
+| Injection | Suspicious question answered without the model in 0 ms; the flagged clause never reached the model |
+| Latency | 3-12 s per answer |
+
+Findings and changes:
+
+- **Gemini's free-tier rate limit.** After 6 questions in quick succession Gemini returned HTTP
+  429. The next 4 questions fell back to rule-based answers within about 5 s, so users still got
+  a safe answer. The gateway's own limit (10 per minute) is higher than this quota, so in a busy
+  demo some answers will be rule-based.
+- **Generic words matched the wrong clause.** "What does the policy say about flood damage?"
+  also pulled in the fire clause, because "damage" appears in almost every clause. Words like
+  "damage", "loss" and "happen" are now ignored when matching (regression test added).
+- **Definitions.** The rule-based answer said it could not answer "What does indemnify mean?";
+  it now answers from the glossary (test added).
+- With the model, the "indemnify" answer also summarised two related clauses; correct, but more
+  than was asked.
+
+### 6. Limitations
+
+- Matching is by keywords, not meaning. A question worded differently from the policy and the
+  everyday-word map can miss a relevant clause; the risk/status overview covers most such cases.
+- The validator checks form, citations and wording, not meaning: a fluent answer that slightly
+  overstates a clause can pass. The disclaimer and "only your insurer can confirm" wording are the
+  backstop.
+- Answers are only as good as the analysis: a clause Agent 2 never retrieved cannot be used.
+- The live check used 12 synthetic questions and one model, not real users.

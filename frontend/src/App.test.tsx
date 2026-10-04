@@ -3,27 +3,50 @@ import { renderApp } from './test/renderApp';
 import { loginAsDemoUser } from './test/session';
 
 describe('landing page', () => {
-  it('shows the hero, capabilities, workflow and responsible-AI note', () => {
+  it('shows the hero, the four agents, an example finding, responsible AI and pricing', () => {
     renderApp('/');
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Discover your coverage gaps',
+      'Know what your insurance actually covers.',
     );
-    expect(screen.getByRole('link', { name: 'Start assessment →' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Start free assessment →' })).toHaveAttribute(
       'href',
       '/register',
     );
-    expect(screen.getByRole('heading', { name: 'Platform capabilities' })).toBeInTheDocument();
-    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
-      'Risk profiling',
-      'Policy intelligence',
-      'Gap detection',
-    ]);
-    expect(screen.getByRole('heading', { name: 'How it works' })).toBeInTheDocument();
-    expect(screen.getByText('Evidence-based report')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Responsible AI' })).toBeInTheDocument();
+    // The trust row and the agent workspace preview.
+    expect(screen.getByText('Every finding cites the policy clause')).toBeInTheDocument();
+    expect(screen.getByText('The gateway calls each agent in turn.')).toBeInTheDocument();
+
+    const how = screen.getByRole('heading', { name: 'How the four agents work together' });
+    expect(how).toBeInTheDocument();
+    expect(screen.getByText(/Agents never call each other/)).toBeInTheDocument();
+
     expect(
-      screen.getByText(/does not provide legal, financial or insurance advice/),
+      screen.getByRole('heading', { name: 'Every finding shows its evidence' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Breakdown of ovens, refrigerators and other machinery is excluded/),
+    ).toBeInTheDocument();
+
+    expect(screen.getByRole('heading', { name: 'Built responsibly' })).toBeInTheDocument();
+    for (const name of ['Fairness', 'Transparency', 'Privacy', 'Human oversight']) {
+      expect(screen.getByRole('heading', { name })).toBeInTheDocument();
+    }
+
+    const pricing = screen.getByRole('heading', { name: 'Plans for every size of business' });
+    expect(pricing).toBeInTheDocument();
+    for (const tier of ['Free', 'Starter', 'Business', 'Broker']) {
+      expect(screen.getByRole('heading', { name: tier })).toBeInTheDocument();
+    }
+    expect(screen.getByText('LKR 2,490')).toBeInTheDocument();
+    expect(screen.getByText(/takes no\s+payments/)).toBeInTheDocument();
+
+    expect(screen.getByRole('link', { name: 'Privacy & consent' })).toHaveAttribute(
+      'href',
+      '/privacy',
+    );
+    expect(
+      screen.getByText(/does not provide legal, financial or\s+insurance advice/),
     ).toBeInTheDocument();
   });
 
@@ -40,6 +63,14 @@ describe('landing page', () => {
 });
 
 describe('routes', () => {
+  it('shows the privacy and consent notice', () => {
+    renderApp('/privacy');
+    expect(
+      screen.getByRole('heading', { name: 'How InsureIntel uses your data' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Your business name is never sent to the AI/)).toBeInTheDocument();
+  });
+
   it('shows a not-found page for an unknown URL', () => {
     renderApp('/no-such-page');
     expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument();

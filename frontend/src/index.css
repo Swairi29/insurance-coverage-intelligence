@@ -4,12 +4,28 @@
 
 @layer base {
   body {
-    @apply bg-canvas font-sans text-ink antialiased;
+    @apply bg-canvas font-sans text-body text-ink antialiased;
   }
   h1,
   h2,
   h3 {
     @apply font-display tracking-tight text-ink-heading;
+  }
+  /* One focus ring for every control (keyboard focus only). */
+  :focus-visible {
+    outline: 2px solid theme('colors.ai.bright');
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Soft aurora glows. Only on the landing hero and the auth pages, never behind data. */
+  .bg-aurora {
+    background-color: theme('colors.canvas');
+    background-image:
+      radial-gradient(55% 45% at 12% 8%, theme('colors.aurora.indigo') 0%, transparent 70%),
+      radial-gradient(45% 40% at 88% 18%, theme('colors.aurora.cyan') 0%, transparent 70%),
+      radial-gradient(50% 45% at 60% 100%, theme('colors.aurora.violet') 0%, transparent 70%);
   }
 }
 

@@ -1,7 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
-import { delay, http, HttpResponse } from 'msw';
-import { analysisQueryKey } from '../api/analyses';
-import type { AnalysisResponse, BusinessProfile, PolicyDocument } from '../api/types';
+import { http, HttpResponse } from 'msw';
+import type { BusinessProfile, PolicyDocument } from '../api/types';
 import { SESSION_KEYS } from '../lib/session';
 import { policiesFixture } from '../mocks/fixtures';
 import { server } from '../mocks/server';
@@ -70,6 +69,8 @@ describe('new analysis: setup', () => {
       ).toBeChecked();
     }
     expect(runButton()).toBeEnabled();
+    // Starting the AI pipeline is an AI action, so it gets the indigo button.
+    expect(runButton()).toHaveClass('bg-ai');
   });
 
   it('allows at most 5 policies', async () => {
@@ -115,8 +116,8 @@ describe('new analysis: setup', () => {
   });
 });
 
-describe('new analysis: running', () => {
-  it('shows the progress screen, sends one request, then opens the result', async () => {
+describe('new analysis: agent workspace', () => {
+  it('starts one run, opens the workspace and shows every agent finishing', async () => {
     saveDraft();
     let requests = 0;
     let sentBody: unknown;
@@ -124,33 +125,16 @@ describe('new analysis: running', () => {
       http.post('*/api/v1/analyses', async ({ request }) => {
         requests++;
         sentBody = await request.clone().json();
-        await delay(300);
         return undefined; // fall through to the normal mock handler
       }),
     );
-    const { user, client } = await openNewAnalysis();
+    const { user } = await openNewAnalysis();
     await screen.findByRole('checkbox', { name: new RegExp(policiesFixture[0].filename) });
 
     await user.click(runButton());
 
-    expect(
-      await screen.findByRole('heading', { name: 'Analysing your coverage…' }),
-    ).toBeInTheDocument();
-    const steps = screen.getByRole('list', { name: 'Analysis steps' });
-    expect(
-      within(steps)
-        .getAllByRole('listitem')
-        .map((li) => li.textContent),
-    ).toEqual(['1Risk profiling', '2Policy evidence', '3Coverage analysis', '4Report writing']);
-    expect(screen.getByText(/You can leave this page/)).toBeInTheDocument();
-    const progress = screen.getByRole('region', { name: 'Analysing your coverage…' });
-    expect(within(progress).getByRole('link', { name: 'History' })).toHaveAttribute(
-      'href',
-      '/app/analyses',
-    );
-    expect(screen.queryByRole('button', { name: 'Run analysis' })).not.toBeInTheDocument();
-
-    await waitFor(() => expect(location()).toMatch(/^\/app\/analyses\/[0-9a-f]{32}$/));
+    await waitFor(() => expect(location()).toMatch(/^\/app\/analyses\/[0-9a-f]{32}\/progress$/));
+    expect(await screen.findByRole('heading', { name: 'Analysis complete' })).toBeInTheDocument();
     expect(requests).toBe(1);
     expect(sentBody).toEqual({
       business: {
@@ -161,42 +145,100 @@ describe('new analysis: running', () => {
       },
       policy_ids: policiesFixture.map((p) => p.policy_id),
     });
+    // Kept so a failed run can be retried from the workspace.
+    expect(JSON.parse(window.sessionStorage.getItem(SESSION_KEYS.lastAnalysis)!)).toEqual(sentBody);
 
-    const requestId = location()!.split('/').pop()!;
-    const cached = client.getQueryData<AnalysisResponse>(analysisQueryKey(requestId));
-    expect(cached?.status).toBe('complete');
-  });
-});
+    const agents = within(screen.getByRole('list', { name: 'Agents' })).getAllByRole('listitem');
+    expect(agents.map((a) => within(a).getByRole('heading').textContent)).toEqual([
+      'Risk Profiling Agent',
+      'Policy Intelligence Agent',
+      'Coverage & Gap Analysis Agent',
+      'Explanation & Recommendation Agent',
+    ]);
+    for (const agent of agents) expect(agent).toHaveTextContent('Done');
 
-describe('new analysis: errors', () => {
-  it.each([
-    ['Down Ltd', 'Risk profiling', 'A required analysis service is not available.'],
-    ['Timeout Ltd', 'Coverage analysis', 'took too long to respond'],
-    ['Broken Ltd', 'Policy evidence', 'could not complete the request'],
-  ])('"%s": names the failed step (%s) and offers a retry', async (name, step, message) => {
-    saveDraft({ business_name: name });
-    let requests = 0;
-    server.use(
-      http.post('*/api/v1/analyses', () => {
-        requests++;
-        return undefined;
-      }),
+    // Hub and spoke: every message goes between the gateway and one agent.
+    const log = screen.getByRole('log', { name: 'Messages between the gateway and the agents' });
+    const lines = within(log).getAllByRole('listitem');
+    expect(lines).toHaveLength(8);
+    expect(lines[0]).toHaveTextContent('Gateway → Risk agent');
+    expect(lines[0]).toHaveTextContent('POST /api/v1/risk-profile');
+    expect(lines[1]).toHaveTextContent('Risk agent → Gateway');
+    for (const line of lines) expect(line).toHaveTextContent(/Gateway/);
+
+    const requestId = location()!.split('/')[3];
+    expect(screen.getByRole('link', { name: 'View results →' })).toHaveAttribute(
+      'href',
+      `/app/analyses/${requestId}`,
     );
+  });
+
+  it('shows the agent that is working while the run is in progress', async () => {
+    // "Slow" names keep real timings in the mock, so the first agent is still running.
+    saveDraft({ business_name: 'Slow Bakery' });
     const { user } = await openNewAnalysis();
     await screen.findByRole('checkbox', { name: new RegExp(policiesFixture[0].filename) });
 
     await user.click(runButton());
 
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('The analysis could not finish');
-    expect(alert).toHaveTextContent(message);
-    expect(alert).toHaveTextContent(`The problem happened at this step: ${step}.`);
-    expect(location()).toBe('/app/analyses/new');
-
-    await user.click(within(alert).getByRole('button', { name: 'Try again' }));
-    await screen.findByRole('alert');
-    expect(requests).toBe(2);
+    expect(
+      await screen.findByRole('heading', { name: 'Analysing your coverage…' }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('Step 1 of 4: Risk Profiling Agent')).toBeInTheDocument();
+    const agents = within(screen.getByRole('list', { name: 'Agents' })).getAllByRole('listitem');
+    expect(agents[0]).toHaveTextContent('Running');
+    expect(agents[1]).toHaveTextContent('Queued');
+    expect(screen.getByRole('progressbar', { name: 'Analysis progress' })).toHaveAttribute(
+      'aria-valuenow',
+      '0',
+    );
+    const leaveNote = screen.getByText(/You can leave this page/).closest('p')!;
+    expect(within(leaveNote).getByRole('link', { name: 'History' })).toHaveAttribute(
+      'href',
+      '/app/analyses',
+    );
   });
+});
+
+describe('new analysis: errors', () => {
+  it.each([
+    ['Down Ltd', 0, 'A required analysis service is not available.'],
+    ['Timeout Ltd', 2, 'took too long to respond'],
+    ['Broken Ltd', 1, 'could not complete the request'],
+  ])(
+    '"%s": marks agent %i as failed, skips the rest and offers a retry',
+    async (name, failedIndex, message) => {
+      saveDraft({ business_name: name });
+      let requests = 0;
+      server.use(
+        http.post('*/api/v1/analyses', () => {
+          requests++;
+          return undefined;
+        }),
+      );
+      const { user } = await openNewAnalysis();
+      await screen.findByRole('checkbox', { name: new RegExp(policiesFixture[0].filename) });
+
+      await user.click(runButton());
+
+      expect(
+        await screen.findByRole('heading', { name: 'The analysis could not finish' }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent(message);
+      const agents = within(screen.getByRole('list', { name: 'Agents' })).getAllByRole('listitem');
+      agents.forEach((agent, index) => {
+        if (index < failedIndex) expect(agent).toHaveTextContent('Done');
+        if (index === failedIndex) expect(agent).toHaveTextContent('Failed');
+        if (index > failedIndex) expect(agent).toHaveTextContent('Skipped');
+      });
+      const firstRun = location();
+
+      await user.click(screen.getByRole('button', { name: 'Retry analysis' }));
+      await waitFor(() => expect(location()).not.toBe(firstRun));
+      expect(location()).toMatch(/\/progress$/);
+      expect(requests).toBe(2);
+    },
+  );
 
   it('refreshes the policy list after a 404 policy_not_found', async () => {
     saveDraft();

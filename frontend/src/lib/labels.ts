@@ -16,6 +16,45 @@ export const STAGE_LABELS: Record<Stage, string> = {
   coverage: 'Coverage analysis',
   report: 'Report writing',
   policy_upload: 'Policy upload',
+  question: 'Question answering',
+};
+
+/**
+ * The four agents as the user sees them. The gateway calls each one in turn and passes the
+ * result on; agents never call each other (hub and spoke).
+ */
+export const AGENTS: Record<
+  AnalysisStage,
+  { name: string; short: string; role: string; input: string; output: string }
+> = {
+  risk_profile: {
+    name: 'Risk Profiling Agent',
+    short: 'Risk agent',
+    role: 'Finds the business risks in your profile.',
+    input: 'Your business profile',
+    output: 'A list of risks, each with a reason',
+  },
+  policy_evidence: {
+    name: 'Policy Intelligence Agent',
+    short: 'Policy agent',
+    role: 'Finds the policy wording that matches each risk.',
+    input: 'The risks and your policy PDFs',
+    output: 'Matching clauses with file, section and page',
+  },
+  coverage: {
+    name: 'Coverage & Gap Analysis Agent',
+    short: 'Coverage agent',
+    role: 'Decides the coverage status of each risk.',
+    input: 'The risks and their clauses',
+    output: 'A status and potential-gap flag per risk',
+  },
+  report: {
+    name: 'Explanation & Recommendation Agent',
+    short: 'Explanation agent',
+    role: 'Explains every finding in plain English.',
+    input: 'The coverage decisions',
+    output: 'A report with next steps and citations',
+  },
 };
 
 export const AGENT_STAGES: readonly AnalysisStage[] = [

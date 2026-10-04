@@ -74,6 +74,8 @@ def _business_payload(profile: BusinessProfile) -> Dict[str, Any]:
     business_type = as_business_type(getattr(profile, "business_type", None))
 
     data: Dict[str, Any] = {"business_type": business_type.value if business_type else "unknown"}
+    if getattr(profile, "business_type_detail", None):
+        data["business_type_detail"] = redact_text(profile.business_type_detail)
     if getattr(profile, "description", None):
         data["description"] = redact_text(profile.description)
     if getattr(profile, "employee_count", None) is not None:

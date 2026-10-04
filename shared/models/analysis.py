@@ -14,6 +14,13 @@ DISCLAIMER = (
     "coverage decision. Confirm every finding with your insurer or insurance broker."
 )
 
+# Shown under every answer to a question about an analysis.
+QA_DISCLAIMER = (
+    "This answer only uses this analysis and the policy wording it found. It is decision "
+    "support, not a legal or binding coverage decision. Confirm it with your insurer or "
+    "insurance broker."
+)
+
 
 class GeneratedBy(str, Enum):
     LLM = "llm"

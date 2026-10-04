@@ -1,8 +1,9 @@
 """Fake agents for the orchestrator tests. No network, and nothing here calls an LLM.
 
 `FakeAgents` is an httpx transport handler that answers like Agents 1-4, records
-every request it receives, and can be told to fail on any path. Agent 4's answer
-comes from the real `ExplanationService` in template mode, so reports are genuine.
+every request it receives, and can be told to fail on any path. Agent 4's answers
+come from the real `ExplanationService` and `QuestionService` in template mode, so
+reports and answers are genuine.
 """
 
 from __future__ import annotations
@@ -13,9 +14,10 @@ from typing import Callable, Dict, List, Optional
 
 import httpx
 
+from agents.explanation_agent.qa_answer import QuestionService
 from agents.explanation_agent.service import ExplanationService
 from services.orchestration.pipeline import AgentClient, AgentUrls, AnalysisPipeline
-from shared.schemas.requests import ExplanationRequest
+from shared.schemas.requests import ExplanationRequest, QuestionRequest
 
 API_KEY = "orchestration-test-key"
 BUSINESS_NAME = "Sunrise Bakery"
@@ -25,6 +27,7 @@ EVIDENCE_PATH = "/api/v1/retrieve-policy-evidence"
 COVERAGE_PATH = "/api/v1/analyse-coverage"
 REPORT_PATH = "/api/v1/generate-report"
 UPLOAD_PATH = "/api/v1/policies"
+QUESTION_PATH = "/api/v1/answer-question"
 
 URLS = AgentUrls(risk="http://risk.test", policy="http://policy.test",
                  coverage="http://coverage.test", explanation="http://explanation.test")
@@ -81,6 +84,7 @@ class FakeAgents:
             COVERAGE_PATH: self._coverage,
             REPORT_PATH: self._report,
             UPLOAD_PATH: self._upload,
+            QUESTION_PATH: self._question,
             "/health": self._health,
         }
 
@@ -155,6 +159,10 @@ class FakeAgents:
     def _report(self, request: httpx.Request) -> httpx.Response:
         report = ExplanationService(use_llm=False).generate(ExplanationRequest.model_validate_json(request.content))
         return httpx.Response(200, content=report.model_dump_json(), headers={"content-type": "application/json"})
+
+    def _question(self, request: httpx.Request) -> httpx.Response:
+        answer = QuestionService(use_llm=False).answer(QuestionRequest.model_validate_json(request.content))
+        return httpx.Response(200, content=answer.model_dump_json(), headers={"content-type": "application/json"})
 
     def _upload(self, request: httpx.Request) -> httpx.Response:
         business_id = multipart_field(request, "business_id")

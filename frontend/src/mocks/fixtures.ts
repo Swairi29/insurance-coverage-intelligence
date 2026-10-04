@@ -27,11 +27,12 @@ export const demoUser = typed<UserResponse>(userJson);
 export const policiesFixture = typed<PolicyDocument[]>(policiesJson);
 export const analysesFixture = typed<AnalysisSummary[]>(analysesJson);
 
-export const analysisByType: Record<BusinessType, AnalysisResponse> = {
+/** Recorded runs for three business types; the mock API uses the bakery one for the others. */
+export const analysisByType = {
   bakery: typed<AnalysisResponse>(bakeryJson),
   restaurant: typed<AnalysisResponse>(restaurantJson),
   retail_shop: typed<AnalysisResponse>(retailShopJson),
-};
+} satisfies Partial<Record<BusinessType, AnalysisResponse>>;
 export const partialAnalysis = typed<AnalysisResponse>(partialJson);
 export const allStatusesAnalysis = typed<AnalysisResponse>(allStatusesJson);
 

@@ -10,7 +10,8 @@ import {
 import type { PolicyDocument, PolicyStatus } from '../api/types';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { DocumentIcon, WarningIcon } from '../components/icons';
-import { Button, buttonClasses } from '../components/ui/Button';
+import { Button } from '../components/ui/Button';
+import { buttonClasses } from '../components/ui/buttonClasses';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { Spinner } from '../components/ui/Spinner';
 import { formatBytes, formatDateTime, plural } from '../lib/format';
@@ -163,10 +164,10 @@ export default function Policies() {
             onRetry={() => void policies.refetch()}
           />
         ) : policies.data.length === 0 ? (
-          <div className="rounded-card border border-line bg-white px-6 py-10 text-center">
-            <p className="font-semibold text-ink-heading">No policies yet</p>
+          <div className="rounded-card border border-dashed border-line-strong bg-white px-6 py-10 text-center">
+            <p className="font-semibold text-ink-heading">Upload your first policy</p>
             <p className="mt-1 text-sm text-muted">
-              Upload at least one policy PDF to run an analysis.
+              Drop a policy PDF above. Once it is ready you can run your first analysis.
             </p>
           </div>
         ) : (

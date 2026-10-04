@@ -18,8 +18,20 @@ from shared.models.risk import RiskCategory
 TAXONOMY_VERSION = "1.0"
 
 ALL_TYPES: FrozenSet[BusinessType] = frozenset(BusinessType)
-FOOD_TYPES: FrozenSet[BusinessType] = frozenset({BusinessType.BAKERY, BusinessType.RESTAURANT})
-RETAIL_TYPES: FrozenSet[BusinessType] = frozenset({BusinessType.RETAIL_SHOP})
+FOOD_TYPES: FrozenSet[BusinessType] = frozenset(
+    {BusinessType.BAKERY, BusinessType.RESTAURANT, BusinessType.CAFE}
+)
+RETAIL_TYPES: FrozenSet[BusinessType] = frozenset(
+    {
+        BusinessType.RETAIL_SHOP,
+        BusinessType.GROCERY_STORE,
+        BusinessType.PHARMACY,
+        BusinessType.CLOTHING_STORE,
+        BusinessType.HARDWARE_STORE,
+    }
+)
+# Salons, workshops, offices and "other" get the general risks (ALL_TYPES) and
+# whatever their details point to; nothing food- or retail-specific is assumed.
 NO_TYPES: FrozenSet[BusinessType] = frozenset()
 
 # Indicator tags: tag -> plain-English label. The label is used as evidence text
