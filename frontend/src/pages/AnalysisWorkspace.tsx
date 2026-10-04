@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAnalysisStatus, useRefreshAnalyses, useStartAnalysis } from '../api/analyses';
 import { isApiError } from '../api/client';
-import type { AnalysisProgress, AnalysisRequest } from '../api/types';
+import type { AnalysisProgress } from '../api/types';
 import { AgentRail } from '../components/AgentRail';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { HandoffLog } from '../components/HandoffLog';
@@ -12,7 +12,7 @@ import { buttonClasses } from '../components/ui/buttonClasses';
 import { SkeletonLines } from '../components/ui/Skeleton';
 import { formatDuration } from '../lib/format';
 import { AGENTS } from '../lib/labels';
-import { SESSION_KEYS, readSession, writeSession } from '../lib/session';
+import { analysisRequestFor, rememberAnalysisRequest } from '../lib/analysisRequests';
 
 /**
  * The agent workspace: which of the four agents is working, what the gateway handed to each
@@ -200,13 +200,14 @@ function Workspace({ progress }: { progress: AnalysisProgress }) {
 function FailureActions({ progress }: { progress: AnalysisProgress }) {
   const navigate = useNavigate();
   const start = useStartAnalysis();
-  const lastRequest = readLastRequest();
+  // The request behind this run, if it was started in this tab.
+  const lastRequest = analysisRequestFor(progress.request_id);
 
   const retry = () => {
     if (!lastRequest) return;
     start.mutate(lastRequest, {
       onSuccess: (next) => {
-        writeSession(SESSION_KEYS.lastAnalysis, JSON.stringify(lastRequest));
+        rememberAnalysisRequest(next.request_id, lastRequest);
         navigate(`/app/analyses/${next.request_id}/progress`);
       },
     });
@@ -245,17 +246,6 @@ function FailureActions({ progress }: { progress: AnalysisProgress }) {
       </div>
     </div>
   );
-}
-
-function readLastRequest(): AnalysisRequest | null {
-  const raw = readSession(SESSION_KEYS.lastAnalysis);
-  if (!raw) return null;
-  try {
-    const value = JSON.parse(raw) as AnalysisRequest;
-    return value?.business && Array.isArray(value.policy_ids) ? value : null;
-  } catch {
-    return null;
-  }
 }
 
 /** Time since `from`, ticking every second until `until` is set. */

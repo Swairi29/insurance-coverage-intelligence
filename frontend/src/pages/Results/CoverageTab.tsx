@@ -110,8 +110,17 @@ export function CoverageTab({
 
       {/* Desktop and print: the table. `relative` contains the sr-only caption. */}
       <div className="relative mt-4 hidden overflow-x-auto rounded-card border border-line bg-white shadow-soft md:block print:block print:overflow-visible">
-        <table className="w-full min-w-[720px] text-left text-sm print:min-w-0">
+        {/* On paper the table must fit the page width: fixed columns, smaller text. */}
+        <table className="w-full min-w-[720px] text-left text-sm print:min-w-0 print:table-fixed print:text-xs print:[&_td]:px-2 print:[&_th]:px-2">
           <caption className="sr-only">Coverage status for each identified risk</caption>
+          <colgroup>
+            <col className="print:w-[22%]" />
+            <col className="print:w-[17%]" />
+            <col className="print:w-[10%]" />
+            <col className="print:w-[13%]" />
+            <col className="print:w-[28%]" />
+            <col className="print:w-[10%]" />
+          </colgroup>
           <thead className="border-b border-line bg-canvas text-xs uppercase tracking-wide text-muted-strong">
             <tr>
               <th scope="col" className="px-4 py-3">
@@ -145,7 +154,7 @@ export function CoverageTab({
             {rows.map((a) => (
               <tr
                 key={a.risk_id}
-                className="border-t border-line align-top first:border-t-0 hover:bg-brand-soft/60"
+                className="border-t border-line align-top first:border-t-0 hover:bg-brand-soft/60 print:break-inside-avoid"
               >
                 <td className="px-4 py-3">
                   <button

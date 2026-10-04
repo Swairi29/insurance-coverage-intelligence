@@ -14,7 +14,7 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from typing import Callable, Dict, Optional
 
@@ -90,8 +90,17 @@ class JobStore:
             job = self._jobs.get(request_id)
             if job is None:
                 return
+            now = _now()
             for stage in job.progress.stages:
-                if stage.state in (StageState.QUEUED, StageState.RUNNING):
+                if stage.state is StageState.RUNNING:
+                    # Still running when the run ended: the crash happened in this stage.
+                    # (Agent errors are marked failed by the pipeline before this is called.)
+                    stage.state = StageState.FAILED
+                    stage.received = "Unexpected error"
+                    stage.finished_at = now
+                    if stage.started_at:
+                        stage.duration_ms = int((now - stage.started_at).total_seconds() * 1000)
+                elif stage.state is StageState.QUEUED:
                     stage.state = StageState.SKIPPED
                     stage.received = "Skipped: an earlier agent failed"
             job.progress.state = RunState.FAILED
@@ -161,28 +170,58 @@ def get_job_store() -> JobStore:
     return JobStore()
 
 
+def _plural(number: int, noun: str) -> str:
+    return f"{number} {noun}{'' if number == 1 else 's'}"
+
+
 def progress_from_analysis(analysis: AnalysisResponse) -> AnalysisProgress:
-    """The status of a saved analysis (e.g. after a gateway restart), rebuilt from its result."""
-    risks = len(analysis.risk_profile.risks)
-    clauses = len({c.chunk_id for a in analysis.coverage.assessments for c in a.evidence})
+    """The status of a saved analysis (after a restart, or once its job has been pruned).
+
+    The saved result holds each agent's duration (`stage_ms`) and the time the run finished
+    (`created_at`), so the timeline is rebuilt backwards from the end: the workspace then shows
+    the same agents, handoffs and timings as during the run. Summaries are counts only.
+    """
     assessments = analysis.coverage.assessments
+    risks = len(analysis.risk_profile.risks)
+    clauses = len({c.chunk_id for a in assessments for c in a.evidence})
+    policies = len({c.policy_id for a in assessments for c in a.evidence})
     gaps = sum(1 for a in assessments if a.potential_gap)
 
+    sent = {
+        Stage.RISK_PROFILE: "business profile",
+        # The policies whose clauses were used (the policy_ids sent are not saved).
+        Stage.POLICY_EVIDENCE: f"{_plural(risks, 'risk')}, {policies} "
+                               f"polic{'y' if policies == 1 else 'ies'} with matching wording",
+        Stage.COVERAGE: f"{_plural(risks, 'risk')} + {_plural(clauses, 'clause')}",
+        Stage.REPORT: _plural(len(assessments), "assessment"),
+    }
     received = {
-        Stage.RISK_PROFILE: f"{risks} risk{'s' if risks != 1 else ''} identified",
-        Stage.POLICY_EVIDENCE: f"{clauses} clause{'s' if clauses != 1 else ''} used as evidence",
-        Stage.COVERAGE: f"{len(assessments)} risks assessed, {gaps} potential gap{'s' if gaps != 1 else ''}",
-        Stage.REPORT: (f"{len(analysis.report.findings)} findings written" if analysis.report
+        Stage.RISK_PROFILE: f"{_plural(risks, 'risk')} identified",
+        Stage.POLICY_EVIDENCE: f"{_plural(clauses, 'clause')} found",
+        Stage.COVERAGE: f"{_plural(len(assessments), 'risk')} assessed, {_plural(gaps, 'potential gap')}",
+        Stage.REPORT: (f"{_plural(len(analysis.report.findings), 'finding')} written "
+                       f"({analysis.report.metadata.llm_findings} by AI)" if analysis.report
                        else "Report not available; coverage results kept"),
     }
+
+    finished = analysis.created_at
+    started = finished - timedelta(milliseconds=sum(analysis.stage_ms.values()))
+    cursor = started
     stages = _queued_stages()
     for entry, stage in zip(stages, ANALYSIS_STAGES):
-        ran = stage.value in analysis.stage_ms
-        failed = stage is Stage.REPORT and analysis.report is None
-        entry.state = StageState.FAILED if failed else StageState.DONE if ran else StageState.SKIPPED
-        entry.received = received[stage] if ran or failed else "No risks to check"
-        entry.duration_ms = analysis.stage_ms.get(stage.value)
+        ms = analysis.stage_ms.get(stage.value)
+        if ms is None:  # Agents 2 and 3 are skipped when no risks were found
+            entry.state = StageState.SKIPPED
+            entry.received = "No risks to check"
+            continue
+        entry.state = StageState.FAILED if stage is Stage.REPORT and analysis.report is None else StageState.DONE
+        entry.sent = sent[stage]
+        entry.received = received[stage]
+        entry.started_at = cursor
+        cursor = cursor + timedelta(milliseconds=ms)
+        entry.finished_at = cursor
+        entry.duration_ms = ms
 
     state = RunState.COMPLETE if analysis.status is AnalysisStatus.COMPLETE else RunState.PARTIAL
-    return AnalysisProgress(request_id=analysis.request_id, state=state, created_at=analysis.created_at,
-                            updated_at=analysis.created_at, stages=stages)
+    return AnalysisProgress(request_id=analysis.request_id, state=state, created_at=started,
+                            updated_at=finished, stages=stages)

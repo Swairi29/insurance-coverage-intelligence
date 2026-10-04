@@ -339,13 +339,13 @@ def _load_analysis(db: Database, user: UserRecord, request_id: str) -> AnalysisR
         return _error(500, "analysis_unreadable", "The stored analysis could not be read.")
 
 
-@app.get("/api/v1/analyses/{request_id}", response_model=AnalysisResponse)
-def get_analysis(request_id: str, user: UserRecord = Depends(get_current_user),
-                 db: Database = Depends(get_database), jobs: JobStore = Depends(get_job_store)):
+def _find_analysis(db: Database, jobs: JobStore, user: UserRecord,
+                   request_id: str) -> AnalysisResponse | JSONResponse:
+    """The user's analysis from the database, else a finished run kept in memory (it could not
+    be saved), else 409 while it is still running, else 404."""
     saved = _load_analysis(db, user, request_id)
     if not (isinstance(saved, JSONResponse) and saved.status_code == 404):
         return saved
-    # Not in the database: still running, failed, or finished but could not be saved.
     job = jobs.get(request_id, user.user_id)
     if job is None:
         return saved
@@ -354,6 +354,12 @@ def get_analysis(request_id: str, user: UserRecord = Depends(get_current_user),
     if job.progress.state is RunState.RUNNING:
         return _error(409, "analysis_running", "The analysis is still running.", request_id=request_id)
     return saved
+
+
+@app.get("/api/v1/analyses/{request_id}", response_model=AnalysisResponse)
+def get_analysis(request_id: str, user: UserRecord = Depends(get_current_user),
+                 db: Database = Depends(get_database), jobs: JobStore = Depends(get_job_store)):
+    return _find_analysis(db, jobs, user, request_id)
 
 
 @app.post("/api/v1/analyses/{request_id}/questions", response_model=QuestionAnswerResponse)
@@ -365,6 +371,7 @@ def ask_question(
     db: Database = Depends(get_database),
     pipeline: AnalysisPipeline = Depends(get_pipeline),
     limiter: QuestionLimiter = Depends(get_question_limiter),
+    jobs: JobStore = Depends(get_job_store),
 ):
     """Answer one question from this saved analysis only. Nothing is stored."""
     question_id = _new_request_id()
@@ -376,7 +383,7 @@ def ask_question(
         limited.headers["Retry-After"] = str(wait)
         return limited
 
-    analysis = _load_analysis(db, user, request_id)
+    analysis = _find_analysis(db, jobs, user, request_id)
     if isinstance(analysis, JSONResponse):
         return analysis
 

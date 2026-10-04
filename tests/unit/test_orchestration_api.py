@@ -18,6 +18,7 @@ from shared.schemas.requests import CURRENT_CONSENT_VERSION as CONSENT
 from tests.orchestration_fakes import (
     BUSINESS,
     BUSINESS_NAME,
+    COVERAGE_PATH,
     EVIDENCE_PATH,
     QUESTION_PATH,
     REPORT_PATH,
@@ -336,6 +337,28 @@ def test_status_after_a_restart_comes_from_the_saved_analysis(client):
     assert progress["state"] == "complete"
     assert [s["state"] for s in progress["stages"]] == ["done"] * 4
     assert progress["stages"][0]["received"] == "1 risk identified"
+    # The timeline is rebuilt too, so the workspace's handoff log and elapsed time are not empty.
+    stages = progress["stages"]
+    assert all(st["started_at"] and st["finished_at"] and st["sent"] for st in stages)
+    assert progress["created_at"] == stages[0]["started_at"]
+    assert progress["updated_at"] == stages[-1]["finished_at"]
+    for before, after in zip(stages, stages[1:]):
+        assert before["finished_at"] == after["started_at"]
+
+
+def test_a_crash_marks_the_running_agent_as_failed(client, agents):
+    headers = login(client)
+    policy_id = upload(client, headers)
+    # Not an agent error: the coverage response cannot even be read.
+    agents.overrides[COVERAGE_PATH] = lambda request: (_ for _ in ()).throw(RuntimeError("bug"))
+
+    request_id = start(client, headers, [policy_id]).json()["request_id"]
+    progress = status(client, headers, request_id).json()
+
+    assert progress["state"] == "failed" and progress["error"]["error"] == "analysis_failed"
+    assert [s["state"] for s in progress["stages"]] == ["done", "done", "failed", "skipped"]
+    assert progress["stages"][2]["received"] == "Unexpected error"
+    assert "bug" not in str(progress)
 
 
 def test_result_of_a_running_analysis_is_409(client):
@@ -570,3 +593,28 @@ def test_questions_are_not_saved(client, db):
     request_id = _saved_analysis(client, headers)
     ask(client, headers, request_id)
     assert len(client.get("/api/v1/analyses", headers=headers).json()) == 1
+
+
+def test_question_about_a_run_that_could_not_be_saved(client, monkeypatch):
+    headers = login(client)
+    policy_id = upload(client, headers)
+    monkeypatch.delenv("DOCUMENT_ENCRYPTION_KEY")  # the result cannot be stored
+    get_settings.cache_clear()
+    request_id = start(client, headers, [policy_id]).json()["request_id"]
+
+    response = ask(client, headers, request_id)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["answerable"] is True
+
+
+def test_question_about_a_running_analysis_is_409(client):
+    headers = login(client)
+    user_id = client.get("/api/v1/auth/me", headers=headers).json()["user_id"]
+    jobs = JobStore()
+    app.dependency_overrides[get_job_store] = lambda: jobs
+    jobs.create("run-1", user_id)
+
+    response = ask(client, headers, "run-1")
+
+    assert response.status_code == 409 and response.json()["error"] == "analysis_running"

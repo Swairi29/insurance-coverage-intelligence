@@ -10,7 +10,7 @@ import { DocumentIcon, SparkleIcon } from '../components/icons';
 import { Button } from '../components/ui/Button';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { formatDateTime, plural } from '../lib/format';
-import { SESSION_KEYS, writeSession } from '../lib/session';
+import { rememberAnalysisRequest } from '../lib/analysisRequests';
 import { SALES_CHANNEL_LABELS, businessTypeLabel, loadProfileDraft } from '../lib/profile';
 import type { ProfilePageState } from './BusinessProfile';
 
@@ -46,10 +46,12 @@ function NewAnalysisForm({ profile }: { profile: BusinessProfile }) {
   const start = (body: AnalysisRequest) => {
     if (run.isPending) return; // never start two analyses
     setLastRequest(body);
-    // Kept for the workspace's "Retry analysis" button.
-    writeSession(SESSION_KEYS.lastAnalysis, JSON.stringify(body));
     run.mutate(body, {
-      onSuccess: (progress) => navigate(`/app/analyses/${progress.request_id}/progress`),
+      onSuccess: (progress) => {
+        // Kept for the workspace's "Retry analysis" button.
+        rememberAnalysisRequest(progress.request_id, body);
+        navigate(`/app/analyses/${progress.request_id}/progress`);
+      },
       onError: (error) => {
         if (!isApiError(error)) return;
         if (error.status === 404) {

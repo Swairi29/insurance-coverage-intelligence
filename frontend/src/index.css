@@ -30,8 +30,11 @@
 }
 
 @media print {
+  /* Top and bottom margins on every page. The side margins are padding on the report itself
+     (AppLayout's <main>), so they survive the print dialog's "Margins: None / Minimum". */
   @page {
-    margin: 14mm;
+    size: A4;
+    margin: 14mm 0;
   }
   body {
     background: #fff;

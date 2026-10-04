@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Set
 
 from agents.explanation_agent.context import FindingPair, classify_evidence, make_excerpt, sanitize
 from agents.explanation_agent.llm import TextGenerator
@@ -46,10 +46,42 @@ FLAGGED_EXCERPT = (
     "Clause text withheld because it contained instruction-like text. "
     "Read page {page} of the policy document directly."
 )
-LLM_PARTIAL_WARNING ="Some findings use standard wording because the AI wording did not pass the safety checks."
+LLM_PARTIAL_WARNING = "Some findings use standard wording because the AI wording did not pass the safety checks."
 LLM_TIME_BUDGET_WARNING = (
     "Some findings use standard wording because the AI wording took too long to generate."
 )
+LLM_SERVICE_WARNING = (
+    "Some findings use standard wording because the AI service did not respond "
+    "(for example, it was busy or rate-limited)."
+)
+
+
+def _fallback_warnings(problems: Sequence[str], template_ids: Set[str]) -> List[str]:
+    """One warning per reason some findings kept template wording, so the report says why.
+
+    Problem codes come from rag.generate_llm_items: "batch N: time_budget" (out of time),
+    "batch N: llm_error" / "batch N: error" (the call failed), "<risk_id>: <code>" (that
+    finding's AI wording was missing or rejected), "item: V1" / "envelope: V1" (the whole
+    answer had the wrong shape). A code about a risk that still got AI wording is not a
+    reason for any template wording.
+    """
+    timed_out = any(p.endswith(": time_budget") for p in problems)
+    failed = any(p.endswith(": llm_error") or p.endswith(": error") for p in problems)
+    # V2 = an answer for a risk that was not asked about in that batch: it never explains why
+    # a finding kept template wording.
+    rejected = any(
+        (p.split(":", 1)[0] in template_ids or p.split(":", 1)[0] in {"item", "envelope"})
+        and not p.endswith(": V2")
+        for p in problems
+    )
+    warnings = []
+    if timed_out:
+        warnings.append(LLM_TIME_BUDGET_WARNING)
+    if failed:
+        warnings.append(LLM_SERVICE_WARNING)
+    if rejected or not warnings:
+        warnings.append(LLM_PARTIAL_WARNING)
+    return warnings
 
 
 class ExplanationService:
@@ -83,7 +115,6 @@ class ExplanationService:
                                                      deadline=deadline)
             if problems:
                 logger.info("LLM items rejected or missing: %s", ", ".join(problems))
-        out_of_time = any(problem.endswith("time_budget") for problem in problems)
 
         findings = [_finding(pair, request.business_type, llm_items.get(pair.assessment.risk_id)) for pair in pairs]
         warnings.extend(_flagged_clause_warnings(pairs))
@@ -92,7 +123,8 @@ class ExplanationService:
         if llm_attempted and llm_count == 0:
             warnings.append(LLM_UNAVAILABLE_WARNING)
         elif llm_attempted and llm_count < len(findings):
-            warnings.append(LLM_TIME_BUDGET_WARNING if out_of_time else LLM_PARTIAL_WARNING)
+            template_ids = {f.risk_id for f in findings if f.generated_by is GeneratedBy.TEMPLATE}
+            warnings.extend(_fallback_warnings(problems, template_ids))
 
         processing_ms = int((time.perf_counter() - started) * 1000)
         logger.info(
