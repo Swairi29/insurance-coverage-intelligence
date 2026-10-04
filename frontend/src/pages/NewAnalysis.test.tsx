@@ -70,6 +70,8 @@ describe('new analysis: setup', () => {
       ).toBeChecked();
     }
     expect(runButton()).toBeEnabled();
+    // Starting the AI pipeline is an AI action, so it gets the indigo button.
+    expect(runButton()).toHaveClass('bg-ai');
   });
 
   it('allows at most 5 policies', async () => {

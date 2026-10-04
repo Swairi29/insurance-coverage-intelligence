@@ -204,6 +204,64 @@ class ExplanationRequest(BaseModel):
         return assessments
 
 
+# --- Questions about one saved analysis (Agent 4) ---
+
+MIN_QUESTION_CHARS = 3
+MAX_QUESTION_CHARS = 500
+_HAS_WORD = re.compile(r"\w")
+
+
+def _clean_question(value: str) -> str:
+    """One line of text: a question can't add its own lines or blocks to the prompt layout."""
+    value = re.sub(r"\s+", " ", value).strip()
+    if not _HAS_WORD.search(value):
+        raise ValueError("question must contain words.")
+    return value
+
+
+class QuestionRequest(BaseModel):
+    """Body of `POST /api/v1/answer-question`: one question about one saved analysis.
+
+    The answer may only use what the analysis already contains, so the gateway
+    sends Agent 3's assessments (with their evidence clauses) from the saved
+    analysis. Nothing is retrieved again.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    request_id: str = Field(default_factory=_new_request_id, min_length=1, max_length=64)
+    business_id: str = Field(min_length=1, max_length=64)
+    # As with the report, the business name is not sent to Agent 4.
+    business_type: Optional[BusinessType] = None
+    question: str = Field(min_length=MIN_QUESTION_CHARS, max_length=MAX_QUESTION_CHARS)
+    assessments: List[CoverageAssessment] = Field(default_factory=list, max_length=50)
+
+    @field_validator("request_id", mode="before")
+    @classmethod
+    def _null_means_generate(cls, value: Optional[str]):
+        return _new_request_id() if value is None else value
+
+    @field_validator("request_id")
+    @classmethod
+    def _check_request_id(cls, value: str) -> str:
+        if not _REQUEST_ID_PATTERN.match(value):
+            raise ValueError("request_id may only contain letters, digits, '-' and '_'.")
+        return value
+
+    @field_validator("question")
+    @classmethod
+    def _check_question(cls, value: str) -> str:
+        return _clean_question(value)
+
+    @field_validator("assessments")
+    @classmethod
+    def _unique_assessments(cls, assessments: List[CoverageAssessment]):
+        ids = [assessment.risk_id for assessment in assessments]
+        if len(ids) != len(set(ids)):
+            raise ValueError("assessments must not contain duplicate risk_id values.")
+        return assessments
+
+
 # --- Orchestration gateway (consumed by the frontend) ---
 
 _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -267,3 +325,20 @@ class AnalysisRequest(BaseModel):
         if any(not 1 <= len(pid) <= 64 for pid in policy_ids):
             raise ValueError("each policy_id must be 1-64 characters.")
         return policy_ids
+
+
+class AskQuestionRequest(BaseModel):
+    """Body of `POST /api/v1/analyses/{request_id}/questions`.
+
+    Only the question: the analysis comes from the path, the business from the
+    logged-in user.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    question: str = Field(min_length=MIN_QUESTION_CHARS, max_length=MAX_QUESTION_CHARS)
+
+    @field_validator("question")
+    @classmethod
+    def _check_question(cls, value: str) -> str:
+        return _clean_question(value)

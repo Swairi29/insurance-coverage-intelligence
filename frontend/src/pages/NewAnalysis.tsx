@@ -6,7 +6,7 @@ import { isApiError } from '../api/client';
 import { MAX_POLICIES_PER_ANALYSIS, policiesQueryKey, usePolicies } from '../api/policies';
 import type { AnalysisRequest, BusinessProfile, PolicyDocument } from '../api/types';
 import { ErrorMessage } from '../components/ErrorMessage';
-import { DocumentIcon } from '../components/icons';
+import { DocumentIcon, SparkleIcon } from '../components/icons';
 import { Button } from '../components/ui/Button';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { Spinner } from '../components/ui/Spinner';
@@ -144,9 +144,11 @@ function NewAnalysisForm({ profile }: { profile: BusinessProfile }) {
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <Button
+          variant="ai"
           onClick={() => start({ business: profile, policy_ids: chosen })}
           disabled={chosen.length === 0}
         >
+          <SparkleIcon className="h-4 w-4" />
           Run analysis
         </Button>
         <p className="text-sm text-muted">
@@ -267,9 +269,9 @@ function AnalysisProgress() {
     <section
       aria-labelledby="progress-title"
       aria-busy="true"
-      className="mx-auto max-w-xl rounded-card border border-line bg-white p-6 text-center sm:p-8"
+      className="mx-auto max-w-xl rounded-card border border-line border-t-4 border-t-ai-bright bg-white p-6 text-center sm:p-8"
     >
-      <Spinner className="mx-auto h-10 w-10" />
+      <Spinner className="mx-auto h-10 w-10" colour="text-ai-bright" />
       <h1 id="progress-title" className="mt-4 text-2xl font-extrabold">
         Analysing your coverage…
       </h1>
@@ -279,15 +281,15 @@ function AnalysisProgress() {
       <div
         role="progressbar"
         aria-label="Analysis in progress"
-        className="mx-auto mt-5 h-1.5 w-full overflow-hidden rounded-full bg-brand-tint"
+        className="mx-auto mt-5 h-1.5 w-full overflow-hidden rounded-full bg-ai-tint"
       >
-        <div className="h-full w-1/3 motion-safe:animate-[progress_1.6s_ease-in-out_infinite] rounded-full bg-brand" />
+        <div className="h-full w-1/3 motion-safe:animate-[progress_1.6s_ease-in-out_infinite] rounded-full bg-ai-bright" />
       </div>
 
       <ol className="mx-auto mt-6 max-w-xs space-y-2 text-left text-sm" aria-label="Analysis steps">
         {AGENT_STAGES.map((stage, index) => (
           <li key={stage} className="flex items-center gap-3">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-tint text-xs font-bold text-brand">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ai-tint text-xs font-bold text-ai">
               {index + 1}
             </span>
             <span className="text-ink-heading">{STAGE_LABELS[stage]}</span>
