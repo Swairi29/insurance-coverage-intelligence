@@ -144,7 +144,7 @@ class FakeInterpreterLLM:
     """Stands in for Agent 3's LLM: answers from INTERPRETATIONS by the risk name in the prompt."""
 
     def generate_text(self, prompt, *, system_instruction=None, json_output=False):
-        name = re.search(r"Name: (.+)", prompt).group(1).strip()
+        name = re.search(r"<NAME>(.+?)</NAME>", prompt).group(1).strip()
         status, reason, chunk_ids = INTERPRETATIONS[name]
         return json.dumps({"status": status, "reason": reason, "confidence": 0.8, "evidence_chunk_ids": chunk_ids})
 

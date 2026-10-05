@@ -23,23 +23,30 @@
 //             business_name containing "Slow" -> each agent takes 6x longer
 //             employee_count > 250            -> 422 with details
 //             an unknown policy id            -> 404 policy_not_found
+//   question  containing "too many"           -> 429 too_many_questions (Retry-After 42)
+//             containing "agent down"         -> 503 agent_unavailable, stage question
+//             otherwise a rule-based answer from the analysis (mocks/answers.ts)
 
 import { delay, http, HttpResponse } from 'msw';
 import type {
   AnalysisRequest,
   AnalysisResponse,
   AnalysisStage,
+  AskQuestionRequest,
   BusinessProfile,
   ErrorResponse,
   GatewayError,
   LoginRequest,
   PolicyDocument,
+  RegisterRequest,
   Stage,
   TokenResponse,
   UserResponse,
 } from '../api/types';
+import { CONSENT_VERSION } from '../lib/consent';
 import { db, newId, sortNewestFirst } from './db';
 import { allStatusesAnalysis, analysisByType, partialAnalysis } from './fixtures';
+import { mockAnswer } from './answers';
 import { progressAt, queuedProgress, type MockJob } from './jobs';
 
 // '*' matches any origin: the page's own in the browser, http://localhost:3000 in tests.
@@ -183,7 +190,11 @@ export const handlers = [
 
   // auth
   http.post(`${API}/auth/register`, async ({ request }) => {
-    const { email = '', password = '' } = (await request.json()) as Partial<LoginRequest>;
+    const {
+      email = '',
+      password = '',
+      consent_version: consentVersion,
+    } = (await request.json()) as Partial<RegisterRequest>;
     const normalised = email.trim().toLowerCase();
     const details: ErrorResponse['details'] = [];
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalised)) {
@@ -191,6 +202,12 @@ export const handlers = [
     }
     if (password.length < 8) {
       details.push({ field: 'password', message: 'String should have at least 8 characters' });
+    }
+    if (consentVersion !== CONSENT_VERSION) {
+      details.push({
+        field: 'consent_version',
+        message: 'Please agree to the current privacy and data processing notice.',
+      });
     }
     if (details.length) return validationError(details);
     if (normalised === 'taken@insureintel.test' || db.users.has(normalised)) {
@@ -201,6 +218,8 @@ export const handlers = [
       email: normalised,
       business_id: db.users.values().next().value!.user.business_id,
       created_at: new Date().toISOString(),
+      consent_version: consentVersion,
+      consented_at: new Date().toISOString(),
     };
     db.users.set(normalised, { password, user });
     return HttpResponse.json(user, { status: 201 });
@@ -363,6 +382,38 @@ export const handlers = [
     return saved
       ? HttpResponse.json(progressFromSaved(saved))
       : gatewayError(404, 'analysis_not_found', 'Analysis not found.');
+  }),
+
+  http.post(`${API}/analyses/:requestId/questions`, async ({ request, params }) => {
+    if (!currentUser(request)) return unauthorized();
+    const requestId = String(params.requestId);
+    const { question = '' } = (await request.json()) as Partial<AskQuestionRequest>;
+    const text = question.replace(/\s+/g, ' ').trim();
+    if (text.length < 3 || text.length > 500 || !/[\p{L}\p{N}]/u.test(text)) {
+      return validationError([
+        { field: 'question', message: 'String should have between 3 and 500 characters' },
+      ]);
+    }
+    const analysis = db.analyses.get(requestId);
+    if (!analysis) return gatewayError(404, 'analysis_not_found', 'Analysis not found.');
+    const lower = text.toLowerCase();
+    if (lower.includes('too many')) {
+      return HttpResponse.json(
+        {
+          error: 'too_many_questions',
+          message: 'Too many questions in a short time. Please wait 42 seconds.',
+        } satisfies GatewayError,
+        { status: 429, headers: { 'Retry-After': '42' } },
+      );
+    }
+    if (lower.includes('agent down')) {
+      return gatewayError(503, 'agent_unavailable', AGENT_MESSAGES.agent_unavailable, {
+        stage: 'question',
+        request_id: newId(),
+      });
+    }
+    await wait(900);
+    return HttpResponse.json(mockAnswer(analysis, text));
   }),
 
   http.get(`${API}/analyses`, ({ request }) => {

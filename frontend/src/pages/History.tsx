@@ -42,7 +42,7 @@ export default function History() {
             <p className="mt-1 text-sm text-muted">
               Every analysis you run is saved here, encrypted, so you can come back to it.
             </p>
-            <Link to="/app/analyses/new" className={`mt-4 ${buttonClasses('ai', 'sm')}`}>
+            <Link to="/app/analyses/new" className={`mt-4 ${buttonClasses('primary', 'sm')}`}>
               Run your first analysis
             </Link>
           </div>

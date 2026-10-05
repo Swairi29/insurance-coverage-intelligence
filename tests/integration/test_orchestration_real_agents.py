@@ -26,6 +26,7 @@ from services.orchestration.api import get_pipeline  # noqa: E402
 from services.orchestration.database import Database, get_database  # noqa: E402
 from services.orchestration.pipeline import AgentClient, AnalysisPipeline  # noqa: E402
 from shared.config.settings import get_settings  # noqa: E402
+from shared.schemas.requests import CURRENT_CONSENT_VERSION  # noqa: E402
 from tests.integration.test_agent3_to_agent4 import BUSINESS  # noqa: E402
 from scripts.gateway_client import run_analysis  # noqa: E402
 from tests.orchestration_fakes import URLS  # noqa: E402
@@ -99,7 +100,7 @@ def gateway(monkeypatch, tmp_path, agents):
 
 
 def _login(gateway) -> dict:
-    gateway.post("/api/v1/auth/register", json={"email": "owner@sunrise.test", "password": PASSWORD})
+    gateway.post("/api/v1/auth/register", json={"email": "owner@sunrise.test", "password": PASSWORD, "consent_version": CURRENT_CONSENT_VERSION})
     token = gateway.post("/api/v1/auth/login", json={"email": "owner@sunrise.test", "password": PASSWORD})
     return {"Authorization": f"Bearer {token.json()['access_token']}"}
 
@@ -141,7 +142,7 @@ def test_a_second_user_cannot_analyse_someone_elses_policy(gateway):
     policy_id = gateway.post("/api/v1/policies", headers=owner,
                              files={"file": ("sunrise.pdf", _policy_pdf(), "application/pdf")}).json()["policy_id"]
 
-    gateway.post("/api/v1/auth/register", json={"email": "other@shop.test", "password": PASSWORD})
+    gateway.post("/api/v1/auth/register", json={"email": "other@shop.test", "password": PASSWORD, "consent_version": CURRENT_CONSENT_VERSION})
     token = gateway.post("/api/v1/auth/login", json={"email": "other@shop.test", "password": PASSWORD})
     other = {"Authorization": f"Bearer {token.json()['access_token']}"}
 

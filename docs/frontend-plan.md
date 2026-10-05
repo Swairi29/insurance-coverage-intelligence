@@ -196,6 +196,15 @@ Evidence that has `flagged: true` gets a warning icon: "This clause contained un
 and was not used by the AI." Render all policy text **as plain text**. Never use
 `dangerouslySetInnerHTML`, because policy PDFs are untrusted input.
 
+### Ask about this analysis (Results page)
+
+Below the result tabs, `components/AskPanel.tsx` sends one question at a time to
+`POST /api/v1/analyses/{id}/questions`. Example questions are built from the analysis's own risks.
+Each answer shows whether an AI wrote it (`AiLabel`), keeps the line breaks of rule-based
+answers, lists the related risks and cites its clauses with `EvidenceList`; an unanswerable
+question gets a grey card with no sources. A 429 says how long to wait. The conversation lives in
+React state only (the server stores nothing) and is hidden when printing.
+
 ### Aurora light design rules (redesign)
 
 All tokens are in `frontend/tailwind.config.ts`; components never use hex values.

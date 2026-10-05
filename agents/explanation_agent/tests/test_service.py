@@ -10,6 +10,7 @@ import pytest
 from agents.explanation_agent.service import (
     LLM_PARTIAL_WARNING,
     LLM_TIME_BUDGET_WARNING,
+    LLM_SERVICE_WARNING,
     LLM_UNAVAILABLE_WARNING,
     ExplanationService,
 )
@@ -296,3 +297,29 @@ def test_status_and_gap_always_equal_input(responses):
         assert [f.verification_required for f in report.findings] == [
             f.status.value != "covered" for f in report.findings
         ]
+
+
+# --- why findings fell back to template wording (the warning must name the real cause) ----------
+
+def _partial_report(*responses):
+    answers = [load_llm_response(r) if isinstance(r, str) and r.endswith(".json") else r for r in responses]
+    service = ExplanationService(client=FakeLLM(answers), provider="gemini", model="test")
+    return service.generate(ExplanationRequest.model_validate(load_fixture("bakery_mixed.json")))
+
+
+def test_service_failure_is_not_called_a_safety_rejection():
+    # Batch 2's call fails (e.g. Gemini HTTP 429): the AI was unavailable, nothing was rejected.
+    report = _partial_report("bakery_mixed_good.json", RuntimeError("HTTP 429"))
+    assert report.metadata.llm_findings == 4
+    assert LLM_SERVICE_WARNING in report.warnings
+    assert LLM_PARTIAL_WARNING not in report.warnings
+
+
+def test_safety_rejection_keeps_its_own_warning():
+    good = json.loads(load_llm_response("bakery_mixed_good.json"))
+    # A batch-1 finding uses a blocked phrase, so the validator rejects it (V5).
+    item = next(i for i in good["findings"] if i["risk_id"] == "EQP_BREAKDOWN")
+    item["explanation"] = "This is definitely fully covered."
+    report = _partial_report(json.dumps(good), RuntimeError("HTTP 429"))
+    assert LLM_PARTIAL_WARNING in report.warnings
+    assert LLM_SERVICE_WARNING in report.warnings

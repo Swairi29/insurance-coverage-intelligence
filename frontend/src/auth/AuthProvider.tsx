@@ -17,7 +17,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearSession = useCallback(() => {
     clearToken();
     removeSession(SESSION_KEYS.profileDraft);
-    removeSession(SESSION_KEYS.lastAnalysis);
+    removeSession(SESSION_KEYS.analysisRequests);
     queryClient.clear();
     setUser(null);
     setStatus('anonymous');
@@ -67,8 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(
-    async (email: string, password: string) => {
-      await registerRequest({ email, password });
+    async (email: string, password: string, consentVersion: string) => {
+      await registerRequest({ email, password, consent_version: consentVersion });
       await login(email, password);
     },
     [login],

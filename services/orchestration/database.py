@@ -33,7 +33,9 @@ CREATE TABLE IF NOT EXISTS users (
     email         TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     business_id   TEXT NOT NULL UNIQUE,
-    created_at    TEXT NOT NULL
+    created_at    TEXT NOT NULL,
+    consent_version TEXT,
+    consented_at  TEXT
 );
 CREATE TABLE IF NOT EXISTS policies (
     policy_id     TEXT PRIMARY KEY,
@@ -70,6 +72,14 @@ class UserRecord:
     password_hash: str
     business_id: str
     created_at: datetime
+    # The privacy notice agreed to at sign-up, and when (None for older accounts).
+    consent_version: Optional[str] = None
+    consented_at: Optional[datetime] = None
+
+
+# Columns added after the first release, with their type. init_schema adds any that an
+# existing database file does not have yet, so no data is lost.
+_ADDED_COLUMNS = {"users": {"consent_version": "TEXT", "consented_at": "TEXT"}}
 
 
 class Database:
@@ -80,6 +90,11 @@ class Database:
         Path(self._path).parent.mkdir(parents=True, exist_ok=True)
         with self._connection() as conn:
             conn.executescript(_SCHEMA)
+            for table, columns in _ADDED_COLUMNS.items():
+                existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+                for name, kind in columns.items():
+                    if name not in existing:
+                        conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
 
     @contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:
@@ -94,21 +109,26 @@ class Database:
 
     # --- users --------------------------------------------------------------------------
 
-    def create_user(self, email: str, password_hash: str) -> UserRecord:
+    def create_user(self, email: str, password_hash: str,
+                    consent_version: Optional[str] = None) -> UserRecord:
+        now = datetime.now(timezone.utc)
         user = UserRecord(
             user_id=str(uuid.uuid4()),
             email=email,
             password_hash=password_hash,
             business_id=f"B-{uuid.uuid4().hex[:16]}",
-            created_at=datetime.now(timezone.utc),
+            created_at=now,
+            consent_version=consent_version,
+            consented_at=now if consent_version else None,
         )
         try:
             with self._connection() as conn:
                 conn.execute(
-                    "INSERT INTO users (user_id, email, password_hash, business_id, created_at) "
-                    "VALUES (?, ?, ?, ?, ?)",
+                    "INSERT INTO users (user_id, email, password_hash, business_id, created_at, "
+                    "consent_version, consented_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (user.user_id, user.email, user.password_hash, user.business_id,
-                     user.created_at.isoformat()),
+                     user.created_at.isoformat(), user.consent_version,
+                     user.consented_at.isoformat() if user.consented_at else None),
                 )
         except sqlite3.IntegrityError:
             raise DuplicateEmailError() from None
@@ -131,6 +151,8 @@ class Database:
             password_hash=row["password_hash"],
             business_id=row["business_id"],
             created_at=datetime.fromisoformat(row["created_at"]),
+            consent_version=row["consent_version"],
+            consented_at=datetime.fromisoformat(row["consented_at"]) if row["consented_at"] else None,
         )
 
     # --- policies -----------------------------------------------------------------------

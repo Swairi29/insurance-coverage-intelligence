@@ -94,7 +94,8 @@ export function AppLayout() {
                   to={item.to}
                   end={item.end}
                   className={({ isActive }) =>
-                    `block rounded-pill px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+                    // The ring is drawn inside the pill: the scrolling list would clip one outside it.
+                    `block rounded-pill px-3.5 py-1.5 text-sm font-semibold transition-colors focus-visible:-outline-offset-2 ${
                       isActive
                         ? 'bg-brand-tint text-brand'
                         : 'text-muted-strong hover:bg-canvas hover:text-ink-heading'
@@ -108,7 +109,10 @@ export function AppLayout() {
           </ul>
         </nav>
       </header>
-      <main id="main" className="mx-auto max-w-6xl px-4 py-8 print:max-w-none print:p-0">
+      <main
+        id="main"
+        className="mx-auto max-w-6xl px-4 py-8 print:max-w-none print:px-[14mm] print:py-0"
+      >
         <Outlet />
       </main>
     </div>

@@ -76,7 +76,7 @@ export default function Dashboard() {
             Signed in as <span className="font-medium text-ink-heading">{user?.email}</span>
           </p>
         </div>
-        <Link to="/app/analyses/new" className={buttonClasses('ai')}>
+        <Link to="/app/analyses/new" className={buttonClasses('primary')}>
           <SparkleIcon className="h-4 w-4" />
           Run new analysis
         </Link>

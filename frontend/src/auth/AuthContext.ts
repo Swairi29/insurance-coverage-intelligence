@@ -13,7 +13,8 @@ export interface AuthContextValue {
   /** Throws an ApiError when the login fails. */
   login: (email: string, password: string) => Promise<void>;
   /** Registers, then logs in with the same details. Throws an ApiError on failure. */
-  register: (email: string, password: string) => Promise<void>;
+  /** `consentVersion`: the privacy notice the user has just agreed to. */
+  register: (email: string, password: string, consentVersion: string) => Promise<void>;
   logout: () => void;
 }
 

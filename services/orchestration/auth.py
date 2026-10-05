@@ -61,9 +61,9 @@ def _dummy_hash() -> str:
     return hash_password("not-a-real-password")
 
 
-def register_user(db: Database, email: str, password: str) -> UserRecord:
-    """Raises `DuplicateEmailError` if the email is taken."""
-    return db.create_user(email, hash_password(password))
+def register_user(db: Database, email: str, password: str, consent_version: str) -> UserRecord:
+    """Raises `DuplicateEmailError` if the email is taken. Records the consent given."""
+    return db.create_user(email, hash_password(password), consent_version=consent_version)
 
 
 def authenticate(db: Database, email: str, password: str) -> Optional[UserRecord]:

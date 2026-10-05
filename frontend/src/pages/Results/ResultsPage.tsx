@@ -7,6 +7,7 @@ import type { AnalysisResponse } from '../../api/types';
 import { Disclaimer } from '../../components/Disclaimer';
 import { ErrorMessage } from '../../components/ErrorMessage';
 import { SparkleIcon } from '../../components/icons';
+import { AskPanel } from '../../components/AskPanel';
 import { AnalysisStatusBadge } from '../../components/StatusBadge';
 import { StatusBar } from '../../components/StatusBar';
 import { Alert } from '../../components/ui/Alert';
@@ -223,6 +224,8 @@ function Results({ analysis }: { analysis: AnalysisResponse }) {
           {t.id === 'risks' && <RiskProfileTab profile={analysis.risk_profile} />}
         </div>
       ))}
+
+      <AskPanel analysis={analysis} policyNames={policyNames} />
     </article>
   );
 }

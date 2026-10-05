@@ -315,9 +315,9 @@ Run: `uvicorn services.orchestration.api:app --port 8000 --reload`
 |---|---|---|---|
 | `GET` | `/health` | none | Gateway only |
 | `GET` | `/health/agents` | none | `up` / `down` for each agent's `/health`; `status` is `degraded` if any is down |
-| `POST` | `/api/v1/auth/register` | none | `{"email", "password"}` → 201 `UserResponse`; 409 if the email is taken |
+| `POST` | `/api/v1/auth/register` | none | `{"email", "password", "consent_version"}` → 201 `UserResponse`; 409 if the email is taken; 422 without consent to the current notice |
 | `POST` | `/api/v1/auth/login` | none | `{"email", "password"}` → `TokenResponse` (`access_token`, `expires_in` seconds) |
-| `GET` | `/api/v1/auth/me` | Bearer | `UserResponse` (`user_id`, `email`, `business_id`, `created_at`) |
+| `GET` | `/api/v1/auth/me` | Bearer | `UserResponse` (`user_id`, `email`, `business_id`, `created_at`, `consent_version`, `consented_at`) |
 | `GET` | `/api/v1/policies` | Bearer | The user's uploaded policies, newest first |
 | `POST` | `/api/v1/policies` | Bearer | Multipart `file` (PDF) → Agent 2 → `PolicyUploadResponse` |
 | `POST` | `/api/v1/analyses` | Bearer | `AnalysisRequest` → **202** `AnalysisProgress`; the four agents then run in the background |
@@ -332,6 +332,13 @@ Run: `uvicorn services.orchestration.api:app --port 8000 --reload`
 **Rules**
 
 - Passwords: 8 characters minimum, 72 bytes maximum (bcrypt's limit). Emails are lower-cased.
+- Consent: registration needs `consent_version` equal to `CURRENT_CONSENT_VERSION`
+  (`shared/schemas/requests.py`; the same value as `CONSENT_VERSION` in
+  `frontend/src/lib/consent.ts`, shown on `/privacy`). Sending it is the user's agreement to the
+  privacy and data-processing notice; anything else is a 422 on `consent_version` and no account
+  is created. The version and the time of agreement are stored with the user (columns
+  `consent_version`, `consented_at`, added automatically to an existing database) and returned by
+  `/auth/me`. Accounts created before this have `null` for both.
 - After 5 failed logins for one email within 15 minutes, login for that email returns 429 until
   the oldest failure is 15 minutes old. A successful login clears the count. Unknown emails are
   counted the same way, so the limit does not reveal which emails exist. The count is in memory,

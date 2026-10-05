@@ -1,7 +1,9 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import type { BusinessProfile, PolicyDocument } from '../api/types';
+import { analysisRequestFor } from '../lib/analysisRequests';
 import { SESSION_KEYS } from '../lib/session';
+import { db } from '../mocks/db';
 import { policiesFixture } from '../mocks/fixtures';
 import { server } from '../mocks/server';
 import { renderApp } from '../test/renderApp';
@@ -145,8 +147,9 @@ describe('new analysis: agent workspace', () => {
       },
       policy_ids: policiesFixture.map((p) => p.policy_id),
     });
-    // Kept so a failed run can be retried from the workspace.
-    expect(JSON.parse(window.sessionStorage.getItem(SESSION_KEYS.lastAnalysis)!)).toEqual(sentBody);
+    // Kept, under this run's id, so a failed run can be retried from the workspace.
+    const runId = location()!.split('/')[3];
+    expect(analysisRequestFor(runId)).toEqual(sentBody);
 
     const agents = within(screen.getByRole('list', { name: 'Agents' })).getAllByRole('listitem');
     expect(agents.map((a) => within(a).getByRole('heading').textContent)).toEqual([
@@ -239,6 +242,36 @@ describe('new analysis: errors', () => {
       expect(requests).toBe(2);
     },
   );
+
+  it('offers a new analysis, not a retry, for a failed run started elsewhere', async () => {
+    // A failed run this tab did not start (e.g. opened from a link): its request is unknown.
+    db.jobs.set('failed-run', {
+      requestId: 'failed-run',
+      startedAt: Date.now(),
+      durations: [0, 0, 0, 0],
+      result: null,
+      policyCount: 1,
+      failure: {
+        stage: 'risk_profile',
+        error: {
+          error: 'agent_unavailable',
+          message: 'A required analysis service is not available.',
+        },
+      },
+      saved: false,
+    });
+    loginAsDemoUser();
+    renderApp('/app/analyses/failed-run/progress');
+
+    expect(
+      await screen.findByRole('heading', { name: 'The analysis could not finish' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry analysis' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Start a new analysis' })).toHaveAttribute(
+      'href',
+      '/app/analyses/new',
+    );
+  });
 
   it('refreshes the policy list after a 404 policy_not_found', async () => {
     saveDraft();

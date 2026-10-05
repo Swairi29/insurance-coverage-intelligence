@@ -170,6 +170,10 @@ answer the question. A test checks that rule-based answers pass the same checks.
 
 ### 4. Privacy and abuse
 
+- Consent is recorded: an account can only be created by agreeing to the current privacy and
+  data-processing notice (`/privacy`), which says when clauses and questions go to an AI
+  provider. The notice version and the time of agreement are stored with the account.
+
 - Only the business type, the question and the analysis's assessments are sent to Agent 4;
   never the business name.
 - With `LLM_PROVIDER=gemini`, the question and the chosen clauses are sent to **Google's Gemini
