@@ -1,325 +1,297 @@
-import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { Brand } from '../components/Brand';
-import { CheckIcon, DocumentIcon, LockIcon, SparkleIcon } from '../components/icons';
 import { SampleFinding } from '../components/SampleFinding';
-import { buttonClasses } from '../components/ui/buttonClasses';
 import { EQUIPMENT_EXAMPLE } from '../lib/examples';
-import { AGENTS, AGENT_STAGES } from '../lib/labels';
-import { ANNUAL_MONTHS_CHARGED, PRICING_TIERS, formatLkr } from '../lib/pricing';
 
 const REPO_URL = 'https://github.com/Swairi29/insurance-coverage-intelligence';
 const RESPONSIBLE_AI_URL = `${REPO_URL}/blob/main/docs/responsible-ai.md`;
-
-const NAV = [
-  { href: '#how-it-works', label: 'How it works' },
-  { href: '#example', label: 'Example' },
-  { href: '#responsible-ai', label: 'Responsible AI' },
-  { href: '#pricing', label: 'Pricing' },
-];
-
-const TRUST = [
-  { icon: DocumentIcon, text: 'Every finding cites the policy clause' },
-  { icon: LockIcon, text: 'Runs on your documents only' },
-  { icon: CheckIcon, text: 'Decision support, not advice' },
-];
-
-const RESPONSIBLE_AI = [
-  {
-    title: 'Fairness',
-    text: 'Every business of the same type is checked against the same risk rules, and your business name is never sent to the AI.',
-  },
-  {
-    title: 'Transparency',
-    text: 'Each finding shows the clause, file, section and page behind it, and AI-written text is always labelled.',
-  },
-  {
-    title: 'Privacy',
-    text: 'Policies and results are encrypted at rest, clauses with hidden instructions are withheld from the AI, and logs hold counts only.',
-  },
-  {
-    title: 'Human oversight',
-    text: 'Coverage statuses come from rules the AI cannot change, and every potential gap asks you to confirm with your insurer or broker.',
-  },
+const WORKFLOW = [
+  [
+    '01',
+    'Business information + policy',
+    'Choose a saved business profile or describe a scenario, then select uploaded policies.',
+  ],
+  [
+    '02',
+    'Risk Profiling Agent',
+    'Identify the business risks relevant to the information provided.',
+  ],
+  ['03', 'Policy Intelligence Agent', 'Find relevant policy wording for each identified risk.'],
+  ['04', 'Coverage & Gap Analysis Agent', 'Assess coverage status against the retrieved evidence.'],
+  [
+    '05',
+    'Evidence-based report',
+    'Review explanations, recommendations, and source policy wording.',
+  ],
 ];
 
 export default function Landing() {
   const { status } = useAuth();
   const loggedIn = status === 'authenticated';
-  const scrolled = useScrolled();
-  const primaryTo = loggedIn ? '/app' : '/register';
+  const primaryTo = loggedIn ? '/app/analyses/new' : '/register';
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <header
-        className={`sticky top-0 z-30 border-b bg-white/70 backdrop-blur transition-colors ${
-          scrolled ? 'border-line' : 'border-transparent'
-        }`}
-      >
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <Brand />
-          <nav aria-label="Site" className="flex items-center gap-1 sm:gap-2">
-            {NAV.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="hidden rounded-pill px-3 py-2 text-sm font-semibold text-muted-strong hover:text-brand md:inline"
-              >
-                {item.label}
-              </a>
-            ))}
-            {loggedIn ? (
-              <Link to="/app" className={buttonClasses('primary', 'sm')}>
-                Open your dashboard
-              </Link>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="rounded-pill px-3 py-2 text-sm font-semibold text-muted-strong hover:text-brand"
-                >
-                  Log in
-                </Link>
-                <Link to="/register" className={buttonClasses('primary', 'sm')}>
-                  Get started
-                </Link>
-              </>
-            )}
+    <div className="dark-ui min-h-screen bg-[#050b18]">
+      <header className="absolute inset-x-0 top-0 z-20 border-b border-white/10">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
+          <Brand tone="dark" />
+          <nav aria-label="Site" className="flex items-center gap-2 sm:gap-4">
+            <a
+              href="#how-it-works"
+              className="hidden text-sm font-medium text-slate-300 hover:text-white sm:inline"
+            >
+              How it works
+            </a>
+            <a
+              href="#responsible-ai"
+              className="hidden text-sm font-medium text-slate-300 hover:text-white md:inline"
+            >
+              Responsible AI
+            </a>
+            <Link
+              to="/login"
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-white/5"
+            >
+              Log in
+            </Link>
+            <Link
+              to={primaryTo}
+              className="rounded-lg bg-blue-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-900/30 hover:bg-blue-400"
+            >
+              {loggedIn ? 'Open workspace' : 'Start assessment'}
+            </Link>
           </nav>
         </div>
       </header>
 
       <main>
-        {/* Hero */}
-        <section className="bg-aurora">
-          <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-20 pt-14 sm:pt-20 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-            <div className="motion-safe:animate-fade-up">
-              <p className="inline-flex items-center gap-1.5 rounded-pill border border-ai-border bg-white/70 px-3 py-1.5 text-xs font-bold text-ai">
-                <SparkleIcon className="h-3.5 w-3.5" />
-                Four AI agents, one evidence-based report
+        <section className="relative overflow-hidden bg-[#07142c] text-white">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-20 -top-28 h-[34rem] w-[34rem] rounded-full bg-blue-500/20 blur-[100px]"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -bottom-56 left-[20%] h-[30rem] w-[50rem] rounded-full bg-indigo-500/15 blur-[100px]"
+          />
+          <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-5 pb-20 pt-32 sm:px-8 sm:pt-36 lg:grid-cols-[1.05fr_.95fr] lg:px-10 lg:pb-24">
+            <div>
+              <p className="inline-flex items-center gap-2 rounded-full border border-blue-300/20 bg-blue-400/10 px-3.5 py-2 text-xs font-bold text-blue-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
+                AI-driven coverage intelligence
               </p>
-              <h1 className="mt-6 text-4xl font-extrabold leading-[1.08] sm:text-display">
-                Know what your insurance <span className="text-brand">actually covers.</span>
+              <h1 className="mt-6 max-w-2xl text-4xl font-extrabold leading-[1.06] tracking-tight text-white sm:text-6xl">
+                Understand your risks.
+                <br />
+                <span className="bg-gradient-to-r from-blue-300 via-cyan-200 to-indigo-300 bg-clip-text text-transparent">
+                  Discover coverage gaps.
+                </span>
               </h1>
-              <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted-strong">
-                InsureIntel reads your business profile and your policy PDFs, checks every business
-                risk against the wording, and shows which risks are covered, which are not, and the
-                exact clause behind each answer.
+              <p className="mt-6 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
+                InsureIntel helps small and medium-sized businesses analyse business risks and
+                insurance policies through a structured, evidence-based workflow.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link to={primaryTo} className={buttonClasses('primary', 'lg')}>
-                  {loggedIn ? 'Continue your assessment →' : 'Start free assessment →'}
+                <Link
+                  to={primaryTo}
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 px-5 py-3 text-sm font-bold text-white shadow-[0_10px_35px_rgba(37,99,235,.3)] hover:brightness-110"
+                >
+                  Start assessment <span aria-hidden="true">→</span>
                 </Link>
-                <a href="#how-it-works" className={buttonClasses('secondary', 'lg')}>
-                  See how it works
+                <a
+                  href="#how-it-works"
+                  className="inline-flex items-center rounded-xl border border-white/15 px-5 py-3 text-sm font-semibold text-slate-100 hover:bg-white/5"
+                >
+                  Explore workflow
                 </a>
               </div>
-              <ul
-                className="mt-8 grid gap-2 text-sm text-ink sm:grid-cols-3"
-                aria-label="Why trust it"
-              >
-                {TRUST.map(({ icon: Icon, text }) => (
-                  <li key={text} className="flex items-start gap-2">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-brand shadow-soft">
-                      <Icon className="h-3 w-3" />
-                    </span>
-                    {text}
-                  </li>
-                ))}
-              </ul>
+              <p className="mt-6 text-xs text-slate-400">
+                Academic prototype · decision support, not insurance or legal advice
+              </p>
             </div>
-            <PipelinePreview />
+            <WorkflowCard />
           </div>
         </section>
 
-        {/* How it works */}
-        <Section
-          id="how-it-works"
-          eyebrow="How it works"
-          title="How the four agents work together"
-          intro="The gateway runs the agents in order and passes each result on to the next. Agents never call each other, so every step is logged and can be checked."
-        >
-          <ol className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {AGENT_STAGES.map((stage, index) => {
-              const agent = AGENTS[stage];
-              return (
-                <li
-                  key={stage}
-                  className="rounded-card border border-line bg-white p-5 shadow-soft"
-                >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-tint font-display text-sm font-extrabold text-brand">
-                    {index + 1}
-                  </span>
-                  <h3 className="mt-3 text-lg font-bold">{agent.name}</h3>
-                  <p className="mt-1 text-sm text-muted">{agent.role}</p>
-                  <dl className="mt-4 space-y-2 text-sm">
-                    <div>
-                      <dt className="text-meta font-semibold text-muted">Input</dt>
-                      <dd className="text-ink">{agent.input}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-meta font-semibold text-muted">Output</dt>
-                      <dd className="text-ink">{agent.output}</dd>
-                    </div>
-                  </dl>
-                </li>
-              );
-            })}
-          </ol>
-        </Section>
-
-        {/* Example finding */}
-        <section id="example" className="scroll-mt-20 border-y border-line bg-white">
-          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 lg:grid-cols-2">
-            <div>
-              <p className="text-meta font-semibold uppercase tracking-wide text-ai">
-                See a real finding
-              </p>
-              <h2 className="mt-2 text-title font-extrabold">Every finding shows its evidence</h2>
-              <p className="mt-4 leading-relaxed text-muted-strong">
-                No answer comes without its source. Each risk shows its coverage status, the quoted
-                clause, and the file, section and page it came from, so you or your broker can check
-                it in seconds.
-              </p>
-              <ul className="mt-6 space-y-2 text-sm text-ink">
-                {[
-                  'Status decided by coverage rules, never changed by the AI',
-                  'Potential gaps flagged in red, with a next step',
-                  'AI-written explanations are labelled as such',
-                ].map((point) => (
-                  <li key={point} className="flex items-start gap-2">
-                    <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-status-covered" />
-                    {point}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <SampleFinding finding={EQUIPMENT_EXAMPLE} />
-          </div>
-        </section>
-
-        {/* Responsible AI */}
-        <Section
-          id="responsible-ai"
-          eyebrow="Responsible AI"
-          title="Built responsibly"
-          intro="What the system actually does to keep results fair, explainable and safe."
-        >
-          <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {RESPONSIBLE_AI.map((item) => (
+        <section className="relative z-10 mx-auto -mt-7 max-w-7xl px-5 sm:px-8 lg:px-10">
+          <ul className="grid gap-4 md:grid-cols-3">
+            {[
+              [
+                '01',
+                'Risk Profiling',
+                'Identify potential business risks from structured details or a free-text scenario.',
+              ],
+              [
+                '02',
+                'Policy Intelligence',
+                'Find relevant wording in the policy documents you provide.',
+              ],
+              [
+                '03',
+                'Gap Detection',
+                'Compare risks with policy evidence and explain potential gaps.',
+              ],
+            ].map(([number, title, text]) => (
               <li
-                key={item.title}
-                className="rounded-card border border-line bg-white p-5 shadow-soft"
+                key={number}
+                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_16px_40px_rgba(15,35,70,.07)]"
               >
-                <h3 className="text-lg font-bold">{item.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-strong">{item.text}</p>
+                <span className="text-xs font-extrabold tracking-[.16em] text-blue-600">
+                  {number} / CAPABILITY
+                </span>
+                <h2 className="mt-3 text-lg font-bold text-slate-950">{title}</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-500">{text}</p>
               </li>
             ))}
           </ul>
-          <p className="mt-6 text-sm">
+        </section>
+
+        <section id="how-it-works" className="scroll-mt-10 px-5 py-20 sm:px-8 lg:px-10">
+          <div className="mx-auto max-w-7xl">
+            <p className="text-xs font-bold uppercase tracking-[.18em] text-blue-600">
+              How it works
+            </p>
+            <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-950">
+              One workflow, from input to report
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
+              The gateway runs the four agents in sequence. Both input methods continue through the
+              same policy and coverage analysis.
+            </p>
+            <ol className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              {WORKFLOW.map(([number, title, text], index) => (
+                <li
+                  key={number}
+                  className="relative rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                >
+                  <span
+                    className={`grid h-9 w-9 place-items-center rounded-xl text-xs font-extrabold ${index === 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-blue-50 text-blue-700'}`}
+                  >
+                    {number}
+                  </span>
+                  <h3 className="mt-4 font-bold text-slate-950">{title}</h3>
+                  <p className="mt-2 text-sm leading-5 text-slate-500">{text}</p>
+                  {index < WORKFLOW.length - 1 && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -right-3 top-1/2 z-10 hidden text-lg text-blue-400 xl:block"
+                    >
+                      →
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        <section className="border-y border-slate-200 bg-white px-5 py-16 sm:px-8 lg:px-10">
+          <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-2">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[.18em] text-blue-600">
+                Evidence first
+              </p>
+              <h2 className="mt-2 text-3xl font-extrabold text-slate-950">
+                Review the wording behind a finding
+              </h2>
+              <p className="mt-4 max-w-xl text-sm leading-6 text-slate-500">
+                Coverage assessments are grounded in retrieved policy clauses. Review the cited
+                wording, section, and page, then confirm any questions with your insurer or broker.
+              </p>
+              <Link
+                to={primaryTo}
+                className="mt-6 inline-flex rounded-xl bg-[#102449] px-5 py-3 text-sm font-bold text-white hover:bg-blue-900"
+              >
+                Explore an analysis →
+              </Link>
+            </div>
+            <div className="rounded-3xl bg-[#0b1b38] p-4 sm:p-6">
+              <SampleFinding finding={EQUIPMENT_EXAMPLE} />
+            </div>
+          </div>
+        </section>
+
+        <section id="responsible-ai" className="scroll-mt-10 px-5 py-20 sm:px-8 lg:px-10">
+          <div className="mx-auto max-w-7xl">
+            <p className="text-xs font-bold uppercase tracking-[.18em] text-blue-600">
+              Responsible AI
+            </p>
+            <h2 className="mt-2 text-3xl font-extrabold text-slate-950">
+              Decision support with human oversight
+            </h2>
+            <ul className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {[
+                ['Fairness', 'Businesses of the same type are checked using the same risk rules.'],
+                ['Transparency', 'Findings connect back to the source policy wording.'],
+                [
+                  'Privacy',
+                  'Analysis logs contain stage and count details rather than policy text.',
+                ],
+                [
+                  'Human oversight',
+                  'Confirm potential gaps and coverage decisions with your insurer or broker.',
+                ],
+              ].map(([title, text]) => (
+                <li key={title} className="rounded-2xl border border-slate-200 bg-white p-5">
+                  <h3 className="font-bold text-slate-950">{title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">{text}</p>
+                </li>
+              ))}
+            </ul>
             <a
               href={RESPONSIBLE_AI_URL}
               target="_blank"
               rel="noreferrer"
-              className="font-semibold text-brand hover:underline"
+              className="mt-5 inline-block text-sm font-bold text-blue-700 hover:underline"
             >
-              Read the full Responsible AI notes →
+              Read the Responsible AI notes →
             </a>
-          </p>
-        </Section>
+          </div>
+        </section>
 
-        {/* Pricing */}
-        <section id="pricing" className="scroll-mt-20 border-t border-line bg-white">
-          <div className="mx-auto max-w-6xl px-4 py-16">
-            <p className="text-meta font-semibold uppercase tracking-wide text-ai">Pricing</p>
-            <h2 className="mt-2 text-title font-extrabold">Plans for every size of business</h2>
-            <p className="mt-3 max-w-2xl text-muted-strong">
-              Start free on one policy. Pay yearly and get two months free.
-            </p>
-            <ul className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {PRICING_TIERS.map((tier) => (
-                <li
-                  key={tier.name}
-                  className={`flex flex-col rounded-card border bg-white p-6 ${
-                    tier.highlighted ? 'border-brand shadow-lift' : 'border-line shadow-soft'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-lg font-bold">{tier.name}</h3>
-                    {tier.highlighted && (
-                      <span className="rounded-pill bg-brand-tint px-2.5 py-0.5 text-xs font-bold text-brand">
-                        Most popular
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1 text-sm text-muted">{tier.audience}</p>
-                  <p className="mt-4">
-                    <span className="font-display text-3xl font-extrabold text-ink-heading">
-                      {tier.monthlyLkr === 0 ? 'Free' : formatLkr(tier.monthlyLkr)}
-                    </span>
-                    {tier.monthlyLkr > 0 && <span className="text-sm text-muted"> / month</span>}
-                  </p>
-                  <p className="text-xs text-muted">
-                    {tier.monthlyLkr > 0
-                      ? `${formatLkr(tier.monthlyLkr * ANNUAL_MONTHS_CHARGED)} a year`
-                      : 'No card needed'}
-                  </p>
-                  <ul className="mt-5 flex-1 space-y-2 text-sm text-ink">
-                    {tier.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2">
-                        <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-status-covered" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link
-                    to={loggedIn ? '/app' : '/register'}
-                    className={`mt-6 ${buttonClasses(tier.highlighted ? 'primary' : 'secondary')}`}
-                  >
-                    {tier.cta}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-6 text-xs text-muted">
-              Proposed launch pricing in Sri Lankan rupees. This academic prototype takes no
-              payments; every plan opens the same free account.
-            </p>
+        <section
+          id="pricing"
+          className="border-t border-slate-200 bg-white px-5 py-12 sm:px-8 lg:px-10"
+        >
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="font-bold text-slate-950">Academic prototype</p>
+              <p className="mt-1 text-sm text-slate-500">
+                No payments are processed. Product plans are not active in this prototype.
+              </p>
+            </div>
+            <Link to="/privacy" className="text-sm font-bold text-blue-700 hover:underline">
+              Privacy and consent →
+            </Link>
           </div>
         </section>
       </main>
-
-      <footer className="border-t border-line bg-canvas">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 text-sm sm:flex-row sm:items-center sm:justify-between">
-          <p className="max-w-xl text-xs text-muted">
+      <footer className="bg-[#07142c] px-5 py-8 text-sm text-slate-300 sm:px-8 lg:px-10">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-xl text-xs leading-5">
             Academic prototype built at SLIIT. InsureIntel does not provide legal, financial or
             insurance advice; confirm every finding with your insurer or broker.
           </p>
-          <ul className="flex flex-wrap gap-x-5 gap-y-2 font-semibold">
+          <ul className="flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold">
             <li>
               <a
                 href={RESPONSIBLE_AI_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="text-brand hover:underline"
+                className="hover:text-white"
               >
-                Responsible AI notes
+                Responsible AI
               </a>
             </li>
             <li>
-              <Link to="/privacy" className="text-brand hover:underline">
+              <Link to="/privacy" className="hover:text-white">
                 Privacy &amp; consent
               </Link>
             </li>
             <li>
-              <a
-                href={REPO_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="text-brand hover:underline"
-              >
-                GitHub repository
+              <a href={REPO_URL} target="_blank" rel="noreferrer" className="hover:text-white">
+                GitHub
               </a>
             </li>
           </ul>
@@ -329,111 +301,34 @@ export default function Landing() {
   );
 }
 
-function Section({
-  id,
-  eyebrow,
-  title,
-  intro,
-  children,
-}: {
-  id: string;
-  eyebrow: string;
-  title: string;
-  intro: string;
-  children: ReactNode;
-}) {
+function WorkflowCard() {
   return (
-    <section id={id} className="scroll-mt-20">
-      <div className="mx-auto max-w-6xl px-4 py-16">
-        <p className="text-meta font-semibold uppercase tracking-wide text-ai">{eyebrow}</p>
-        <h2 className="mt-2 text-title font-extrabold">{title}</h2>
-        <p className="mt-3 max-w-2xl text-muted-strong">{intro}</p>
-        <div className="mt-8">{children}</div>
-      </div>
-    </section>
-  );
-}
-
-/**
- * A picture of one run as the agent workspace shows it: the gateway calling each agent in
- * turn. Static and labelled as a sample.
- */
-function PipelinePreview() {
-  const rows: {
-    stage: (typeof AGENT_STAGES)[number];
-    state: 'Done' | 'Running' | 'Queued';
-    out: string;
-  }[] = [
-    { stage: 'risk_profile', state: 'Done', out: '14 risks identified' },
-    { stage: 'policy_evidence', state: 'Done', out: '22 clauses found' },
-    { stage: 'coverage', state: 'Running', out: 'Deciding each status…' },
-    { stage: 'report', state: 'Queued', out: 'Waiting' },
-  ];
-  return (
-    <figure className="rounded-card border border-line bg-white/90 p-5 shadow-lift backdrop-blur">
-      <figcaption className="flex items-center justify-between gap-2">
-        <span className="text-sm font-bold text-ink-heading">Agent workspace</span>
-        <span className="rounded-pill bg-canvas px-2 py-0.5 text-xs font-semibold text-muted">
-          Sample run
+    <figure className="rounded-3xl border border-white/10 bg-white/[.06] p-5 shadow-[0_20px_80px_rgba(1,10,30,.35)] backdrop-blur sm:p-7">
+      <figcaption className="flex items-center justify-between">
+        <span className="text-sm font-bold text-white">Analysis workflow</span>
+        <span className="rounded-full border border-blue-300/20 bg-blue-300/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-200">
+          Illustrative
         </span>
       </figcaption>
-      <p className="mt-1 text-meta text-muted">The gateway calls each agent in turn.</p>
-      <ol className="mt-4 space-y-2">
-        {rows.map((row, index) => (
+      <ol className="mt-5 space-y-3">
+        {WORKFLOW.map(([number, title, text]) => (
           <li
-            key={row.stage}
-            className={`flex items-center gap-3 rounded-panel border px-3 py-2.5 ${
-              row.state === 'Running' ? 'border-ai-bright bg-ai-tint/60' : 'border-line bg-white'
-            }`}
+            key={number}
+            className="flex gap-3 rounded-xl border border-white/10 bg-[#0c1c38]/80 p-3.5"
           >
-            <span
-              aria-hidden="true"
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                row.state === 'Done'
-                  ? 'bg-status-covered text-white'
-                  : row.state === 'Running'
-                    ? 'bg-ai text-white motion-safe:animate-pulse-ring'
-                    : 'bg-canvas text-muted-strong'
-              }`}
-            >
-              {row.state === 'Done' ? '✓' : index + 1}
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-blue-500/15 text-xs font-extrabold text-blue-200">
+              {number}
             </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold text-ink-heading">
-                {AGENTS[row.stage].name}
-              </span>
-              <span className="block text-xs text-muted">{row.out}</span>
-            </span>
-            <span
-              className={`text-xs font-semibold ${
-                row.state === 'Done'
-                  ? 'text-status-covered'
-                  : row.state === 'Running'
-                    ? 'text-ai'
-                    : 'text-muted'
-              }`}
-            >
-              {row.state}
+            <span>
+              <span className="block text-sm font-semibold text-white">{title}</span>
+              <span className="mt-0.5 block text-xs leading-5 text-slate-400">{text}</span>
             </span>
           </li>
         ))}
       </ol>
-      <div className="mt-4 rounded-panel bg-canvas px-3 py-2.5">
-        <p className="text-xs text-muted">Sample result</p>
-        <p className="text-sm font-semibold text-ink-heading">14 risks checked, 5 potential gaps</p>
-      </div>
+      <p className="mt-4 text-center text-[10px] text-slate-500">
+        Product workflow illustration · no sample outcomes shown
+      </p>
     </figure>
   );
-}
-
-/** True once the page has scrolled, to show the header's bottom border. */
-function useScrolled(): boolean {
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-  return scrolled;
 }

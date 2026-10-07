@@ -18,6 +18,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearToken();
     removeSession(SESSION_KEYS.profileDraft);
     removeSession(SESSION_KEYS.analysisRequests);
+    removeSession(SESSION_KEYS.scenarioAnalysisIds);
     queryClient.clear();
     setUser(null);
     setStatus('anonymous');

@@ -15,7 +15,7 @@ export function useStartScenarioAnalysis() {
   });
 }
 
-export function useScenarioAnalysisStatus(requestId: string | undefined) {
+export function useScenarioAnalysisStatus(requestId: string | undefined, enabled = true) {
   return useQuery({
     queryKey: ['scenario-analyses', requestId, 'status'],
     queryFn: ({ signal }) =>
@@ -23,7 +23,7 @@ export function useScenarioAnalysisStatus(requestId: string | undefined) {
         `/api/v1/scenario-analyses/${encodeURIComponent(requestId!)}/status`,
         { signal },
       ),
-    enabled: Boolean(requestId),
+    enabled: Boolean(requestId) && enabled,
     refetchInterval: (query) => (query.state.data?.state === 'running' ? 1000 : false),
     refetchIntervalInBackground: true,
   });

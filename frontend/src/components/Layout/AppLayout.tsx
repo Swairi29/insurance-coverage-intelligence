@@ -1,84 +1,98 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
-import { AgentStatus } from '../AgentStatus';
 import { Brand } from '../Brand';
-import { ChevronDownIcon } from '../icons';
 import { Popover } from '../Popover';
 
 const NAV_ITEMS = [
-  { to: '/app', label: 'Dashboard', end: true },
-  { to: '/app/profile', label: 'Business profile', end: false },
-  { to: '/app/policies', label: 'Policies', end: false },
-  { to: '/app/analyses/new', label: 'New analysis', end: false },
-  { to: '/app/scenario-analysis', label: 'Scenario Analysis', end: false },
-  { to: '/app/analyses', label: 'History', end: true },
+  { to: '/app', label: 'Overview', icon: 'overview', end: true },
+  { to: '/app/businesses', label: 'Businesses', icon: 'businesses', end: false },
+  { to: '/app/policies', label: 'Policies', icon: 'policies', end: false },
+  { to: '/app/analyses', label: 'Analyses', icon: 'analyses', end: false },
+  { to: '/app/history', label: 'History', icon: 'history', end: false },
 ];
 
-/** "owner@sunrise.test" -> "OW"; "jane.doe@x" -> "JD". */
 function initials(email: string | undefined): string {
   const name = (email ?? '').split('@')[0];
   const parts = name.split(/[._-]+/).filter(Boolean);
-  const letters = parts.length > 1 ? parts[0][0] + parts[1][0] : name.slice(0, 2);
-  return letters.toUpperCase() || '?';
+  return (parts.length > 1 ? parts[0][0] + parts[1][0] : name.slice(0, 2)).toUpperCase() || '?';
 }
 
-/** The frame around every logged-in page: header, navigation and the page itself. */
 export function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-
-  const handleLogout = () => {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const signOut = () => {
     logout();
     navigate('/login', { replace: true });
   };
 
   return (
-    <div className="min-h-screen bg-canvas print:bg-white">
+    <div className="dark-ui min-h-screen bg-[#050b18] text-slate-100 lg:flex">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-brand focus:shadow"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:p-3 focus:text-blue-700"
       >
         Skip to content
       </a>
-      <header className="sticky top-0 z-30 border-b border-line bg-white/80 backdrop-blur print:hidden">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <Brand to="/app" />
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="hidden md:inline-flex">
-              <AgentStatus />
+      <aside className="hidden w-[250px] shrink-0 flex-col border-r border-white/10 bg-[#071225] px-4 py-6 text-white lg:fixed lg:inset-y-0 lg:flex">
+        <Brand to="/app" tone="dark" />
+        <p className="mb-3 mt-10 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+          Workspace
+        </p>
+        <SidebarLinks onNavigate={() => setMobileOpen(false)} />
+        <div className="mt-auto">
+          <Link
+            to="/app/settings"
+            className="mb-4 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white"
+          >
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-white/5 text-blue-200">
+              <NavigationIcon name="settings" />
             </span>
+            Settings
+          </Link>
+          <Link
+            to="/app/analyses/new"
+            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 px-4 py-3 text-sm font-bold text-white shadow-[0_8px_30px_rgba(37,99,235,.28)] hover:brightness-110 focus-visible:outline-white"
+          >
+            <span aria-hidden="true" className="text-lg leading-none">
+              +
+            </span>{' '}
+            New Analysis
+          </Link>
+          <div className="mt-5 border-t border-white/10 pt-4">
             <Popover
               triggerLabel={`Account menu for ${user?.email ?? 'your account'}`}
-              triggerClassName="inline-flex items-center gap-1.5 rounded-pill p-1 pr-2 text-muted-strong hover:bg-brand-soft"
+              triggerClassName="flex w-full items-center gap-3 rounded-xl p-2 text-left hover:bg-white/5"
               trigger={
                 <>
                   <span
                     aria-hidden="true"
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-xs font-bold text-white"
+                    className="grid h-9 w-9 place-items-center rounded-full bg-blue-500/20 text-xs font-bold text-blue-200"
                   >
                     {initials(user?.email)}
                   </span>
-                  <ChevronDownIcon className="h-4 w-4" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-semibold">{user?.email ?? 'Account'}</span>
+                    <span className="block text-[10px] text-slate-400">InsureIntel workspace</span>
+                  </span>
+                  <span aria-hidden="true" className="text-slate-400">
+                    ···
+                  </span>
                 </>
               }
             >
               {(close) => (
-                <div>
-                  <p className="px-2 text-meta text-muted">Signed in as</p>
-                  <p
-                    className="truncate px-2 text-sm font-semibold text-ink-heading"
-                    title={user?.email}
-                  >
-                    {user?.email}
-                  </p>
+                <div className="min-w-48">
+                  <p className="px-2 text-xs text-muted">Signed in as</p>
+                  <p className="truncate px-2 py-1 text-sm font-semibold">{user?.email}</p>
                   <div className="my-2 border-t border-line" />
                   <button
-                    type="button"
+                    className="w-full rounded px-2 py-2 text-left text-sm hover:bg-canvas"
                     onClick={() => {
                       close();
-                      handleLogout();
+                      signOut();
                     }}
-                    className="w-full rounded-control px-2 py-2 text-left text-sm font-semibold text-ink-heading hover:bg-brand-soft hover:text-brand"
                   >
                     Log out
                   </button>
@@ -87,35 +101,132 @@ export function AppLayout() {
             </Popover>
           </div>
         </div>
-        <nav aria-label="Main" className="mx-auto max-w-6xl px-3 pb-2.5">
-          <ul className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {NAV_ITEMS.map((item) => (
-              <li key={item.to} className="shrink-0">
-                <NavLink
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    // The ring is drawn inside the pill: the scrolling list would clip one outside it.
-                    `block rounded-pill px-3.5 py-1.5 text-sm font-semibold transition-colors focus-visible:-outline-offset-2 ${
-                      isActive
-                        ? 'bg-brand-tint text-brand'
-                        : 'text-muted-strong hover:bg-canvas hover:text-ink-heading'
-                    }`
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </header>
-      <main
-        id="main"
-        className="mx-auto max-w-6xl px-4 py-8 print:max-w-none print:px-[14mm] print:py-0"
+      </aside>
+
+      {mobileOpen && (
+        <button
+          aria-label="Close navigation"
+          className="fixed inset-0 z-40 bg-slate-950/60 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col border-r border-white/10 bg-[#071225] px-4 py-6 text-white transition-transform lg:hidden ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        <Outlet />
-      </main>
+        <div className="flex items-center justify-between">
+          <Brand to="/app" tone="dark" />
+          <button
+            aria-label="Close navigation"
+            className="rounded-lg px-3 py-2 text-slate-300 hover:bg-white/10"
+            onClick={() => setMobileOpen(false)}
+          >
+            ×
+          </button>
+        </div>
+        <p className="mb-3 mt-10 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+          Workspace
+        </p>
+        <SidebarLinks onNavigate={() => setMobileOpen(false)} />
+        <Link
+          onClick={() => setMobileOpen(false)}
+          to="/app/settings"
+          className="mt-auto rounded-xl px-3 py-3 text-sm text-slate-300 hover:bg-white/5"
+        >
+          Settings
+        </Link>
+        <Link
+          onClick={() => setMobileOpen(false)}
+          to="/app/analyses/new"
+          className="mt-3 rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-bold"
+        >
+          + New Analysis
+        </Link>
+      </aside>
+
+      <div className="min-w-0 flex-1 lg:ml-[250px]">
+        <header className="sticky top-0 z-30 flex h-[72px] items-center justify-between border-b border-white/10 bg-[#071225]/90 px-4 text-white backdrop-blur sm:px-7 lg:px-10">
+          <div className="flex items-center gap-3">
+            <button
+              aria-label="Open navigation"
+              className="grid h-10 w-10 place-items-center rounded-xl border border-white/15 text-slate-200 lg:hidden"
+              onClick={() => setMobileOpen(true)}
+            >
+              <span aria-hidden="true">☰</span>
+            </button>
+            <span className="hidden text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 sm:block">
+              Insurance intelligence workspace
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="hidden items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 sm:flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Workspace ready
+            </span>
+            <Link
+              to="/app/settings"
+              aria-label="Account settings"
+              className="grid h-10 w-10 place-items-center rounded-full bg-[#102449] text-xs font-bold text-white"
+            >
+              {initials(user?.email)}
+            </Link>
+          </div>
+        </header>
+        <main
+          id="main"
+          className="mx-auto min-h-[calc(100vh-72px)] max-w-[1500px] px-4 py-6 sm:px-7 sm:py-8 lg:px-10 lg:py-10"
+        >
+          <Outlet />
+        </main>
+      </div>
     </div>
+  );
+}
+
+function SidebarLinks({ onNavigate }: { onNavigate: () => void }) {
+  return (
+    <nav aria-label="Application" className="space-y-1">
+      {NAV_ITEMS.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end={item.end}
+          onClick={onNavigate}
+          className={({ isActive }) =>
+            `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? 'bg-blue-500/15 text-white ring-1 ring-inset ring-blue-400/20' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`
+          }
+        >
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-white/5 text-slate-400 transition-colors group-[.active]:bg-blue-400/10 group-[.active]:text-cyan-200">
+            <NavigationIcon name={item.icon} />
+          </span>
+          {item.label}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+function NavigationIcon({ name }: { name: string }) {
+  const paths: Record<string, string> = {
+    overview: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
+    businesses: 'M3 21V7l9-4 9 4v14 M9 21v-6h6v6 M8 10h.01 M16 10h.01',
+    policies: 'M6 3h9l4 4v14H6z M14 3v5h5 M9 13h7 M9 17h7',
+    analyses: 'M4 19V5 M4 19h17 M8 15l4-4 3 2 5-7',
+    history: 'M3 12a9 9 0 1 0 2.6-6.4L3 8 M3 3v5h5 M12 7v5l3 2',
+    settings:
+      'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.6 2.8-.2-.1a1.7 1.7 0 0 0-1.8.5l-.1.2h-3.2l-.1-.2a1.7 1.7 0 0 0-1.8-.5l-.2.1-1.6-2.8.1-.1a1.7 1.7 0 0 0 .3-1.9l-.1-.2-2.1-1.1v-3.2l2.1-1.1.1-.2a1.7 1.7 0 0 0-.3-1.9l-.1-.1 1.6-2.8.2.1a1.7 1.7 0 0 0 1.8-.5l.1-.2h3.2l.1.2a1.7 1.7 0 0 0 1.8.5l.2-.1 1.6 2.8-.1.1a1.7 1.7 0 0 0-.3 1.9l.1.2 2.1 1.1v3.2L19.4 15z',
+  };
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-[17px] w-[17px]"
+    >
+      <path d={paths[name] ?? paths.overview} />
+    </svg>
   );
 }

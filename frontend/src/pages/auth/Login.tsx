@@ -78,8 +78,9 @@ export default function Login() {
   return (
     <AuthCard
       title="Welcome back"
-      subtitle="Log in to see your business risks and insurance coverage."
+      subtitle="Continue your insurance intelligence analysis."
       aside="Pick up where your last analysis left off."
+      imageSrc="/policy-coverage.jpg"
       footer={
         <>
           New to InsureIntel?{' '}

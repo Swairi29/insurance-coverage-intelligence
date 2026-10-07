@@ -15,6 +15,9 @@ import Policies from './pages/Policies';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import ScenarioAnalysis from './pages/ScenarioAnalysis';
+import Businesses from './pages/Businesses';
+import SettingsPage from './pages/Settings';
+import { Navigate } from 'react-router-dom';
 
 export default function App() {
   return (
@@ -46,12 +49,21 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="businesses" element={<Businesses />} />
         <Route path="profile" element={<BusinessProfile />} />
         <Route path="policies" element={<Policies />} />
         <Route path="analyses/new" element={<NewAnalysis />} />
-        <Route path="scenario-analysis" element={<ScenarioAnalysis />} />
+        <Route path="analyses/new/profile" element={<NewAnalysis profileFlow />} />
+        <Route path="analyses/new/scenario" element={<ScenarioAnalysis />} />
+        <Route
+          path="scenario-analysis"
+          element={<Navigate to="/app/analyses/new/scenario" replace />}
+        />
         <Route path="analyses" element={<History />} />
+        <Route path="history" element={<History />} />
+        <Route path="settings" element={<SettingsPage />} />
         <Route path="analyses/:requestId" element={<ResultsPage />} />
+        <Route path="analyses/:requestId/running" element={<AnalysisWorkspace />} />
         <Route path="analyses/:requestId/progress" element={<AnalysisWorkspace />} />
         <Route path="*" element={<NotFound />} />
       </Route>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAnalysisStatus, useRefreshAnalyses, useStartAnalysis } from '../api/analyses';
 import { isApiError } from '../api/client';
 import type { AnalysisProgress } from '../api/types';
@@ -13,6 +13,7 @@ import { SkeletonLines } from '../components/ui/Skeleton';
 import { formatDuration } from '../lib/format';
 import { AGENTS } from '../lib/labels';
 import { analysisRequestFor, rememberAnalysisRequest } from '../lib/analysisRequests';
+import { useScenarioAnalysisStatus } from '../api/scenarioAnalyses';
 
 /**
  * The agent workspace: which of the four agents is working, what the gateway handed to each
@@ -21,7 +22,12 @@ import { analysisRequestFor, rememberAnalysisRequest } from '../lib/analysisRequ
  */
 export default function AnalysisWorkspace() {
   const { requestId = '' } = useParams();
-  const status = useAnalysisStatus(requestId);
+  const [search] = useSearchParams();
+  const location = useLocation();
+  const scenario = search.get('source') === 'scenario';
+  const profileStatus = useAnalysisStatus(requestId, { enabled: !scenario });
+  const scenarioStatus = useScenarioAnalysisStatus(requestId, scenario);
+  const status = scenario ? scenarioStatus : profileStatus;
 
   if (status.isPending) {
     return (
@@ -55,10 +61,25 @@ export default function AnalysisWorkspace() {
       />
     );
   }
-  return <Workspace progress={status.data} />;
+  const routeState = location.state as { analysisLabel?: string } | null;
+  return (
+    <Workspace
+      progress={status.data}
+      scenario={scenario}
+      analysisLabel={routeState?.analysisLabel}
+    />
+  );
 }
 
-function Workspace({ progress }: { progress: AnalysisProgress }) {
+function Workspace({
+  progress,
+  scenario,
+  analysisLabel,
+}: {
+  progress: AnalysisProgress;
+  scenario: boolean;
+  analysisLabel?: string;
+}) {
   const refreshAnalyses = useRefreshAnalyses();
   const running = progress.state === 'running';
   const finished = progress.state === 'complete' || progress.state === 'partial';
@@ -74,11 +95,11 @@ function Workspace({ progress }: { progress: AnalysisProgress }) {
   const wasRunning = useRef(running);
   useEffect(() => {
     if (wasRunning.current && !running) {
-      void refreshAnalyses();
+      if (!scenario) void refreshAnalyses();
       headingRef.current?.focus();
     }
     wasRunning.current = running;
-  }, [running, refreshAnalyses]);
+  }, [running, refreshAnalyses, scenario]);
 
   const title = running
     ? 'Analysing your coverage…'
@@ -114,6 +135,9 @@ function Workspace({ progress }: { progress: AnalysisProgress }) {
                       ? 'All four agents have finished.'
                       : 'An agent failed, so the agents after it were skipped.'}
             </p>
+            {analysisLabel && (
+              <p className="mt-2 text-sm font-semibold text-slate-700">{analysisLabel}</p>
+            )}
           </div>
           <dl className="flex gap-6 text-right">
             <div>
@@ -150,46 +174,57 @@ function Workspace({ progress }: { progress: AnalysisProgress }) {
 
         {finished && (
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            <Link to={`/app/analyses/${progress.request_id}`} className={buttonClasses('primary')}>
+            <Link
+              to={`/app/analyses/${progress.request_id}${scenario ? '?source=scenario' : ''}`}
+              className={buttonClasses('primary')}
+            >
               View results →
             </Link>
-            <span className="text-sm text-muted">The result is saved in your History.</span>
+            <span className="text-sm text-muted">
+              {scenario ? 'Scenario run complete.' : 'The result is saved in your History.'}
+            </span>
           </div>
         )}
-        {progress.state === 'failed' && <FailureActions progress={progress} />}
+        {progress.state === 'failed' && <FailureActions progress={progress} scenario={scenario} />}
       </header>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <section aria-labelledby="agents-title">
-          <h2 id="agents-title" className="text-lg font-bold">
-            Agents
-          </h2>
-          <div className="mt-3">
-            <AgentRail stages={progress.stages} />
-          </div>
-        </section>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,.85fr)]">
         <section
-          aria-labelledby="log-title"
-          className="h-fit rounded-card border border-line bg-white p-5 shadow-soft"
+          aria-labelledby="agents-title"
+          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
         >
-          <h2 id="log-title" className="text-lg font-bold">
-            Handoff log
+          <h2 id="agents-title" className="text-lg font-bold text-slate-950">
+            Analysis stages
           </h2>
-          <div className="mt-2">
-            <HandoffLog stages={progress.stages} startedAt={progress.created_at} />
-          </div>
+          <StageTimeline stages={progress.stages} />
         </section>
+        <details className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <summary className="cursor-pointer text-sm font-bold text-slate-800">
+            Show technical details
+          </summary>
+          <div className="mt-4">
+            <AgentRail stages={progress.stages} />
+            <div className="mt-4">
+              <HandoffLog stages={progress.stages} startedAt={progress.created_at} />
+            </div>
+          </div>
+        </details>
       </div>
 
       {running && (
         <p className="mt-6 flex items-start gap-2 rounded-panel border border-brand-border bg-brand-soft px-4 py-3 text-sm text-muted-strong">
           <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
           <span>
-            You can leave this page. The analysis keeps running and is saved to your{' '}
-            <Link to="/app/analyses" className="font-semibold text-brand hover:underline">
-              History
-            </Link>{' '}
-            when it finishes.
+            You can leave this page. The analysis keeps running
+            {scenario ? '.' : ' and is saved to your '}{' '}
+            {!scenario && (
+              <>
+                <Link to="/app/analyses" className="font-semibold text-brand hover:underline">
+                  History
+                </Link>{' '}
+                when it finishes.
+              </>
+            )}
           </span>
         </p>
       )}
@@ -197,7 +232,7 @@ function Workspace({ progress }: { progress: AnalysisProgress }) {
   );
 }
 
-function FailureActions({ progress }: { progress: AnalysisProgress }) {
+function FailureActions({ progress, scenario }: { progress: AnalysisProgress; scenario: boolean }) {
   const navigate = useNavigate();
   const start = useStartAnalysis();
   // The request behind this run, if it was started in this tab.
@@ -208,7 +243,9 @@ function FailureActions({ progress }: { progress: AnalysisProgress }) {
     start.mutate(lastRequest, {
       onSuccess: (next) => {
         rememberAnalysisRequest(next.request_id, lastRequest);
-        navigate(`/app/analyses/${next.request_id}/progress`);
+        navigate(`/app/analyses/${next.request_id}/running`, {
+          state: { analysisLabel: lastRequest.business.business_name },
+        });
       },
     });
   };
@@ -231,20 +268,70 @@ function FailureActions({ progress }: { progress: AnalysisProgress }) {
         <ErrorMessage title="The analysis could not start again" error={start.error} />
       )}
       <div className="flex flex-wrap gap-3">
-        {lastRequest ? (
+        {lastRequest && !scenario ? (
           <Button onClick={retry} loading={start.isPending}>
             Retry analysis
           </Button>
         ) : (
-          <Link to="/app/analyses/new" className={buttonClasses('primary')}>
+          <Link
+            to={scenario ? '/app/analyses/new/scenario' : '/app/analyses/new'}
+            className={buttonClasses('primary')}
+          >
             Start a new analysis
           </Link>
         )}
-        <Link to="/app/analyses/new" className={buttonClasses('secondary')}>
+        <Link
+          to={scenario ? '/app/analyses/new/scenario' : '/app/analyses/new'}
+          className={buttonClasses('secondary')}
+        >
           Change policies
         </Link>
       </div>
     </div>
+  );
+}
+
+function StageTimeline({ stages }: { stages: AnalysisProgress['stages'] }) {
+  const labels: Record<string, string> = {
+    risk_profile: 'Identifying your risks',
+    policy_evidence: 'Checking your policies',
+    coverage: 'Assessing coverage',
+    report: 'Preparing your report',
+  };
+  const stateLabels = {
+    queued: 'Queued',
+    running: 'Running',
+    done: 'Completed',
+    failed: 'Failed',
+    skipped: 'Skipped',
+  };
+  return (
+    <ol className="mt-4 space-y-3">
+      {stages.map((stage, index) => (
+        <li
+          key={stage.stage}
+          aria-current={stage.state === 'running' ? 'step' : undefined}
+          className={`flex items-start gap-3 rounded-xl border p-3.5 ${stage.state === 'running' ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-white'}`}
+        >
+          <span
+            aria-hidden="true"
+            className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-bold ${stage.state === 'done' ? 'bg-emerald-600 text-white' : stage.state === 'failed' ? 'bg-rose-600 text-white' : stage.state === 'running' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}
+          >
+            {stage.state === 'done' ? '✓' : String(index + 1).padStart(2, '0')}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold text-slate-900">
+              {labels[stage.stage] ?? stage.agent}
+            </span>
+            <span className="block text-xs text-slate-500">{AGENTS[stage.stage].name}</span>
+            {stage.received && (
+              <span className="mt-1 block text-xs text-slate-600">{stage.received}</span>
+            )}
+          </span>
+          <span className="text-xs font-semibold text-slate-600">{stateLabels[stage.state]}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 

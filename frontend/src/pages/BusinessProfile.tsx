@@ -9,6 +9,7 @@ import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { INPUT_CLASSES, inputBorder } from '../components/ui/fieldStyles';
 import { TextArea, TextField } from '../components/ui/TextField';
+import { PageHeader } from '../components/ui/PageHeader';
 import {
   BUSINESS_TYPE_GROUPS,
   BUSINESS_TYPE_LABELS,
@@ -79,13 +80,12 @@ export default function BusinessProfile() {
   const errorCount = Object.keys(errors).length;
 
   return (
-    <section className="max-w-3xl">
-      <h1 className="text-2xl font-extrabold">Business profile</h1>
-      <p className="mt-2 text-sm text-muted">
-        Tell us about the business. The more you fill in, the more specific the risk check is. Only
-        the name and type are required. The profile is kept in this browser tab and sent with each
-        analysis; it is cleared when you log out.
-      </p>
+    <section className="max-w-4xl">
+      <PageHeader
+        eyebrow="Businesses · profile details"
+        title="Business profile"
+        description="Add the information used by the structured risk profiling flow. Only the business name and type are required. This profile is kept in this browser tab and cleared when you log out."
+      />
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6 space-y-6">
         {pageState?.notice && <Alert tone="info">{pageState.notice}</Alert>}
@@ -101,7 +101,7 @@ export default function BusinessProfile() {
           </Alert>
         )}
 
-        <Card title="About the business">
+        <Card title="Step 1 — Business">
           <TextField
             label="Business name"
             required
@@ -189,13 +189,15 @@ export default function BusinessProfile() {
               },
             })}
           />
+        </Card>
 
+        <Card title="Step 2 — Operations">
           <Controller
             control={control}
             name="equipment"
             render={({ field, fieldState }) => (
               <TagInput
-                label="Equipment"
+                label="Equipment and systems"
                 value={field.value}
                 onChange={field.onChange}
                 maxItems={LIMITS.equipmentItems}
@@ -206,9 +208,6 @@ export default function BusinessProfile() {
               />
             )}
           />
-        </Card>
-
-        <Card title="How the business operates">
           <fieldset>
             <legend className="text-sm font-semibold text-ink-heading">How do you sell?</legend>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -244,7 +243,7 @@ export default function BusinessProfile() {
           ))}
         </Card>
 
-        <Card title="Location">
+        <Card title="Step 3 — Location">
           <div className="grid gap-4 sm:grid-cols-3">
             {(['city', 'district', 'country'] as const).map((place) => (
               <TextField

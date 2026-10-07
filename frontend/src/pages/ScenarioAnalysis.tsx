@@ -1,30 +1,20 @@
 import { useState } from 'react';
-import {
-  useScenarioAnalysis,
-  useScenarioAnalysisStatus,
-  useStartScenarioAnalysis,
-} from '../api/scenarioAnalyses';
+import { Link, useNavigate } from 'react-router-dom';
+import { useStartScenarioAnalysis } from '../api/scenarioAnalyses';
 import { MAX_POLICIES_PER_ANALYSIS, usePolicies } from '../api/policies';
 import { isApiError } from '../api/client';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { Button } from '../components/ui/Button';
-
-const STAGES = [
-  ['risk_profile', 'Risk identification'],
-  ['policy_evidence', 'Policy evidence'],
-  ['coverage', 'Coverage analysis'],
-  ['report', 'Explanation/report'],
-] as const;
+import { PageHeader } from '../components/ui/PageHeader';
+import { rememberScenarioAnalysis } from '../lib/scenarioHistory';
 
 export default function ScenarioAnalysis() {
+  const navigate = useNavigate();
   const policies = usePolicies();
   const run = useStartScenarioAnalysis();
-  const status = useScenarioAnalysisStatus(run.data?.request_id);
-  const terminal = status.data?.state === 'complete' || status.data?.state === 'partial';
-  const result = useScenarioAnalysis(run.data?.request_id, terminal);
-  const active = run.isPending || status.data?.state === 'running';
   const [scenario, setScenario] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
+  const [reviewing, setReviewing] = useState(false);
   const ready = policies.data?.filter((policy) => policy.status === 'ready') ?? [];
   const toggle = (id: string) =>
     setSelected((current) =>
@@ -35,195 +25,181 @@ export default function ScenarioAnalysis() {
           : current,
     );
 
+  const start = () =>
+    run.mutate(
+      { scenario, policy_ids: selected },
+      {
+        onSuccess: (progress) => {
+          rememberScenarioAnalysis(progress.request_id, progress.created_at);
+          navigate(`/app/analyses/${progress.request_id}/running?source=scenario`, {
+            state: { analysisLabel: 'Scenario analysis' },
+          });
+        },
+      },
+    );
+
   return (
-    <section className="max-w-4xl">
-      <h1 className="text-2xl font-extrabold">Scenario Analysis</h1>
-      <p className="mt-2 text-sm text-muted">
-        Describe a business or insurance scenario and check it against your uploaded policies.
-      </p>
-      <form
-        className="mt-6 space-y-6"
-        onSubmit={(event) => {
-          event.preventDefault();
-          run.mutate({ scenario, policy_ids: selected });
-        }}
-      >
-        <label className="block rounded-card border border-line bg-white p-5">
-          <span className="font-bold">Your scenario</span>
-          <textarea
-            required
-            minLength={10}
-            maxLength={4000}
-            value={scenario}
-            onChange={(event) => setScenario(event.target.value)}
-            rows={5}
-            className="mt-3 w-full rounded-control border border-line p-3 text-sm"
-            placeholder="Describe your business, activities, equipment, and concerns..."
-          />
-        </label>
-        <fieldset className="rounded-card border border-line bg-white p-5">
-          <legend className="px-1 font-bold">
-            Select policies (up to {MAX_POLICIES_PER_ANALYSIS})
-          </legend>
-          {policies.isError && (
-            <ErrorMessage
-              title="Policies could not be loaded"
-              error={policies.error}
-              onRetry={() => void policies.refetch()}
-            />
-          )}
-          {ready.length === 0 ? (
-            <p className="mt-3 text-sm text-muted">
-              No ready policies are available. Upload a policy first.
-            </p>
-          ) : (
-            <ul className="mt-3 space-y-2">
-              {ready.map((policy) => (
-                <li key={policy.policy_id}>
-                  <label className="flex gap-3 rounded-lg border border-line p-3 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(policy.policy_id)}
-                      disabled={
-                        !selected.includes(policy.policy_id) &&
-                        selected.length >= MAX_POLICIES_PER_ANALYSIS
-                      }
-                      onChange={() => toggle(policy.policy_id)}
-                    />
-                    {policy.filename}
-                  </label>
-                </li>
-              ))}
-            </ul>
-          )}
-        </fieldset>
-        <Button
-          type="submit"
-          variant="ai"
-          loading={active}
-          disabled={scenario.trim().length < 10 || selected.length === 0 || active}
+    <section className="mx-auto max-w-4xl">
+      <Link to="/app/analyses/new" className="text-sm font-semibold text-blue-700 hover:underline">
+        ← New Analysis methods
+      </Link>
+      <PageHeader
+        eyebrow="New analysis · scenario input"
+        title="Describe a Scenario"
+        description="Describe your business, situation, or risk in your own words. This follows the same four-agent analysis as a business profile."
+      />
+
+      {!reviewing ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            setReviewing(true);
+          }}
+          className="space-y-5"
         >
-          Start Scenario Analysis
-        </Button>
-      </form>
-      {run.data && status.data && (
-        <section aria-live="polite" className="mt-6 rounded-card border border-line bg-white p-5">
-          <h2 className="font-bold">
-            {status.data.state === 'running'
-              ? 'Scenario Analysis in progress'
-              : 'Scenario Analysis progress'}
-          </h2>
-          <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm">
-            {STAGES.map(([key, label]) => {
-              const stage = status.data?.stages.find((item) => item.stage === key);
-              const state = stage?.state ?? 'queued';
-              return (
-                <li key={key} aria-current={state === 'running' ? 'step' : undefined}>
-                  {label}:{' '}
-                  {state === 'done'
-                    ? 'Complete'
-                    : state === 'running'
-                      ? 'In progress'
-                      : state === 'failed'
-                        ? 'Failed'
-                        : state === 'skipped'
-                          ? 'Skipped'
-                          : 'Waiting'}
-                  {stage?.received ? ` — ${stage.received}` : ''}
-                </li>
-              );
-            })}
-          </ol>
-        </section>
-      )}
-      {run.isError && (
-        <div className="mt-6">
-          <ErrorMessage
-            title={
-              isApiError(run.error) && run.error.stage
-                ? `${run.error.stage.replaceAll('_', ' ')} failed`
-                : 'Scenario Analysis failed'
-            }
-            error={run.error}
-          />
-        </div>
-      )}
-      {status.data?.state === 'failed' && status.data.error && (
-        <p role="alert" className="mt-6 rounded-lg bg-red-50 p-3 text-sm text-red-900">
-          {status.data.error.message}
-        </p>
-      )}
-      {result.isError && (
-        <div className="mt-6">
-          <ErrorMessage
-            title="Scenario Analysis results could not be loaded"
-            error={result.error}
-            onRetry={() => void result.refetch()}
-          />
-        </div>
-      )}
-      {result.data && (
-        <article className="mt-8 space-y-6">
-          <h2 className="text-xl font-bold">Scenario Analysis results</h2>
-          {result.data.warnings.map((warning) => (
-            <p key={warning} className="rounded-lg bg-amber-50 p-3 text-sm">
-              {warning}
+          <label className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <span className="font-bold text-slate-900">Describe your business or situation</span>
+            <span className="mt-1 block text-xs text-slate-500">
+              Include activities, equipment, employees, location, customers, or concerns.
+            </span>
+            <textarea
+              required
+              minLength={10}
+              maxLength={4000}
+              value={scenario}
+              onChange={(event) => setScenario(event.target.value)}
+              rows={7}
+              className="mt-4 w-full rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm leading-6 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+              placeholder="Describe your business, activities, equipment, employees, location, customers, or concerns..."
+            />
+            <span className="mt-2 block text-right text-xs text-slate-400">
+              {scenario.length} / 4000
+            </span>
+          </label>
+          <fieldset className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <legend className="px-1 font-bold text-slate-900">Select policies</legend>
+            <p className="mb-4 text-xs text-slate-500">
+              Choose up to {MAX_POLICIES_PER_ANALYSIS} ready policy documents.
             </p>
-          ))}
-          <section className="rounded-card border border-line bg-white p-5">
-            <h3 className="font-bold">Identified risks ({result.data.risks.length})</h3>
-            {result.data.risks.length ? (
-              <ul className="mt-3 grid gap-3 md:grid-cols-2">
-                {result.data.risks.map((risk) => (
-                  <li key={risk.risk_id} className="rounded-lg border border-line p-4">
-                    <h4 className="font-semibold">{risk.name}</h4>
-                    <p className="mt-2 text-sm">{risk.reason}</p>
-                    <p className="mt-2 text-xs text-muted">
-                      {risk.category} · confidence {Math.round(risk.confidence * 100)}%
-                    </p>
-                    {risk.evidence.length > 0 && (
-                      <ul className="mt-2 list-disc pl-5 text-xs">
-                        {risk.evidence.map((item, index) => (
-                          <li key={`${item.source}-${index}`}>{item.text}</li>
-                        ))}
-                      </ul>
-                    )}
+            {policies.isError && (
+              <ErrorMessage
+                title="Policies could not be loaded"
+                error={policies.error}
+                onRetry={() => void policies.refetch()}
+              />
+            )}
+            {ready.length === 0 ? (
+              <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
+                No ready policies are available.{' '}
+                <Link to="/app/policies" className="font-bold underline">
+                  Upload a policy first.
+                </Link>
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {ready.map((policy) => (
+                  <li key={policy.policy_id}>
+                    <label
+                      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3.5 text-sm transition ${selected.includes(policy.policy_id) ? 'border-blue-300 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-blue-600"
+                        checked={selected.includes(policy.policy_id)}
+                        disabled={
+                          !selected.includes(policy.policy_id) &&
+                          selected.length >= MAX_POLICIES_PER_ANALYSIS
+                        }
+                        onChange={() => toggle(policy.policy_id)}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold text-slate-900">
+                          {policy.filename}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-slate-500">
+                          {policy.page_count} pages · Ready
+                        </span>
+                      </span>
+                      <span className="text-xs font-medium text-slate-400">PDF</span>
+                    </label>
                   </li>
                 ))}
               </ul>
-            ) : (
-              <p className="mt-2 text-sm text-muted">No risks were identified.</p>
             )}
-          </section>
-          <section className="rounded-card border border-line bg-white p-5">
-            <h3 className="font-bold">Coverage analysis</h3>
-            <ul className="mt-3 space-y-3">
-              {result.data.coverage.assessments.map((item) => (
-                <li key={item.risk_id} className="border-b border-line pb-3">
-                  <strong>{item.risk_name}</strong> · {item.status}
-                  <p className="text-sm">{item.reason}</p>
-                </li>
-              ))}
-            </ul>
-          </section>
-          <section className="rounded-card border border-line bg-white p-5">
-            <h3 className="font-bold">Explanation and report</h3>
-            {result.data.report ? (
-              <p className="mt-2 text-sm">{result.data.report.summary.headline}</p>
-            ) : (
-              <p className="mt-2 text-sm text-muted">
-                The report could not be generated; coverage results are shown above.
+          </fieldset>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-slate-500">
+              Scenario input · {selected.length} policies selected
+            </p>
+            <Button
+              type="submit"
+              variant="ai"
+              disabled={scenario.trim().length < 10 || selected.length === 0}
+            >
+              Review analysis <span aria-hidden="true">→</span>
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[.16em] text-blue-600">
+                Final review
               </p>
-            )}
-            {result.data.report?.findings.map((finding, index) => (
-              <div key={`${finding.title}-${index}`} className="mt-3">
-                <h4 className="font-semibold">{finding.title}</h4>
-                <p className="text-sm">{finding.explanation}</p>
-                <p className="text-sm">{finding.recommendation}</p>
-              </div>
-            ))}
-          </section>
-        </article>
+              <h2 className="mt-1 text-xl font-bold text-slate-950">Review analysis</h2>
+            </div>
+            <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-bold text-cyan-800">
+              Scenario input
+            </span>
+          </div>
+          <dl className="mt-6 grid gap-5 sm:grid-cols-[140px_1fr]">
+            <dt className="text-sm font-semibold text-slate-500">Scenario summary</dt>
+            <dd className="whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-800">
+              {scenario}
+            </dd>
+            <dt className="text-sm font-semibold text-slate-500">Policies selected</dt>
+            <dd className="text-sm font-semibold text-slate-900">
+              {selected.length} of {MAX_POLICIES_PER_ANALYSIS}
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {ready
+                  .filter((policy) => selected.includes(policy.policy_id))
+                  .map((policy) => (
+                    <li
+                      key={policy.policy_id}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs"
+                    >
+                      {policy.filename}
+                    </li>
+                  ))}
+              </ul>
+            </dd>
+          </dl>
+          {run.isError && (
+            <div className="mt-5">
+              <ErrorMessage
+                title={
+                  isApiError(run.error) && run.error.stage
+                    ? `${run.error.stage.replaceAll('_', ' ')} failed`
+                    : 'Analysis could not start'
+                }
+                error={run.error}
+              />
+            </div>
+          )}
+          <div className="mt-7 flex flex-wrap justify-between gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setReviewing(false)}
+              disabled={run.isPending}
+            >
+              Back to edit
+            </Button>
+            <Button variant="ai" onClick={start} loading={run.isPending}>
+              Start analysis <span aria-hidden="true">→</span>
+            </Button>
+          </div>
+        </section>
       )}
     </section>
   );

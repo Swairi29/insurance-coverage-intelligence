@@ -14,7 +14,11 @@ import { rememberAnalysisRequest } from '../lib/analysisRequests';
 import { SALES_CHANNEL_LABELS, businessTypeLabel, loadProfileDraft } from '../lib/profile';
 import type { ProfilePageState } from './BusinessProfile';
 
-export default function NewAnalysis() {
+export default function NewAnalysis({ profileFlow = false }: { profileFlow?: boolean }) {
+  return profileFlow ? <BusinessProfileAnalysis /> : <AnalysisMethodChooser />;
+}
+
+function BusinessProfileAnalysis() {
   const [profile] = useState(loadProfileDraft);
   if (!profile) {
     const state: ProfilePageState = {
@@ -23,6 +27,62 @@ export default function NewAnalysis() {
     return <Navigate to="/app/profile" replace state={state} />;
   }
   return <NewAnalysisForm profile={profile} />;
+}
+
+function AnalysisMethodChooser() {
+  return (
+    <section className="mx-auto max-w-5xl">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">
+        New analysis · step 1 of 2
+      </p>
+      <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
+        How would you like to describe your business?
+      </h1>
+      <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
+        Choose an input method. Both options continue through the same risk, policy, coverage, and
+        report workflow.
+      </p>
+      <div className="mt-8 grid gap-5 md:grid-cols-2">
+        <article className="relative overflow-hidden rounded-3xl border border-blue-200 bg-white p-6 shadow-[0_14px_45px_rgba(20,50,100,.08)] sm:p-8">
+          <span className="absolute right-5 top-5 rounded-full bg-blue-50 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-blue-700">
+            Recommended
+          </span>
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-sm font-extrabold text-white">
+            01
+          </div>
+          <h2 className="mt-6 text-xl font-bold text-slate-950">Business Profile</h2>
+          <p className="mt-2 min-h-12 text-sm leading-6 text-slate-500">
+            Use your saved business information, operations, location, and equipment.
+          </p>
+          <Link
+            to="/app/analyses/new/profile"
+            className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#102449] px-5 py-3 text-sm font-bold text-white hover:bg-blue-800"
+          >
+            Continue <span aria-hidden="true">→</span>
+          </Link>
+        </article>
+        <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_14px_45px_rgba(20,50,100,.05)] sm:p-8">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-cyan-50 text-sm font-extrabold text-cyan-700">
+            02
+          </div>
+          <h2 className="mt-6 text-xl font-bold text-slate-950">Describe a Scenario</h2>
+          <p className="mt-2 min-h-12 text-sm leading-6 text-slate-500">
+            Describe a business or situation in your own words for flexible risk profiling.
+          </p>
+          <Link
+            to="/app/analyses/new/scenario"
+            className="mt-7 inline-flex items-center gap-2 rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-800 hover:border-blue-300 hover:bg-blue-50"
+          >
+            Continue <span aria-hidden="true">→</span>
+          </Link>
+        </article>
+      </div>
+      <div className="mt-7 rounded-2xl border border-blue-100 bg-blue-50/70 p-4 text-sm text-blue-950">
+        <span className="font-bold">One analysis experience.</span> Both inputs are checked against
+        your selected policies and produce the same coverage and report sections.
+      </div>
+    </section>
+  );
 }
 
 function NewAnalysisForm({ profile }: { profile: BusinessProfile }) {
@@ -50,7 +110,9 @@ function NewAnalysisForm({ profile }: { profile: BusinessProfile }) {
       onSuccess: (progress) => {
         // Kept for the workspace's "Retry analysis" button.
         rememberAnalysisRequest(progress.request_id, body);
-        navigate(`/app/analyses/${progress.request_id}/progress`);
+        navigate(`/app/analyses/${progress.request_id}/running`, {
+          state: { analysisLabel: profile.business_name },
+        });
       },
       onError: (error) => {
         if (!isApiError(error)) return;
@@ -151,7 +213,7 @@ function NewAnalysisForm({ profile }: { profile: BusinessProfile }) {
           loading={run.isPending}
         >
           <SparkleIcon className="h-4 w-4" />
-          Run analysis
+          Start analysis
         </Button>
         <p className="text-sm text-muted">
           {chosen.length === 0

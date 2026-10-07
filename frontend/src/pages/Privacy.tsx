@@ -9,8 +9,8 @@ import { CONSENT_VERSION } from '../lib/consent';
  */
 export default function Privacy() {
   return (
-    <div className="min-h-screen bg-canvas">
-      <header className="border-b border-line bg-white/80 backdrop-blur">
+    <div className="dark-ui min-h-screen bg-[#050b18]">
+      <header className="border-b border-white/10 bg-[#071225]/80 backdrop-blur">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-4 py-4">
           <Brand />
           <Link to="/register" className="text-sm font-semibold text-brand hover:underline">
