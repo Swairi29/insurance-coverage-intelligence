@@ -197,14 +197,23 @@ def progress_from_analysis(analysis: AnalysisResponse) -> AnalysisProgress:
     (`created_at`), so the timeline is rebuilt backwards from the end: the workspace then shows
     the same agents, handoffs and timings as during the run. Summaries are counts only.
     """
+    return _progress_from_saved(analysis, risks=len(analysis.risk_profile.risks), scenario=False)
+
+
+def progress_from_scenario_analysis(analysis: ScenarioAnalysisResponse) -> AnalysisProgress:
+    """The status of a saved scenario analysis, rebuilt the same way."""
+    return _progress_from_saved(analysis, risks=len(analysis.risks), scenario=True)
+
+
+def _progress_from_saved(analysis: AnalysisResponse | ScenarioAnalysisResponse, *, risks: int,
+                         scenario: bool) -> AnalysisProgress:
     assessments = analysis.coverage.assessments
-    risks = len(analysis.risk_profile.risks)
     clauses = len({c.chunk_id for a in assessments for c in a.evidence})
     policies = len({c.policy_id for a in assessments for c in a.evidence})
     gaps = sum(1 for a in assessments if a.potential_gap)
 
     sent = {
-        Stage.RISK_PROFILE: "business profile",
+        Stage.RISK_PROFILE: "scenario text" if scenario else "business profile",
         # The policies whose clauses were used (the policy_ids sent are not saved).
         Stage.POLICY_EVIDENCE: f"{_plural(risks, 'risk')}, {policies} "
                                f"polic{'y' if policies == 1 else 'ies'} with matching wording",
@@ -223,7 +232,7 @@ def progress_from_analysis(analysis: AnalysisResponse) -> AnalysisProgress:
     finished = analysis.created_at
     started = finished - timedelta(milliseconds=sum(analysis.stage_ms.values()))
     cursor = started
-    stages = _queued_stages()
+    stages = _queued_stages(scenario=scenario)
     for entry, stage in zip(stages, ANALYSIS_STAGES):
         ms = analysis.stage_ms.get(stage.value)
         if ms is None:  # Agents 2 and 3 are skipped when no risks were found

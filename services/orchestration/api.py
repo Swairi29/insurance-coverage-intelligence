@@ -40,7 +40,12 @@ from services.orchestration.auth import (
     register_user,
 )
 from services.orchestration.database import Database, DuplicateEmailError, UserRecord, get_database
-from services.orchestration.jobs import JobStore, get_job_store, progress_from_analysis
+from services.orchestration.jobs import (
+    JobStore,
+    get_job_store,
+    progress_from_analysis,
+    progress_from_scenario_analysis,
+)
 from services.orchestration.pipeline import AgentCallError, AnalysisPipeline, ErrorKind, PipelineResult, Stage
 from shared.config.settings import get_settings
 from shared.models.policy import PolicyDocument
@@ -244,7 +249,7 @@ def _to_response(result: PipelineResult) -> AnalysisResponse:
     )
 
 
-def _summary(analysis: AnalysisResponse) -> AnalysisSummary:
+def _summary(analysis: AnalysisResponse | ScenarioAnalysisResponse) -> AnalysisSummary:
     if analysis.report is not None:
         total, gaps = analysis.report.summary.total_findings, analysis.report.summary.potential_gaps
     else:
@@ -297,13 +302,13 @@ def run_scenario_analysis(
         return _error(404, "policy_not_found", "One or more policies were not found for your account.",
                       request_id=request_id)
     progress = jobs.create(request_id, user.user_id, scenario=True)
-    background.add_task(_run_scenario_analysis_job, pipeline, jobs, user, body, request_id)
+    background.add_task(_run_scenario_analysis_job, pipeline, jobs, db, user, body, request_id)
     response.headers["X-Request-ID"] = request_id
     response.headers["Location"] = f"/api/v1/scenario-analyses/{request_id}/status"
     return progress
 
 
-def _run_scenario_analysis_job(pipeline: AnalysisPipeline, jobs: JobStore, user: UserRecord,
+def _run_scenario_analysis_job(pipeline: AnalysisPipeline, jobs: JobStore, db: Database, user: UserRecord,
                                body: ScenarioAnalysisRequest, request_id: str) -> None:
     try:
         risks, coverage, report, warnings, stage_ms = pipeline.run_scenario(
@@ -332,24 +337,41 @@ def _run_scenario_analysis_job(pipeline: AnalysisPipeline, jobs: JobStore, user:
         created_at=datetime.now(timezone.utc), risks=risks.risks, llm_used=risks.llm_used,
         coverage=coverage, report=report, warnings=warnings, stage_ms=stage_ms,
     )
+    # Saved like a profile analysis (encrypted), so it stays in History after the job is pruned.
+    try:
+        encrypted = encrypt_bytes(result.model_dump_json().encode("utf-8"))
+        db.save_scenario_analysis(user_id=user.user_id, summary=_summary(result), encrypted_result=encrypted)
+    except (SecurityConfigError, sqlite3.Error) as exc:
+        logger.error("Scenario analysis could not be saved (%s) (request %s).", type(exc).__name__, request_id)
+        result.warnings.append(NOT_SAVED_WARNING)
     jobs.complete_scenario(request_id, result)
+
+
+@app.get("/api/v1/scenario-analyses", response_model=List[AnalysisSummary])
+def list_scenario_analyses(user: UserRecord = Depends(get_current_user), db: Database = Depends(get_database)):
+    return db.list_scenario_analyses(user.user_id)
 
 
 @app.get("/api/v1/scenario-analyses/{request_id}/status", response_model=AnalysisProgress)
 def scenario_analysis_status(request_id: str, user: UserRecord = Depends(get_current_user),
+                              db: Database = Depends(get_database),
                               jobs: JobStore = Depends(get_job_store)):
     job = jobs.get(request_id, user.user_id)
-    if job is None:
-        return _error(404, "scenario_analysis_not_found", "Scenario Analysis not found.")
-    return job.progress
+    if job is not None:
+        return job.progress
+    saved = _load_scenario_analysis(db, user, request_id)
+    if isinstance(saved, JSONResponse):
+        return saved
+    return progress_from_scenario_analysis(saved)
 
 
 @app.get("/api/v1/scenario-analyses/{request_id}", response_model=ScenarioAnalysisResponse)
 def get_scenario_analysis(request_id: str, user: UserRecord = Depends(get_current_user),
+                          db: Database = Depends(get_database),
                           jobs: JobStore = Depends(get_job_store)):
     job = jobs.get(request_id, user.user_id)
-    if job is None:
-        return _error(404, "scenario_analysis_not_found", "Scenario Analysis not found.")
+    if job is None:  # pruned, or the gateway restarted: read the saved copy
+        return _load_scenario_analysis(db, user, request_id)
     if job.progress.state is RunState.RUNNING:
         return _error(409, "scenario_analysis_running", "Scenario Analysis is still running.", request_id=request_id)
     if job.progress.state is RunState.FAILED:
@@ -405,6 +427,19 @@ def analysis_status(request_id: str, user: UserRecord = Depends(get_current_user
 @app.get("/api/v1/analyses", response_model=List[AnalysisSummary])
 def list_analyses(user: UserRecord = Depends(get_current_user), db: Database = Depends(get_database)):
     return db.list_analyses(user.user_id)
+
+
+def _load_scenario_analysis(db: Database, user: UserRecord,
+                            request_id: str) -> ScenarioAnalysisResponse | JSONResponse:
+    """One of the user's saved scenario analyses, or the error response to return instead."""
+    encrypted = db.get_scenario_analysis(user_id=user.user_id, request_id=request_id)
+    if encrypted is None:  # also when it belongs to someone else
+        return _error(404, "scenario_analysis_not_found", "Scenario Analysis not found.")
+    try:
+        return ScenarioAnalysisResponse.model_validate_json(decrypt_bytes(encrypted))
+    except SecurityConfigError:
+        logger.error("Stored scenario analysis could not be decrypted (request %s).", request_id)
+        return _error(500, "analysis_unreadable", "The stored analysis could not be read.")
 
 
 def _load_analysis(db: Database, user: UserRecord, request_id: str) -> AnalysisResponse | JSONResponse:

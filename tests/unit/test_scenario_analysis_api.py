@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from services.orchestration.api import app, get_pipeline
 from services.orchestration.auth import LoginLimiter, get_login_limiter
 from services.orchestration.database import Database, get_database
+from services.orchestration.jobs import JobStore, get_job_store
 from services.orchestration.pipeline import AgentCallError, ErrorKind, Stage
 from shared.config.settings import get_settings
 from shared.models.scenario_risk import ScenarioRisk
@@ -123,3 +124,58 @@ def test_scenario_report_failure_is_partial(setup_scenario):
     response = client.get(f"/api/v1/scenario-analyses/{started.json()['request_id']}", headers=headers)
     assert response.status_code == 200
     assert response.json()["status"] == "partial" and response.json()["report"] is None
+
+
+def run_scenario(client, headers):
+    policy_id = create_policy(client, headers)
+    started = client.post("/api/v1/scenario-analyses", headers=headers, json={"scenario":"Bakery uses commercial ovens with five staff.", "policy_ids":[policy_id]})
+    assert started.status_code == 202, started.text
+    return started.json()["request_id"]
+
+
+def test_finished_scenario_is_saved_encrypted_and_listed(setup_scenario):
+    client, db, _ = setup_scenario
+    headers = signed_in(client)
+    request_id = run_scenario(client, headers)
+    listed = client.get("/api/v1/scenario-analyses", headers=headers)
+    assert listed.status_code == 200
+    [summary] = listed.json()
+    assert summary["request_id"] == request_id and summary["status"] == "complete"
+    assert summary["total_findings"] >= 1
+    user_id = db.get_user_by_email("scenario@example.com").user_id
+    stored = db.get_scenario_analysis(user_id=user_id, request_id=request_id)
+    assert stored is not None and b"Commercial oven fire" not in stored  # encrypted at rest
+
+
+def test_saved_scenario_survives_a_gateway_restart(setup_scenario):
+    client, _, _ = setup_scenario
+    headers = signed_in(client)
+    request_id = run_scenario(client, headers)
+    # A restart empties the in-memory job store.
+    app.dependency_overrides[get_job_store] = lambda: JobStore()
+    result = client.get(f"/api/v1/scenario-analyses/{request_id}", headers=headers)
+    assert result.status_code == 200, result.text
+    assert result.json()["risks"][0]["name"] == "Commercial oven fire"
+    status = client.get(f"/api/v1/scenario-analyses/{request_id}/status", headers=headers).json()
+    assert status["state"] == "complete"
+    assert status["stages"][0]["endpoint"] == "POST /api/v1/scenario-risk-profile"
+    assert status["stages"][0]["sent"] == "scenario text"
+
+
+def test_saved_scenario_is_private_to_its_owner(setup_scenario):
+    client, _, _ = setup_scenario
+    request_id = run_scenario(client, signed_in(client))
+    other = signed_in(client, "another@example.com")
+    app.dependency_overrides[get_job_store] = lambda: JobStore()
+    assert client.get("/api/v1/scenario-analyses", headers=other).json() == []
+    assert client.get(f"/api/v1/scenario-analyses/{request_id}", headers=other).status_code == 404
+    assert client.get(f"/api/v1/scenario-analyses/{request_id}/status", headers=other).status_code == 404
+
+
+def test_failed_scenario_is_not_saved(setup_scenario):
+    import httpx
+    client, _, agents = setup_scenario
+    headers = signed_in(client)
+    agents.overrides[SCENARIO_RISK_PATH] = lambda request: httpx.Response(503, json={"error":"down"})
+    run_scenario(client, headers)
+    assert client.get("/api/v1/scenario-analyses", headers=headers).json() == []

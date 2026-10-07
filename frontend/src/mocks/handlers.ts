@@ -421,6 +421,12 @@ export const handlers = [
     return HttpResponse.json(db.summaries);
   }),
 
+  // The mock API runs no scenario analyses, so the saved list is always empty.
+  http.get(`${API}/scenario-analyses`, ({ request }) => {
+    if (!currentUser(request)) return unauthorized();
+    return HttpResponse.json([]);
+  }),
+
   http.get(`${API}/analyses/:requestId`, ({ request, params }) => {
     if (!currentUser(request)) return unauthorized();
     const requestId = String(params.requestId);

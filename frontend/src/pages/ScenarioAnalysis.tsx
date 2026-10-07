@@ -6,7 +6,8 @@ import { isApiError } from '../api/client';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
-import { rememberScenarioAnalysis } from '../lib/scenarioHistory';
+import { SkeletonList } from '../components/ui/Skeleton';
+import { rememberScenarioAnalysis, scenarioLabel } from '../lib/scenarioHistory';
 
 export default function ScenarioAnalysis() {
   const navigate = useNavigate();
@@ -25,18 +26,18 @@ export default function ScenarioAnalysis() {
           : current,
     );
 
-  const start = () =>
-    run.mutate(
-      { scenario, policy_ids: selected },
-      {
-        onSuccess: (progress) => {
-          rememberScenarioAnalysis(progress.request_id, progress.created_at);
-          navigate(`/app/analyses/${progress.request_id}/running?source=scenario`, {
-            state: { analysisLabel: 'Scenario analysis' },
-          });
-        },
+  const start = () => {
+    const body = { scenario, policy_ids: selected };
+    run.mutate(body, {
+      onSuccess: (progress) => {
+        // Kept for the History label and the workspace's "Retry analysis" button.
+        rememberScenarioAnalysis(progress.request_id, progress.created_at, body);
+        navigate(`/app/analyses/${progress.request_id}/running?source=scenario`, {
+          state: { analysisLabel: scenarioLabel(progress.request_id) },
+        });
       },
-    );
+    });
+  };
 
   return (
     <section className="mx-auto max-w-4xl">
@@ -88,7 +89,9 @@ export default function ScenarioAnalysis() {
                 onRetry={() => void policies.refetch()}
               />
             )}
-            {ready.length === 0 ? (
+            {policies.isPending ? (
+              <SkeletonList label="Loading your policies" rows={2} />
+            ) : policies.isError ? null : ready.length === 0 ? (
               <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
                 No ready policies are available.{' '}
                 <Link to="/app/policies" className="font-bold underline">

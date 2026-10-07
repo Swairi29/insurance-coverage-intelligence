@@ -7,6 +7,8 @@
 - `analyses`: finished runs. The full result holds policy excerpts, so it is
   stored Fernet-encrypted (the same key as the policy PDFs); the summary
   columns are kept in plain text for the history list.
+- `scenario_analyses`: finished free-text scenario runs, stored the same way.
+  A separate table, because the result has a different shape.
 
 A new connection is opened per operation, because FastAPI runs sync endpoints
 in a thread pool and a sqlite3 connection must stay on one thread.
@@ -57,7 +59,17 @@ CREATE TABLE IF NOT EXISTS analyses (
     result         BLOB NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_policies_business ON policies (business_id);
+CREATE TABLE IF NOT EXISTS scenario_analyses (
+    request_id     TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL REFERENCES users (user_id),
+    status         TEXT NOT NULL,
+    created_at     TEXT NOT NULL,
+    total_findings INTEGER NOT NULL,
+    potential_gaps INTEGER NOT NULL,
+    result         BLOB NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_analyses_user ON analyses (user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_scenario_analyses_user ON scenario_analyses (user_id, created_at);
 """
 
 
@@ -187,29 +199,51 @@ class Database:
             ).fetchall()
         return {row["policy_id"] for row in rows}
 
-    # --- analyses -----------------------------------------------------------------------
+    # --- analyses and scenario analyses -----------------------------------------------
+    # Both tables have the same columns. `table` is always one of the two constants below,
+    # never user input, so formatting it into the SQL is safe.
 
     def save_analysis(self, *, user_id: str, summary: AnalysisSummary, encrypted_result: bytes) -> None:
+        self._save_run(_ANALYSES, user_id, summary, encrypted_result)
+
+    def get_analysis(self, *, user_id: str, request_id: str) -> Optional[bytes]:
+        """The encrypted result, or None if it does not exist or belongs to another user."""
+        return self._get_run(_ANALYSES, user_id, request_id)
+
+    def list_analyses(self, user_id: str, limit: int = 50) -> List[AnalysisSummary]:
+        return self._list_runs(_ANALYSES, user_id, limit)
+
+    def save_scenario_analysis(self, *, user_id: str, summary: AnalysisSummary,
+                               encrypted_result: bytes) -> None:
+        self._save_run(_SCENARIO_ANALYSES, user_id, summary, encrypted_result)
+
+    def get_scenario_analysis(self, *, user_id: str, request_id: str) -> Optional[bytes]:
+        """The encrypted result, or None if it does not exist or belongs to another user."""
+        return self._get_run(_SCENARIO_ANALYSES, user_id, request_id)
+
+    def list_scenario_analyses(self, user_id: str, limit: int = 50) -> List[AnalysisSummary]:
+        return self._list_runs(_SCENARIO_ANALYSES, user_id, limit)
+
+    def _save_run(self, table: str, user_id: str, summary: AnalysisSummary, encrypted_result: bytes) -> None:
         with self._connection() as conn:
             conn.execute(
-                "INSERT INTO analyses (request_id, user_id, status, created_at, total_findings, "
+                f"INSERT INTO {table} (request_id, user_id, status, created_at, total_findings, "
                 "potential_gaps, result) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (summary.request_id, user_id, summary.status.value, summary.created_at.isoformat(),
                  summary.total_findings, summary.potential_gaps, encrypted_result),
             )
 
-    def get_analysis(self, *, user_id: str, request_id: str) -> Optional[bytes]:
-        """The encrypted result, or None if it does not exist or belongs to another user."""
+    def _get_run(self, table: str, user_id: str, request_id: str) -> Optional[bytes]:
         with self._connection() as conn:
             row = conn.execute(
-                "SELECT result FROM analyses WHERE request_id = ? AND user_id = ?", (request_id, user_id)
+                f"SELECT result FROM {table} WHERE request_id = ? AND user_id = ?", (request_id, user_id)
             ).fetchone()
         return None if row is None else bytes(row["result"])
 
-    def list_analyses(self, user_id: str, limit: int = 50) -> List[AnalysisSummary]:
+    def _list_runs(self, table: str, user_id: str, limit: int) -> List[AnalysisSummary]:
         with self._connection() as conn:
             rows = conn.execute(
-                "SELECT request_id, status, created_at, total_findings, potential_gaps FROM analyses "
+                f"SELECT request_id, status, created_at, total_findings, potential_gaps FROM {table} "
                 "WHERE user_id = ? ORDER BY created_at DESC LIMIT ?", (user_id, limit)
             ).fetchall()
         return [
@@ -222,6 +256,10 @@ class Database:
             )
             for row in rows
         ]
+
+
+_ANALYSES = "analyses"
+_SCENARIO_ANALYSES = "scenario_analyses"
 
 
 @lru_cache
