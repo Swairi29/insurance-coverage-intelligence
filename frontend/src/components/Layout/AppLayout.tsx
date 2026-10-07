@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
+import { AgentStatus } from '../AgentStatus';
 import { Brand } from '../Brand';
 import { Popover } from '../Popover';
 
@@ -8,8 +9,8 @@ const NAV_ITEMS = [
   { to: '/app', label: 'Overview', icon: 'overview', end: true },
   { to: '/app/businesses', label: 'Businesses', icon: 'businesses', end: false },
   { to: '/app/policies', label: 'Policies', icon: 'policies', end: false },
-  { to: '/app/analyses', label: 'Analyses', icon: 'analyses', end: false },
-  { to: '/app/history', label: 'History', icon: 'history', end: false },
+  // `end`: only the list itself, not New Analysis or a result.
+  { to: '/app/analyses', label: 'History', icon: 'history', end: true },
 ];
 
 function initials(email: string | undefined): string {
@@ -35,12 +36,15 @@ export function AppLayout() {
       >
         Skip to content
       </a>
-      <aside className="hidden w-[250px] shrink-0 flex-col border-r border-white/10 bg-[#071225] px-4 py-6 text-white lg:fixed lg:inset-y-0 lg:flex print:hidden">
+      <aside
+        aria-label="Sidebar"
+        className="hidden w-[250px] shrink-0 flex-col border-r border-white/10 bg-[#071225] px-4 py-6 text-white lg:fixed lg:inset-y-0 lg:flex print:hidden"
+      >
         <Brand to="/app" tone="dark" />
         <p className="mb-3 mt-10 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
           Workspace
         </p>
-        <SidebarLinks onNavigate={() => setMobileOpen(false)} />
+        <SidebarLinks label="Main" onNavigate={() => setMobileOpen(false)} />
         <div className="mt-auto">
           <Link
             to="/app/settings"
@@ -111,7 +115,8 @@ export function AppLayout() {
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col border-r border-white/10 bg-[#071225] px-4 py-6 text-white transition-transform lg:hidden print:hidden ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        aria-label="Navigation menu"
+        className={`fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col border-r border-white/10 bg-[#071225] px-4 py-6 text-white transition-[transform,visibility] lg:hidden print:hidden ${mobileOpen ? 'visible translate-x-0' : 'invisible -translate-x-full'}`}
       >
         <div className="flex items-center justify-between">
           <Brand to="/app" tone="dark" />
@@ -126,7 +131,7 @@ export function AppLayout() {
         <p className="mb-3 mt-10 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
           Workspace
         </p>
-        <SidebarLinks onNavigate={() => setMobileOpen(false)} />
+        <SidebarLinks label="Main (menu)" onNavigate={() => setMobileOpen(false)} />
         <Link
           onClick={() => setMobileOpen(false)}
           to="/app/settings"
@@ -158,10 +163,8 @@ export function AppLayout() {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="hidden items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 sm:flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              Workspace ready
-            </span>
+            {/* Live: polls /health/agents and lists any agent that is down. */}
+            <AgentStatus tone="dark" />
             <Link
               to="/app/settings"
               aria-label="Account settings"
@@ -182,9 +185,9 @@ export function AppLayout() {
   );
 }
 
-function SidebarLinks({ onNavigate }: { onNavigate: () => void }) {
+function SidebarLinks({ label, onNavigate }: { label: string; onNavigate: () => void }) {
   return (
-    <nav aria-label="Application" className="space-y-1">
+    <nav aria-label={label} className="space-y-1">
       {NAV_ITEMS.map((item) => (
         <NavLink
           key={item.to}

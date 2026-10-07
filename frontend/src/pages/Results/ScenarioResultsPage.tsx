@@ -59,8 +59,8 @@ export function ScenarioResultsPage({ analysis }: { analysis: ScenarioAnalysisRe
   return (
     <article className="mx-auto max-w-5xl text-ink">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <Link to="/app/history" className="text-sm font-semibold text-blue-300 hover:underline">
-          ← Analyses
+        <Link to="/app/analyses" className="text-sm font-semibold text-blue-300 hover:underline">
+          ← History
         </Link>
         <div className="flex flex-wrap items-center gap-2">
           <Link

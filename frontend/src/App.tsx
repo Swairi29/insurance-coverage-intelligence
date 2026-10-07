@@ -60,7 +60,8 @@ export default function App() {
           element={<Navigate to="/app/analyses/new/scenario" replace />}
         />
         <Route path="analyses" element={<History />} />
-        <Route path="history" element={<History />} />
+        {/* One history page: the old /app/history link still works. */}
+        <Route path="history" element={<Navigate to="/app/analyses" replace />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="analyses/:requestId" element={<ResultsPage />} />
         <Route path="analyses/:requestId/running" element={<AnalysisWorkspace />} />

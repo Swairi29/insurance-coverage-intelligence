@@ -269,7 +269,7 @@ describe('new analysis: errors', () => {
     expect(screen.queryByRole('button', { name: 'Retry analysis' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Start a new analysis' })).toHaveAttribute(
       'href',
-      '/app/analyses/new',
+      '/app/analyses/new/profile',
     );
   });
 

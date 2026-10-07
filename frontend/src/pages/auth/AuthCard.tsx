@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { Brand } from '../../components/Brand';
 import { LockIcon } from '../../components/icons';
+import { SampleFinding } from '../../components/SampleFinding';
+import { THEFT_EXAMPLE } from '../../lib/examples';
 
 /**
  * The login and register layout: an aurora panel with the value proposition and an example
@@ -57,18 +59,10 @@ export function AuthCard({
             Four connected agents review business risks and policy wording, then connect coverage
             findings to the evidence behind them.
           </p>
-          <ol className="mt-8 grid max-w-md grid-cols-2 gap-x-5 gap-y-3 border-t border-white/15 pt-5 text-xs text-blue-50/85">
-            {['Risk profiling', 'Policy evidence', 'Coverage analysis', 'Clear explanations'].map(
-              (item, index) => (
-                <li key={item} className="flex items-center gap-2">
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-blue-200/20 bg-blue-400/10 text-[9px] font-bold text-cyan-100">
-                    0{index + 1}
-                  </span>
-                  {item}
-                </li>
-              ),
-            )}
-          </ol>
+          {/* A real-looking result, so the value is clear before signing up. */}
+          <div className="mt-8 max-w-md">
+            <SampleFinding finding={THEFT_EXAMPLE} compact />
+          </div>
         </div>
         <p className="relative z-10 text-xs text-blue-100/70">
           Academic prototype · Decision support, not legal, financial or insurance advice.

@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAnalysisStatus, useRefreshAnalyses, useStartAnalysis } from '../api/analyses';
@@ -13,7 +14,16 @@ import { SkeletonLines } from '../components/ui/Skeleton';
 import { formatDuration } from '../lib/format';
 import { AGENTS } from '../lib/labels';
 import { analysisRequestFor, rememberAnalysisRequest } from '../lib/analysisRequests';
-import { useScenarioAnalysisStatus } from '../api/scenarioAnalyses';
+import {
+  scenarioAnalysesListKey,
+  useScenarioAnalysisStatus,
+  useStartScenarioAnalysis,
+} from '../api/scenarioAnalyses';
+import {
+  rememberScenarioAnalysis,
+  scenarioLabel,
+  scenarioRequestFor,
+} from '../lib/scenarioHistory';
 
 /**
  * The agent workspace: which of the four agents is working, what the gateway handed to each
@@ -66,7 +76,13 @@ export default function AnalysisWorkspace() {
     <Workspace
       progress={status.data}
       scenario={scenario}
-      analysisLabel={routeState?.analysisLabel}
+      // The route state is lost on reload; the request saved in this tab still names the run.
+      analysisLabel={
+        routeState?.analysisLabel ??
+        (scenario
+          ? scenarioLabel(requestId)
+          : analysisRequestFor(requestId)?.business.business_name)
+      }
     />
   );
 }
@@ -81,6 +97,7 @@ function Workspace({
   analysisLabel?: string;
 }) {
   const refreshAnalyses = useRefreshAnalyses();
+  const queryClient = useQueryClient();
   const running = progress.state === 'running';
   const finished = progress.state === 'complete' || progress.state === 'partial';
   const done = progress.stages.filter((s) => s.state === 'done').length;
@@ -95,11 +112,13 @@ function Workspace({
   const wasRunning = useRef(running);
   useEffect(() => {
     if (wasRunning.current && !running) {
-      if (!scenario) void refreshAnalyses();
+      // The finished run is now saved: refresh the History list it belongs to.
+      if (scenario) void queryClient.invalidateQueries({ queryKey: scenarioAnalysesListKey });
+      else void refreshAnalyses();
       headingRef.current?.focus();
     }
     wasRunning.current = running;
-  }, [running, refreshAnalyses, scenario]);
+  }, [running, refreshAnalyses, queryClient, scenario]);
 
   const title = running
     ? 'Analysing your coverage…'
@@ -234,20 +253,35 @@ function Workspace({
 
 function FailureActions({ progress, scenario }: { progress: AnalysisProgress; scenario: boolean }) {
   const navigate = useNavigate();
-  const start = useStartAnalysis();
+  const startProfile = useStartAnalysis();
+  const startScenario = useStartScenarioAnalysis();
+  const start = scenario ? startScenario : startProfile;
   // The request behind this run, if it was started in this tab.
-  const lastRequest = analysisRequestFor(progress.request_id);
+  const profileRequest = scenario ? undefined : analysisRequestFor(progress.request_id);
+  const scenarioRequest = scenario ? scenarioRequestFor(progress.request_id) : undefined;
+  const canRetry = Boolean(profileRequest ?? scenarioRequest);
+  const setupPath = scenario ? '/app/analyses/new/scenario' : '/app/analyses/new/profile';
 
   const retry = () => {
-    if (!lastRequest) return;
-    start.mutate(lastRequest, {
-      onSuccess: (next) => {
-        rememberAnalysisRequest(next.request_id, lastRequest);
-        navigate(`/app/analyses/${next.request_id}/running`, {
-          state: { analysisLabel: lastRequest.business.business_name },
-        });
-      },
-    });
+    if (profileRequest) {
+      startProfile.mutate(profileRequest, {
+        onSuccess: (next) => {
+          rememberAnalysisRequest(next.request_id, profileRequest);
+          navigate(`/app/analyses/${next.request_id}/running`, {
+            state: { analysisLabel: profileRequest.business.business_name },
+          });
+        },
+      });
+    } else if (scenarioRequest) {
+      startScenario.mutate(scenarioRequest, {
+        onSuccess: (next) => {
+          rememberScenarioAnalysis(next.request_id, next.created_at, scenarioRequest);
+          navigate(`/app/analyses/${next.request_id}/running?source=scenario`, {
+            state: { analysisLabel: scenarioLabel(next.request_id) },
+          });
+        },
+      });
+    }
   };
 
   return (
@@ -268,23 +302,17 @@ function FailureActions({ progress, scenario }: { progress: AnalysisProgress; sc
         <ErrorMessage title="The analysis could not start again" error={start.error} />
       )}
       <div className="flex flex-wrap gap-3">
-        {lastRequest && !scenario ? (
+        {canRetry ? (
           <Button onClick={retry} loading={start.isPending}>
             Retry analysis
           </Button>
         ) : (
-          <Link
-            to={scenario ? '/app/analyses/new/scenario' : '/app/analyses/new'}
-            className={buttonClasses('primary')}
-          >
+          <Link to={setupPath} className={buttonClasses('primary')}>
             Start a new analysis
           </Link>
         )}
-        <Link
-          to={scenario ? '/app/analyses/new/scenario' : '/app/analyses/new'}
-          className={buttonClasses('secondary')}
-        >
-          Change policies
+        <Link to={setupPath} className={buttonClasses('secondary')}>
+          {scenario ? 'Change scenario or policies' : 'Change policies'}
         </Link>
       </div>
     </div>

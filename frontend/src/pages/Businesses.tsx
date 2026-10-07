@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { Button } from '../components/ui/Button';
+import { buttonClasses } from '../components/ui/buttonClasses';
 import { PageHeader } from '../components/ui/PageHeader';
 import { businessTypeLabel, loadProfileDraft } from '../lib/profile';
 
@@ -21,8 +21,8 @@ export default function Businesses() {
         title="Businesses"
         description="Manage the business information used to create structured risk profiles."
         action={
-          <Link to="/app/profile">
-            <Button>{profile ? 'Edit business profile' : 'Add a business'}</Button>
+          <Link to="/app/profile" className={buttonClasses('primary')}>
+            {profile ? 'Edit business profile' : 'Add a business'}
           </Link>
         }
       />
@@ -57,11 +57,11 @@ export default function Businesses() {
             <Info label="Account" value={user?.email ?? 'Signed in'} />
           </dl>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link to="/app/profile">
-              <Button variant="secondary">View or edit details</Button>
+            <Link to="/app/profile" className={buttonClasses('secondary')}>
+              View or edit details
             </Link>
-            <Link to="/app/analyses/new/profile">
-              <Button variant="ai">Analyse this business →</Button>
+            <Link to="/app/analyses/new/profile" className={buttonClasses('ai')}>
+              Analyse this business →
             </Link>
           </div>
           <p className="mt-5 text-xs leading-5 text-slate-500">
@@ -78,8 +78,8 @@ export default function Businesses() {
           <p className="mt-1 text-sm text-slate-500">
             Add your business details to use the structured profile analysis method.
           </p>
-          <Link to="/app/profile" className="mt-5 inline-block">
-            <Button>Add business profile</Button>
+          <Link to="/app/profile" className={`mt-5 ${buttonClasses('primary')}`}>
+            Add business profile
           </Link>
         </div>
       )}
