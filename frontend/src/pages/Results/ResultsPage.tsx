@@ -1,6 +1,7 @@
 import { useMemo, useRef, type KeyboardEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useAnalysis } from '../../api/analyses';
+import { useScenarioAnalysis } from '../../api/scenarioAnalyses';
 import { isApiError } from '../../api/client';
 import { usePolicies } from '../../api/policies';
 import type { AnalysisResponse } from '../../api/types';
@@ -19,6 +20,7 @@ import { aiUsage, analysisWarnings, headline, statusCounts } from '../../lib/res
 import { CoverageTab } from './CoverageTab';
 import { ReportTab } from './ReportTab';
 import { RiskProfileTab } from './RiskProfileTab';
+import { ScenarioResultsPage } from './ScenarioResultsPage';
 
 type TabId = 'report' | 'coverage' | 'risks';
 
@@ -30,7 +32,23 @@ const TABS: { id: TabId; label: string }[] = [
 
 export default function ResultsPage() {
   const { requestId = '' } = useParams();
-  const analysis = useAnalysis(requestId);
+  const [searchParams] = useSearchParams();
+  const scenario = searchParams.get('source') === 'scenario';
+  const analysis = useAnalysis(requestId, { enabled: !scenario });
+  const scenarioAnalysis = useScenarioAnalysis(requestId, scenario);
+
+  if (scenario) {
+    if (scenarioAnalysis.isPending) return <SkeletonReport label="Loading the scenario report" />;
+    if (scenarioAnalysis.isError)
+      return (
+        <ErrorMessage
+          title="Scenario results could not be loaded"
+          error={scenarioAnalysis.error}
+          onRetry={() => void scenarioAnalysis.refetch()}
+        />
+      );
+    return <ScenarioResultsPage analysis={scenarioAnalysis.data} />;
+  }
 
   if (analysis.isPending) {
     return <SkeletonReport label="Loading the analysis" />;

@@ -5,6 +5,7 @@
 @layer base {
   body {
     @apply bg-canvas font-sans text-body text-ink antialiased;
+    color-scheme: dark;
   }
   h1,
   h2,
@@ -29,6 +30,130 @@
   }
 }
 
+@layer utilities {
+  /* A few feature pages intentionally keep explicit slate/white utility classes. Scope
+     their original layout classes to the shared dark surface without changing semantics. */
+  .dark-ui {
+    color: #e5edf9;
+    background-color: #050b18;
+  }
+  .dark-ui [class~='bg-white'],
+  .dark-ui [class~='bg-white/80'],
+  .dark-ui [class~='bg-white/90'] {
+    background-color: #0b1930;
+    background-image: linear-gradient(145deg, rgb(16 42 77 / 0.48), rgb(11 27 53 / 0.96));
+    border-color: #203858;
+    box-shadow: 0 16px 40px -26px rgb(0 0 0 / 0.78);
+  }
+  .dark-ui [class~='bg-canvas'],
+  .dark-ui [class~='bg-slate-50'],
+  .dark-ui [class~='bg-slate-100'],
+  .dark-ui [class~='bg-blue-50'],
+  .dark-ui [class~='bg-indigo-50'],
+  .dark-ui [class~='bg-sky-50'] {
+    background-color: #0e203a;
+  }
+  .dark-ui [class~='bg-blue-50/70'] {
+    background-color: rgb(14 32 58 / 0.7);
+  }
+  .dark-ui [class~='bg-amber-50'] {
+    background-color: #302819;
+  }
+  .dark-ui [class~='bg-rose-50'] {
+    background-color: #351d2a;
+  }
+  .dark-ui [class~='bg-emerald-50'] {
+    background-color: #102a2a;
+  }
+  .dark-ui [class~='bg-cyan-50'] {
+    background-color: #0b2936;
+  }
+  .dark-ui [class~='bg-brand-soft'],
+  .dark-ui [class~='bg-brand-tint'],
+  .dark-ui [class~='bg-ai-tint'] {
+    background-color: #102746;
+  }
+  .dark-ui [class~='text-ink'],
+  .dark-ui [class~='text-ink-heading'],
+  .dark-ui [class~='text-slate-950'],
+  .dark-ui [class~='text-slate-900'],
+  .dark-ui [class~='text-slate-800'] {
+    color: #f1f6ff;
+  }
+  .dark-ui [class~='text-slate-700'],
+  .dark-ui [class~='text-slate-600'] {
+    color: #c1cee0;
+  }
+  .dark-ui [class~='text-slate-500'],
+  .dark-ui [class~='text-slate-400'],
+  .dark-ui [class~='text-muted'],
+  .dark-ui [class~='text-muted-strong'] {
+    color: #9aabc4;
+  }
+  .dark-ui [class~='text-blue-700'],
+  .dark-ui [class~='text-blue-600'],
+  .dark-ui [class~='text-indigo-700'] {
+    color: #93c5fd;
+  }
+  .dark-ui [class~='text-rose-700'],
+  .dark-ui [class~='text-rose-800'] {
+    color: #fda4af;
+  }
+  .dark-ui [class~='text-amber-700'],
+  .dark-ui [class~='text-amber-900'] {
+    color: #fcd34d;
+  }
+  .dark-ui [class~='text-emerald-700'] {
+    color: #6ee7b7;
+  }
+  .dark-ui [class~='text-cyan-700'],
+  .dark-ui [class~='text-cyan-800'] {
+    color: #a5f3fc;
+  }
+  .dark-ui [class~='text-blue-800'],
+  .dark-ui [class~='text-blue-950'] {
+    color: #bfdbfe;
+  }
+  .dark-ui [class~='hover:text-white']:hover {
+    color: #fff;
+  }
+  .dark-ui [class~='hover:border-brand']:hover,
+  .dark-ui [class~='hover:border-blue-300']:hover {
+    border-color: #38bdf8;
+    box-shadow: 0 0 24px -14px rgb(56 189 248 / 0.65);
+  }
+  .dark-ui [class~='border-line'],
+  .dark-ui [class~='border-slate-100'],
+  .dark-ui [class~='border-slate-200'],
+  .dark-ui [class~='border-slate-300'] {
+    border-color: #263a56;
+  }
+  .dark-ui [class~='border-amber-200'],
+  .dark-ui [class~='border-rose-200'],
+  .dark-ui [class~='border-emerald-100'],
+  .dark-ui [class~='border-cyan-200'] {
+    border-color: #354a66;
+  }
+  .dark-ui input,
+  .dark-ui select,
+  .dark-ui textarea {
+    color-scheme: dark;
+    background-color: #09172d;
+    color: #f1f6ff;
+  }
+  .dark-ui input::placeholder,
+  .dark-ui textarea::placeholder {
+    color: #8294ae;
+  }
+  .dark-ui input,
+  .dark-ui select,
+  .dark-ui textarea,
+  .dark-ui button,
+  .dark-ui a {
+    transition-duration: 180ms;
+  }
+}
+
 @media print {
   /* Top and bottom margins on every page. The side margins are padding on the report itself
      (AppLayout's <main>), so they survive the print dialog's "Margins: None / Minimum". */
@@ -41,5 +166,11 @@
     /* Keep status colours and tints, which carry meaning, when printing. */
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  .dark-ui [class~='bg-white'],
+  .dark-ui [class~='bg-white/80'],
+  .dark-ui [class~='bg-white/90'] {
+    background: #fff !important;
+    box-shadow: none !important;
   }
 }

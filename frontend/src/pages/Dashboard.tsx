@@ -1,226 +1,284 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAnalyses, useAnalysis } from '../api/analyses';
+import { useAnalyses } from '../api/analyses';
 import { usePolicies } from '../api/policies';
-import type { AnalysisSummary } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
-import { DocumentIcon, SparkleIcon } from '../components/icons';
 import { AnalysisStatusBadge } from '../components/StatusBadge';
-import { StatusBar } from '../components/StatusBar';
 import { buttonClasses } from '../components/ui/buttonClasses';
-import { SkeletonLines } from '../components/ui/Skeleton';
-import { Spinner } from '../components/ui/Spinner';
 import { formatDateTime, plural } from '../lib/format';
-import { businessTypeLabel, loadProfileDraft } from '../lib/profile';
-import { statusCounts } from '../lib/results';
+import { loadProfileDraft } from '../lib/profile';
 
-interface ChecklistStep {
-  title: string;
-  description: string;
-  done: boolean | null; // null while loading
-  to: string;
-  action: string;
-}
+const greeting = () => {
+  const hour = new Date().getHours();
+  return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+};
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [profile] = useState(loadProfileDraft);
+  const profile = loadProfileDraft();
   const policies = usePolicies();
   const analyses = useAnalyses();
+  const rows = [...(analyses.data ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const readyCount = policies.data?.filter((policy) => policy.status === 'ready').length ?? 0;
+  const gaps = rows.reduce((sum, analysis) => sum + analysis.potential_gaps, 0);
+  const name = profile?.business_name || user?.email?.split('@')[0] || 'there';
 
-  const readyPolicies = policies.data?.filter((p) => p.status === 'ready').length ?? 0;
-  const latest = analyses.data
-    ? [...analyses.data].sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
-    : undefined;
-
-  const steps: ChecklistStep[] = [
+  const metrics = [
     {
-      title: 'Business profile',
-      description: profile
-        ? `${profile.business_name}, ${businessTypeLabel(profile).toLowerCase()}.`
-        : 'Kept in this browser tab and sent with each analysis.',
-      done: profile !== null,
-      to: '/app/profile',
-      action: profile ? 'Edit profile' : 'Add profile',
+      label: 'Businesses',
+      value: profile ? 1 : 0,
+      detail: profile?.business_name ?? 'No profile saved yet',
+      accent: 'text-blue-300',
     },
     {
-      title: policies.data ? `Policies uploaded (${readyPolicies})` : 'Policies uploaded',
-      description: policies.data
-        ? `${plural(readyPolicies, 'policy', 'policies')} ready.`
-        : 'PDF policy documents, up to 25 MB each.',
-      done: policies.data ? readyPolicies > 0 : policies.isError ? false : null,
-      to: '/app/policies',
-      action: readyPolicies > 0 ? 'Manage policies' : 'Upload a policy',
+      label: 'Ready policies',
+      value: policies.isPending ? '—' : readyCount,
+      detail: policies.isError ? 'Could not load policies' : 'Available to analyze',
+      accent: 'text-cyan-200',
     },
     {
-      title: 'First analysis',
-      description: 'Checks your risks against your policies and explains any gaps.',
-      done: analyses.data ? analyses.data.length > 0 : analyses.isError ? false : null,
-      to: '/app/analyses/new',
-      action: 'New analysis',
+      label: 'Analyses',
+      value: analyses.isPending ? '—' : rows.length,
+      detail: 'Saved reports',
+      accent: 'text-sky-200',
+    },
+    {
+      label: 'Potential gaps',
+      value: analyses.isPending ? '—' : gaps,
+      detail: 'Across saved reports',
+      accent: 'text-rose-300',
     },
   ];
-  // The first unfinished step is the one to do next.
-  const nextIndex = steps.findIndex((step) => step.done === false);
 
   return (
-    <section className="max-w-5xl">
-      {/* Welcome card */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-card border border-line bg-white p-5 shadow-card sm:p-6">
-        <div className="min-w-0">
-          <p className="text-meta font-semibold text-muted">Your workspace</p>
-          <h1 className="mt-1 truncate text-section font-extrabold sm:text-[1.75rem]">
-            {profile ? profile.business_name : 'Welcome to InsureIntel'}
-          </h1>
-          <p className="mt-1 text-sm text-muted">
-            Signed in as <span className="font-medium text-ink-heading">{user?.email}</span>
-          </p>
-        </div>
-        <Link to="/app/analyses/new" className={buttonClasses('primary')}>
-          <SparkleIcon className="h-4 w-4" />
-          Run new analysis
-        </Link>
-      </div>
+    <section className="relative isolate">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-16 -top-20 -z-10 h-80 w-80 rounded-full bg-blue-600/15 blur-[110px]"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-[38%] top-16 -z-10 h-56 w-56 rounded-full bg-cyan-500/[.07] blur-[100px]"
+      />
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
-        <section
-          aria-labelledby="getting-started"
-          className="rounded-card border border-line bg-white p-5 shadow-soft sm:p-6"
-        >
-          <h2 id="getting-started" className="text-lg font-bold">
-            Setup
-          </h2>
-          <ol className="mt-4 space-y-3" aria-label="Getting started steps">
-            {steps.map((step, index) => (
-              <li
-                key={step.to}
-                aria-current={index === nextIndex ? 'step' : undefined}
-                className={`grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 rounded-panel border p-4 sm:grid-cols-[auto_1fr_auto] ${
-                  index === nextIndex ? 'border-brand bg-brand-soft' : 'border-line'
-                }`}
-              >
-                <StepMarker number={index + 1} done={step.done} />
-                <div className="min-w-0">
-                  <p className="font-semibold text-ink-heading">
-                    {step.title}
-                    <span className="sr-only">
-                      {step.done === true ? ' (done)' : step.done === false ? ' (to do)' : ''}
-                    </span>
-                  </p>
-                  <p className="text-sm text-muted">{step.description}</p>
-                </div>
-                <Link
-                  to={step.to}
-                  className={`col-start-2 justify-self-start sm:col-start-auto ${
-                    index === nextIndex
-                      ? buttonClasses('primary', 'sm')
-                      : 'rounded-control px-3 py-1.5 text-sm font-semibold text-brand hover:bg-brand-soft'
-                  }`}
-                >
-                  {step.action}
-                </Link>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <section
-          aria-labelledby="latest-analysis"
-          className="h-fit rounded-card border border-line bg-white p-5 shadow-soft sm:p-6"
-        >
-          <h2 id="latest-analysis" className="text-lg font-bold">
-            Latest analysis
-          </h2>
-          <div className="mt-4">
-            {analyses.isPending ? (
-              <SkeletonLines label="Loading your latest analysis" lines={4} />
-            ) : analyses.isError ? (
-              <p className="text-sm text-muted">Your analyses could not be loaded right now.</p>
-            ) : latest ? (
-              <LatestAnalysis analysis={latest} total={analyses.data.length} />
-            ) : (
-              <EmptyLatest hasPolicies={readyPolicies > 0} />
-            )}
+      <header className="relative border-b border-blue-200/10 pb-8 pt-2 sm:pb-10">
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div className="max-w-3xl">
+            <p className="text-[10px] font-extrabold uppercase tracking-[.24em] text-cyan-300">
+              {greeting()} · Insurance intelligence workspace
+            </p>
+            <h1 className="mt-3 text-4xl font-extrabold tracking-[-.035em] text-white sm:text-5xl">
+              Welcome back<span className="text-blue-400">.</span>
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">
+              {name === 'there' ? 'Understand your insurance coverage' : `Workspace for ${name}`} —
+              identify potential gaps with evidence from your policies.
+            </p>
           </div>
+          <Link
+            to="/app/analyses/new"
+            className={`${buttonClasses('ai', 'lg')} rounded-xl shadow-[0_10px_36px_-14px_rgba(37,99,235,.8)]`}
+          >
+            <span aria-hidden="true" className="text-xl leading-none">
+              +
+            </span>
+            New Analysis
+          </Link>
+        </div>
+
+        <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-slate-400">
+          <span className="font-semibold uppercase tracking-[.16em] text-slate-500">
+            One evidence-led workflow
+          </span>
+          {['Risk profile', 'Policy evidence', 'Coverage analysis', 'Report'].map(
+            (stage, index) => (
+              <span key={stage} className="inline-flex items-center gap-2">
+                {index > 0 && (
+                  <span aria-hidden="true" className="text-blue-500/70">
+                    /
+                  </span>
+                )}
+                {stage}
+              </span>
+            ),
+          )}
+        </div>
+      </header>
+
+      <section aria-label="Workspace metrics" className="mt-6">
+        <div className="grid overflow-hidden rounded-2xl border border-blue-200/10 bg-gradient-to-br from-[#0d2242] to-[#09172d] shadow-[0_18px_55px_-38px_rgba(37,99,235,.8)] sm:grid-cols-2 xl:grid-cols-4">
+          {metrics.map((metric, index) => (
+            <div
+              key={metric.label}
+              className={`relative min-w-0 px-5 py-4 sm:px-6 sm:py-5 ${index > 0 ? 'border-t border-blue-100/10 sm:border-l sm:border-t-0' : ''} ${index === 2 ? 'xl:border-l' : ''}`}
+            >
+              <p className="text-[10px] font-bold uppercase tracking-[.2em] text-slate-400">
+                {metric.label}
+              </p>
+              <p
+                className={`mt-2 font-display text-4xl font-extrabold tracking-tight ${metric.accent}`}
+              >
+                {metric.value}
+              </p>
+              <p className="mt-1 truncate text-xs text-slate-500">{metric.detail}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="mt-10 grid gap-10 xl:grid-cols-[minmax(0,1.55fr)_minmax(260px,.75fr)]">
+        <section aria-labelledby="recent-title" className="min-w-0">
+          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-blue-100/10 pb-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[.2em] text-blue-300">
+                Your reports
+              </p>
+              <h2 id="recent-title" className="mt-1 text-2xl font-bold text-white">
+                Recent analyses
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Your latest insurance intelligence reports.
+              </p>
+            </div>
+            <Link
+              to="/app/history"
+              className="text-sm font-semibold text-blue-300 hover:text-cyan-200"
+            >
+              View history <span aria-hidden="true">→</span>
+            </Link>
+          </div>
+
+          {analyses.isPending ? (
+            <p className="py-8 text-sm text-slate-400" role="status">
+              Loading analyses…
+            </p>
+          ) : analyses.isError ? (
+            <p role="alert" className="py-6 text-sm text-rose-200">
+              Your analyses could not be loaded. Refresh to try again.
+            </p>
+          ) : rows.length === 0 ? (
+            <div className="py-9">
+              <p className="text-lg font-semibold text-white">No saved reports yet</p>
+              <p className="mt-1 text-sm text-slate-400">
+                Your analysis reports will appear here when they are complete.
+              </p>
+              <Link
+                to="/app/analyses/new"
+                className="mt-4 inline-flex text-sm font-bold text-cyan-300 hover:text-white"
+              >
+                Start your first analysis{' '}
+                <span className="ml-2" aria-hidden="true">
+                  →
+                </span>
+              </Link>
+            </div>
+          ) : (
+            <ul aria-label="Recent analyses" className="divide-y divide-blue-100/10">
+              {rows.slice(0, 5).map((analysis) => (
+                <li key={analysis.request_id}>
+                  <div className="flex flex-wrap items-center justify-between gap-4 py-5 transition-colors hover:bg-blue-300/[.025]">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-slate-100">Insurance analysis</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {formatDateTime(analysis.created_at)}
+                      </p>
+                      <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+                        <span>{plural(analysis.total_findings, 'risk')} assessed</span>
+                        <span
+                          className={analysis.potential_gaps ? 'font-semibold text-rose-300' : ''}
+                        >
+                          {plural(analysis.potential_gaps, 'potential gap')}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <AnalysisStatusBadge status={analysis.status} />
+                      <Link
+                        to={`/app/analyses/${analysis.request_id}`}
+                        aria-label={`Open analysis from ${formatDateTime(analysis.created_at)}`}
+                        className="text-sm font-bold text-blue-300 transition-colors hover:text-cyan-200"
+                      >
+                        Open <span aria-hidden="true">→</span>
+                      </Link>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
+
+        <aside className="space-y-7">
+          <section
+            aria-labelledby="coverage-title"
+            className="relative overflow-hidden border-y border-blue-200/15 py-6 sm:border sm:rounded-2xl sm:px-6"
+          >
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-8 top-1 h-48 w-48 rounded-full bg-rose-500/[.10] blur-[65px]"
+            />
+            <p className="relative text-[10px] font-bold uppercase tracking-[.2em] text-blue-300">
+              Coverage overview
+            </p>
+            <h2 id="coverage-title" className="relative mt-2 text-xl font-bold text-white">
+              Potential gaps to review
+            </h2>
+            <p className="relative mt-5 font-display text-7xl font-extrabold tracking-[-.06em] text-rose-200">
+              {analyses.isPending ? '—' : gaps}
+            </p>
+            <p className="relative mt-1 text-sm text-slate-400">Found across saved analyses</p>
+            <div className="relative mt-5 border-t border-blue-100/10 pt-4">
+              <p className="text-xs leading-5 text-slate-400">
+                Review each finding against its cited policy wording and confirm questions with your
+                insurer or broker.
+              </p>
+              <Link
+                to="/app/analyses"
+                className="mt-4 inline-flex text-sm font-bold text-blue-300 hover:text-cyan-200"
+              >
+                Review reports{' '}
+                <span className="ml-2" aria-hidden="true">
+                  →
+                </span>
+              </Link>
+            </div>
+          </section>
+
+          <section className="border-t border-blue-100/10 pt-5">
+            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-cyan-300">
+              Next step
+            </p>
+            <h2 className="mt-2 text-lg font-bold text-white">
+              {!profile
+                ? 'Add your business details'
+                : readyCount === 0
+                  ? 'Add your policy documents'
+                  : 'Explore your coverage'}
+            </h2>
+            <p className="mt-1 text-sm leading-5 text-slate-400">
+              {!profile
+                ? 'Save structured details to start with a guided risk profile.'
+                : readyCount === 0
+                  ? 'Upload a policy PDF to find relevant wording.'
+                  : 'Start with your profile or describe a scenario in your own words.'}
+            </p>
+            <Link
+              to={
+                !profile
+                  ? '/app/businesses'
+                  : readyCount === 0
+                    ? '/app/policies'
+                    : '/app/analyses/new'
+              }
+              className="mt-3 inline-flex text-sm font-semibold text-blue-300 hover:text-cyan-200"
+            >
+              {!profile ? 'Set up business' : readyCount === 0 ? 'Manage policies' : 'New analysis'}
+              <span className="ml-2" aria-hidden="true">
+                →
+              </span>
+            </Link>
+          </section>
+        </aside>
       </div>
     </section>
-  );
-}
-
-function StepMarker({ number, done }: { number: number; done: boolean | null }) {
-  if (done === null) return <Spinner className="h-7 w-7" />;
-  return done ? (
-    <span
-      aria-hidden="true"
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-status-covered text-sm font-bold text-white"
-    >
-      ✓
-    </span>
-  ) : (
-    <span
-      aria-hidden="true"
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-brand-border text-sm font-bold text-brand"
-    >
-      {number}
-    </span>
-  );
-}
-
-function EmptyLatest({ hasPolicies }: { hasPolicies: boolean }) {
-  return (
-    <div className="rounded-panel border border-dashed border-line-strong bg-canvas px-4 py-6 text-center">
-      <DocumentIcon className="mx-auto h-6 w-6 text-brand" />
-      <p className="mt-2 font-semibold text-ink-heading">No analyses yet</p>
-      <p className="mt-1 text-sm text-muted">
-        {hasPolicies
-          ? 'Run your first analysis to see which risks your policies cover.'
-          : 'Upload your first policy, then run an analysis to see your coverage.'}
-      </p>
-      <Link
-        to={hasPolicies ? '/app/analyses/new' : '/app/policies'}
-        className={`mt-4 ${buttonClasses('primary', 'sm')}`}
-      >
-        {hasPolicies ? 'Run your first analysis' : 'Upload your first policy'}
-      </Link>
-    </div>
-  );
-}
-
-function LatestAnalysis({ analysis, total }: { analysis: AnalysisSummary; total: number }) {
-  // The summary has totals only; the full result gives the count per status for the bar.
-  const full = useAnalysis(analysis.request_id);
-  return (
-    <div>
-      <div className="flex flex-wrap items-center gap-2">
-        <AnalysisStatusBadge status={analysis.status} />
-        <span className="text-sm text-muted">{formatDateTime(analysis.created_at)}</span>
-      </div>
-      <dl className="mt-4 grid grid-cols-2 gap-3">
-        <div className="rounded-panel bg-brand-soft p-3">
-          <dt className="text-xs text-muted">Risks checked</dt>
-          <dd className="font-display text-2xl font-extrabold text-ink-heading">
-            {analysis.total_findings}
-          </dd>
-        </div>
-        <div className="rounded-panel bg-status-excluded-bg p-3">
-          <dt className="text-xs text-muted">Potential gaps</dt>
-          <dd className="font-display text-2xl font-extrabold text-status-excluded">
-            {analysis.potential_gaps}
-          </dd>
-        </div>
-      </dl>
-      {full.data && <StatusBar counts={statusCounts(full.data)} className="mt-4" />}
-      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm font-semibold">
-        <Link to={`/app/analyses/${analysis.request_id}`} className="text-brand hover:underline">
-          Open results →
-        </Link>
-        {total > 1 && (
-          <Link to="/app/analyses" className="text-muted-strong hover:underline">
-            All {total} analyses
-          </Link>
-        )}
-      </div>
-    </div>
   );
 }

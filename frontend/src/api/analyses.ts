@@ -27,9 +27,13 @@ export function useStartAnalysis() {
 }
 
 /** GET /analyses/{id}/status, polled while the run is still going. */
-export function useAnalysisStatus(requestId: string) {
+export function useAnalysisStatus(
+  requestId: string,
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: analysisStatusQueryKey(requestId),
+    enabled,
     queryFn: ({ signal }) =>
       api.get<AnalysisProgress>(`/api/v1/analyses/${encodeURIComponent(requestId)}/status`, {
         signal,

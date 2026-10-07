@@ -83,8 +83,9 @@ export default function Register() {
   return (
     <AuthCard
       title="Create your account"
-      subtitle="Start organising your business risks and insurance coverage."
-      aside="Your first coverage check takes about five minutes."
+      subtitle="Save your businesses, policies and coverage analyses in one place."
+      aside="Build your insurance intelligence workspace."
+      imageSrc="/insurance-concept.jpg"
       footer={
         <>
           Already have an account?{' '}

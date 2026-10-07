@@ -4,7 +4,7 @@ import { buttonClasses } from '../components/ui/buttonClasses';
 
 export default function NotFound() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 px-4 text-center">
+    <main className="dark-ui flex min-h-screen flex-col items-center justify-center gap-4 px-4 text-center">
       <Brand />
       <h1 className="mt-4 text-3xl font-extrabold">Page not found</h1>
       <p className="max-w-sm text-sm text-muted">

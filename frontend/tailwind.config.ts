@@ -8,45 +8,45 @@ export default {
     extend: {
       colors: {
         // Page background behind the white cards; a touch cool so the aurora glows blend in.
-        canvas: '#f6f8fc',
-        ink: { DEFAULT: '#0f172a', heading: '#0f172a' },
+        canvas: '#050b18',
+        ink: { DEFAULT: '#e5edf9', heading: '#f8fbff' },
         // #5a6b82 keeps 4.5:1 contrast on every light background used, tints included.
-        muted: { DEFAULT: '#5a6b82', strong: '#475569' },
+        muted: { DEFAULT: '#9aabc4', strong: '#bac8dc' },
         // `strong` (slate-400) is for dashed drop-zone borders.
-        line: { DEFAULT: '#e2e8f0', strong: '#94a3b8' },
+        line: { DEFAULT: '#263a56', strong: '#3b5272' },
         brand: {
-          DEFAULT: '#1e3a8a',
-          dark: '#172554',
-          tint: '#eff6ff',
-          soft: '#f5f8ff',
-          border: '#dbeafe',
+          DEFAULT: '#2563eb',
+          dark: '#1d4ed8',
+          tint: '#102746',
+          soft: '#0d2039',
+          border: '#25466d',
           // Secondary text on a navy background (7:1).
-          muted: '#cbd5e1',
+          muted: '#cbd8ea',
         },
         // The AI layer. DEFAULT is for text and filled buttons (6.3:1 with white); `bright`
         // (#6366f1, only 4.47:1) is for spinners, bars, borders and focus rings, never text.
         ai: {
-          DEFAULT: '#4f46e5',
-          bright: '#6366f1',
-          dark: '#4338ca',
-          tint: '#eef2ff',
-          border: '#c7d2fe',
+          DEFAULT: '#2563eb',
+          bright: '#38bdf8',
+          dark: '#1d4ed8',
+          tint: '#0b263d',
+          border: '#1d4b70',
         },
         // Soft glows for `.bg-aurora` (landing hero and auth pages only, never behind data).
         aurora: {
-          indigo: '#e0e7ff',
-          sky: '#dbeafe',
-          cyan: '#e0f2fe',
-          violet: '#ede9fe',
+          indigo: '#0b2142',
+          sky: '#0b2844',
+          cyan: '#082a39',
+          violet: '#171b3d',
         },
         // Coverage status colours. Always paired with a text label, never colour alone.
         // `dot` is too light for text: only for dots, bars and card edges.
         status: {
-          covered: { DEFAULT: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', dot: '#10b981' },
-          conditional: { DEFAULT: '#b45309', bg: '#fffbeb', border: '#fde68a', dot: '#f59e0b' },
-          unclear: { DEFAULT: '#4b5563', bg: '#f3f4f6', border: '#d1d5db', dot: '#94a3b8' },
-          excluded: { DEFAULT: '#b91c1c', bg: '#fef2f2', border: '#fecaca', dot: '#ef4444' },
-          notfound: { DEFAULT: '#b91c1c', bg: '#ffffff', border: '#b91c1c', dot: '#ef4444' },
+          covered: { DEFAULT: '#6ee7b7', bg: '#102a2a', border: '#1d5a4c', dot: '#34d399' },
+          conditional: { DEFAULT: '#fcd34d', bg: '#302819', border: '#705522', dot: '#fbbf24' },
+          unclear: { DEFAULT: '#cbd5e1', bg: '#202b3a', border: '#46566c', dot: '#94a3b8' },
+          excluded: { DEFAULT: '#fda4af', bg: '#351d2a', border: '#713344', dot: '#fb7185' },
+          notfound: { DEFAULT: '#fda4af', bg: '#351d2a', border: '#713344', dot: '#fb7185' },
         },
       },
       fontFamily: {
@@ -68,9 +68,9 @@ export default {
         pill: '999px',
       },
       boxShadow: {
-        soft: '0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06)',
-        card: '0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -8px rgb(15 23 42 / 0.10)',
-        lift: '0 2px 4px rgb(15 23 42 / 0.04), 0 20px 48px -16px rgb(30 58 138 / 0.22)',
+        soft: '0 8px 22px -14px rgb(0 0 0 / 0.55)',
+        card: '0 14px 36px -20px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(56 189 248 / 0.04)',
+        lift: '0 24px 54px -24px rgb(0 0 0 / 0.78), 0 0 30px -18px rgb(37 99 235 / 0.5)',
       },
       keyframes: {
         // Indeterminate progress bar: used where the API reports no progress.

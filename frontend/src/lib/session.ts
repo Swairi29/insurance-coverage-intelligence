@@ -8,6 +8,7 @@ export const SESSION_KEYS = {
   profileDraft: 'insureintel.profileDraft',
   /** Each analysis request by request_id, so a failed run can be retried (lib/analysisRequests). */
   analysisRequests: 'insureintel.analysisRequests',
+  scenarioAnalysisIds: 'insureintel.scenarioAnalysisIds',
 } as const;
 
 export function readSession(key: string): string | null {
