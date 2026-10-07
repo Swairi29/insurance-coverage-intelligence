@@ -38,13 +38,13 @@ export default function History() {
       <div className="mb-5 flex gap-2 border-b border-slate-200 pb-3">
         <Link
           to="/app/analyses"
-          className={`rounded-lg px-3 py-2 text-sm font-semibold ${!historyView ? 'bg-blue-50 text-blue-800' : 'text-slate-500 hover:bg-slate-100'}`}
+          className={`rounded-lg px-3 py-2 text-sm font-semibold ${!historyView ? 'bg-blue-50 text-blue-800' : 'text-slate-500 hover:bg-white/5'}`}
         >
           Analyses
         </Link>
         <Link
           to="/app/history"
-          className={`rounded-lg px-3 py-2 text-sm font-semibold ${historyView ? 'bg-blue-50 text-blue-800' : 'text-slate-500 hover:bg-slate-100'}`}
+          className={`rounded-lg px-3 py-2 text-sm font-semibold ${historyView ? 'bg-blue-50 text-blue-800' : 'text-slate-500 hover:bg-white/5'}`}
         >
           History
         </Link>

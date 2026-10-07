@@ -78,7 +78,7 @@ export function TagInput({
                 type="button"
                 onClick={() => onChange(value.filter((existing) => existing !== item))}
                 aria-label={`Remove ${item}`}
-                className="rounded-full px-1.5 text-muted hover:bg-white hover:text-status-excluded focus-visible:outline focus-visible:outline-2"
+                className="rounded-full px-1.5 text-muted hover:bg-status-excluded-bg hover:text-status-excluded focus-visible:outline focus-visible:outline-2"
               >
                 ×
               </button>

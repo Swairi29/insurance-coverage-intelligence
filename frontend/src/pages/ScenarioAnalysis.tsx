@@ -69,7 +69,7 @@ export default function ScenarioAnalysis() {
               value={scenario}
               onChange={(event) => setScenario(event.target.value)}
               rows={7}
-              className="mt-4 w-full rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm leading-6 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+              className="mt-4 w-full rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm leading-6 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20"
               placeholder="Describe your business, activities, equipment, employees, location, customers, or concerns..."
             />
             <span className="mt-2 block text-right text-xs text-slate-400">
@@ -100,7 +100,7 @@ export default function ScenarioAnalysis() {
                 {ready.map((policy) => (
                   <li key={policy.policy_id}>
                     <label
-                      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3.5 text-sm transition ${selected.includes(policy.policy_id) ? 'border-blue-300 bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}
+                      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3.5 text-sm transition ${selected.includes(policy.policy_id) ? 'border-blue-300 bg-blue-50' : 'border-slate-200 hover:border-blue-300'}`}
                     >
                       <input
                         type="checkbox"

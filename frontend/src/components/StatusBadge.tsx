@@ -23,10 +23,11 @@ export function StatusBadge({ status }: { status: CoverageStatus }) {
   );
 }
 
-/** Shown when Agent 3 set `potential_gap`. */
+/** Shown when Agent 3 set `potential_gap`. `text-canvas` is the page colour: dark on the pale
+ *  screen red, near-white on the deep print red. */
 export function GapTag() {
   return (
-    <span className={`${PILL} border-status-excluded bg-status-excluded text-white`}>
+    <span className={`${PILL} border-status-excluded bg-status-excluded text-canvas`}>
       Potential gap
     </span>
   );

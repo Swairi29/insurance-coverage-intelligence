@@ -19,11 +19,13 @@
     --color-brand-soft: 13 32 57;
     --color-brand-border: 37 70 109;
     --color-brand-muted: 203 216 234;
-    --color-ai: 37 99 235;
-    --color-ai-bright: 56 189 248;
-    --color-ai-dark: 29 78 216;
-    --color-ai-tint: 11 38 61;
-    --color-ai-border: 29 75 112;
+    /* Indigo, so AI actions stay distinct from the blue `brand` (about 4.4:1 both as text on
+       the page and under white button text). */
+    --color-ai: 99 102 241;
+    --color-ai-bright: 129 140 248;
+    --color-ai-dark: 79 70 229;
+    --color-ai-tint: 26 27 70;
+    --color-ai-border: 55 48 163;
     --color-status-covered: 110 231 183;
     --color-status-covered-bg: 16 42 42;
     --color-status-covered-border: 29 90 76;
@@ -40,9 +42,10 @@
     --color-status-excluded-bg: 53 29 42;
     --color-status-excluded-border: 113 51 68;
     --color-status-excluded-dot: 251 113 133;
+    /* Outlined (card background, bright border) so it is told apart from the filled excluded. */
     --color-status-notfound: 253 164 175;
-    --color-status-notfound-bg: 53 29 42;
-    --color-status-notfound-border: 113 51 68;
+    --color-status-notfound-bg: 11 25 48;
+    --color-status-notfound-border: 251 113 133;
     --color-status-notfound-dot: 251 113 133;
   }
   body {
@@ -177,6 +180,18 @@
     .dark-ui [class~='border-emerald-100'],
     .dark-ui [class~='border-cyan-200'] {
       border-color: #354a66;
+    }
+    .dark-ui [class~='border-amber-100'],
+    .dark-ui [class~='border-rose-100'],
+    .dark-ui [class~='border-cyan-100'],
+    .dark-ui [class~='border-indigo-100'],
+    .dark-ui [class~='border-blue-100'] {
+      border-color: #263a56;
+    }
+    /* Blue borders mark a highlighted or selected item: keep them blue, just not glaring. */
+    .dark-ui [class~='border-blue-200'],
+    .dark-ui [class~='border-blue-300'] {
+      border-color: #2f5f9e;
     }
     .dark-ui input,
     .dark-ui select,

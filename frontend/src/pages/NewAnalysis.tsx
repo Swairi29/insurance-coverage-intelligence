@@ -71,7 +71,7 @@ function AnalysisMethodChooser() {
           </p>
           <Link
             to="/app/analyses/new/scenario"
-            className="mt-7 inline-flex items-center gap-2 rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-800 hover:border-blue-300 hover:bg-blue-50"
+            className="mt-7 inline-flex items-center gap-2 rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-800 hover:border-blue-300 hover:bg-white/5"
           >
             Continue <span aria-hidden="true">→</span>
           </Link>
