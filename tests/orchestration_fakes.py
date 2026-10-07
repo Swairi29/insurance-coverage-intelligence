@@ -28,6 +28,7 @@ COVERAGE_PATH = "/api/v1/analyse-coverage"
 REPORT_PATH = "/api/v1/generate-report"
 UPLOAD_PATH = "/api/v1/policies"
 QUESTION_PATH = "/api/v1/answer-question"
+SCENARIO_RISK_PATH = "/api/v1/scenario-risk-profile"
 
 URLS = AgentUrls(risk="http://risk.test", policy="http://policy.test",
                  coverage="http://coverage.test", explanation="http://explanation.test")
@@ -80,6 +81,7 @@ class FakeAgents:
         self.down_hosts: set = set()
         self._routes = {
             RISK_PATH: self._risk_profile,
+            SCENARIO_RISK_PATH: self._scenario_risks,
             EVIDENCE_PATH: self._evidence,
             COVERAGE_PATH: self._coverage,
             REPORT_PATH: self._report,
@@ -123,6 +125,16 @@ class FakeAgents:
             "risks": self.risks,
             "warnings": [],
             "metadata": {"taxonomy_version": "1.0", "llm_used": False, "processing_ms": 1},
+        })
+
+    def _scenario_risks(self, request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={
+            "risks": [{
+                "risk_id": "oven_fire", "name": "Commercial oven fire", "category": "property",
+                "description": "A commercial oven may cause a fire.",
+                "reason": "The scenario says commercial ovens are used in a bakery.",
+                "confidence": 0.88, "evidence": [{"text": "commercial ovens", "source": "scenario"}],
+            }], "warnings": [], "llm_used": True,
         })
 
     def _evidence(self, request: httpx.Request) -> httpx.Response:

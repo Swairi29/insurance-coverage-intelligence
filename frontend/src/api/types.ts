@@ -177,6 +177,29 @@ export interface IdentifiedRisk {
   evidence: RiskInputEvidence[];
 }
 
+export interface ScenarioRisk {
+  risk_id: string;
+  name: string;
+  category: string;
+  description: string;
+  reason: string;
+  confidence: number;
+  evidence: { text: string; source: string }[];
+}
+
+export interface ScenarioAnalysisResponse {
+  request_id: string;
+  business_id: string;
+  status: AnalysisStatus;
+  created_at: string;
+  risks: ScenarioRisk[];
+  llm_used: boolean;
+  coverage: CoverageAnalysisResponse;
+  report: ExplanationResponse | null;
+  warnings: string[];
+  stage_ms: Record<string, number>;
+}
+
 export interface ProfileWarning {
   code: ProfileWarningCode;
   field: string | null;

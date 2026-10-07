@@ -27,6 +27,7 @@ from shared.schemas.responses import (
     RunState,
     StageProgress,
     StageState,
+    ScenarioAnalysisResponse,
 )
 
 # How long a finished run stays in memory (it is in the database anyway).
@@ -37,9 +38,12 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _queued_stages() -> list:
+def _queued_stages(*, scenario: bool = False) -> list:
     return [
-        StageProgress(stage=stage.value, agent=STAGE_AGENTS[stage], endpoint=f"POST {STAGE_PATHS[stage]}")
+        StageProgress(stage=stage.value, agent=STAGE_AGENTS[stage], endpoint=(
+            "POST /api/v1/scenario-risk-profile" if scenario and stage is Stage.RISK_PROFILE
+            else f"POST {STAGE_PATHS[stage]}"
+        ))
         for stage in ANALYSIS_STAGES
     ]
 
@@ -49,6 +53,7 @@ class Job:
     user_id: str
     progress: AnalysisProgress
     result: Optional[AnalysisResponse] = None
+    scenario_result: Optional[ScenarioAnalysisResponse] = None
     finished_at: Optional[float] = None  # monotonic
 
 
@@ -62,10 +67,10 @@ class JobStore:
 
     # --- lifecycle --------------------------------------------------------------------------
 
-    def create(self, request_id: str, user_id: str) -> AnalysisProgress:
+    def create(self, request_id: str, user_id: str, *, scenario: bool = False) -> AnalysisProgress:
         now = _now()
         progress = AnalysisProgress(request_id=request_id, state=RunState.RUNNING, created_at=now,
-                                    updated_at=now, stages=_queued_stages())
+                                    updated_at=now, stages=_queued_stages(scenario=scenario))
         with self._lock:
             self._prune()
             self._jobs[request_id] = Job(user_id=user_id, progress=progress)
@@ -81,6 +86,17 @@ class JobStore:
             if job is None:
                 return
             job.result = result
+            job.progress.state = state
+            job.progress.updated_at = _now()
+            job.finished_at = self._clock()
+
+    def complete_scenario(self, request_id: str, result: ScenarioAnalysisResponse) -> None:
+        state = RunState.COMPLETE if result.status is AnalysisStatus.COMPLETE else RunState.PARTIAL
+        with self._lock:
+            job = self._jobs.get(request_id)
+            if job is None:
+                return
+            job.scenario_result = result
             job.progress.state = state
             job.progress.updated_at = _now()
             job.finished_at = self._clock()
@@ -117,7 +133,7 @@ class JobStore:
             if job is None or job.user_id != user_id:
                 return None
             return Job(user_id=job.user_id, progress=job.progress.model_copy(deep=True),
-                       result=job.result, finished_at=job.finished_at)
+                       result=job.result, scenario_result=job.scenario_result, finished_at=job.finished_at)
 
     # --- stage updates (called from the background task) -----------------------------------------
 

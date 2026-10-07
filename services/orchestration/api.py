@@ -41,10 +41,10 @@ from services.orchestration.auth import (
 )
 from services.orchestration.database import Database, DuplicateEmailError, UserRecord, get_database
 from services.orchestration.jobs import JobStore, get_job_store, progress_from_analysis
-from services.orchestration.pipeline import AgentCallError, AnalysisPipeline, ErrorKind, PipelineResult
+from services.orchestration.pipeline import AgentCallError, AnalysisPipeline, ErrorKind, PipelineResult, Stage
 from shared.config.settings import get_settings
 from shared.models.policy import PolicyDocument
-from shared.schemas.requests import AnalysisRequest, AskQuestionRequest, LoginRequest, RegisterRequest
+from shared.schemas.requests import AnalysisRequest, AskQuestionRequest, LoginRequest, RegisterRequest, ScenarioAnalysisRequest
 from shared.schemas.responses import (
     AnalysisProgress,
     AnalysisResponse,
@@ -55,6 +55,7 @@ from shared.schemas.responses import (
     PolicyUploadResponse,
     QuestionAnswerResponse,
     RunState,
+    ScenarioAnalysisResponse,
     TokenResponse,
     UserResponse,
 )
@@ -278,6 +279,85 @@ def run_analysis(
     response.headers["X-Request-ID"] = request_id
     response.headers["Location"] = f"/api/v1/analyses/{request_id}/status"
     return progress
+
+
+@app.post("/api/v1/scenario-analyses", status_code=202, response_model=AnalysisProgress)
+def run_scenario_analysis(
+    body: ScenarioAnalysisRequest,
+    response: Response,
+    background: BackgroundTasks,
+    user: UserRecord = Depends(get_current_user),
+    db: Database = Depends(get_database),
+    pipeline: AnalysisPipeline = Depends(get_pipeline),
+    jobs: JobStore = Depends(get_job_store),
+):
+    """Start the separate scenario-to-report path; identity comes only from JWT."""
+    request_id = _new_request_id()
+    if db.owned_policy_ids(user.business_id, body.policy_ids) != set(body.policy_ids):
+        return _error(404, "policy_not_found", "One or more policies were not found for your account.",
+                      request_id=request_id)
+    progress = jobs.create(request_id, user.user_id, scenario=True)
+    background.add_task(_run_scenario_analysis_job, pipeline, jobs, user, body, request_id)
+    response.headers["X-Request-ID"] = request_id
+    response.headers["Location"] = f"/api/v1/scenario-analyses/{request_id}/status"
+    return progress
+
+
+def _run_scenario_analysis_job(pipeline: AnalysisPipeline, jobs: JobStore, user: UserRecord,
+                               body: ScenarioAnalysisRequest, request_id: str) -> None:
+    try:
+        risks, coverage, report, warnings, stage_ms = pipeline.run_scenario(
+            request_id=request_id, business_id=user.business_id, scenario=body.scenario,
+            policy_ids=body.policy_ids, progress=jobs.reporter(request_id),
+        )
+    except AgentCallError as exc:
+        if exc.stage is Stage.RISK_PROFILE:
+            error = GatewayError(error="scenario_risk_failed",
+                                 message="Scenario risk identification could not be completed. Please try again.",
+                                 stage=exc.stage.value, request_id=request_id)
+        else:
+            _, message = _AGENT_ERRORS[exc.kind]
+            error = GatewayError(error=exc.kind.value, message=message,
+                                 stage=exc.stage.value, request_id=request_id)
+        jobs.fail(request_id, error)
+        return
+    except Exception as exc:
+        logger.error("Scenario analysis crashed (%s) (request %s).", type(exc).__name__, request_id)
+        jobs.fail(request_id, GatewayError(error="scenario_analysis_failed",
+            message="Scenario Analysis could not be completed. Please try again.", request_id=request_id))
+        return
+    result = ScenarioAnalysisResponse(
+        request_id=request_id, business_id=user.business_id,
+        status=AnalysisStatus.COMPLETE if report else AnalysisStatus.PARTIAL,
+        created_at=datetime.now(timezone.utc), risks=risks.risks, llm_used=risks.llm_used,
+        coverage=coverage, report=report, warnings=warnings, stage_ms=stage_ms,
+    )
+    jobs.complete_scenario(request_id, result)
+
+
+@app.get("/api/v1/scenario-analyses/{request_id}/status", response_model=AnalysisProgress)
+def scenario_analysis_status(request_id: str, user: UserRecord = Depends(get_current_user),
+                              jobs: JobStore = Depends(get_job_store)):
+    job = jobs.get(request_id, user.user_id)
+    if job is None:
+        return _error(404, "scenario_analysis_not_found", "Scenario Analysis not found.")
+    return job.progress
+
+
+@app.get("/api/v1/scenario-analyses/{request_id}", response_model=ScenarioAnalysisResponse)
+def get_scenario_analysis(request_id: str, user: UserRecord = Depends(get_current_user),
+                          jobs: JobStore = Depends(get_job_store)):
+    job = jobs.get(request_id, user.user_id)
+    if job is None:
+        return _error(404, "scenario_analysis_not_found", "Scenario Analysis not found.")
+    if job.progress.state is RunState.RUNNING:
+        return _error(409, "scenario_analysis_running", "Scenario Analysis is still running.", request_id=request_id)
+    if job.progress.state is RunState.FAILED:
+        return _error(502, job.progress.error.error, job.progress.error.message,
+                      stage=job.progress.error.stage, request_id=request_id)
+    if job.scenario_result is None:
+        return _error(404, "scenario_analysis_not_found", "Scenario Analysis not found.")
+    return job.scenario_result
 
 
 def _run_analysis_job(pipeline: AnalysisPipeline, jobs: JobStore, db: Database, user: UserRecord,

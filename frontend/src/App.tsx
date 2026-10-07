@@ -14,6 +14,7 @@ import ResultsPage from './pages/Results/ResultsPage';
 import Policies from './pages/Policies';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import ScenarioAnalysis from './pages/ScenarioAnalysis';
 
 export default function App() {
   return (
@@ -48,6 +49,7 @@ export default function App() {
         <Route path="profile" element={<BusinessProfile />} />
         <Route path="policies" element={<Policies />} />
         <Route path="analyses/new" element={<NewAnalysis />} />
+        <Route path="scenario-analysis" element={<ScenarioAnalysis />} />
         <Route path="analyses" element={<History />} />
         <Route path="analyses/:requestId" element={<ResultsPage />} />
         <Route path="analyses/:requestId/progress" element={<AnalysisWorkspace />} />

@@ -82,7 +82,7 @@ def analyse_coverage(
 
         service = CoverageAnalysisService(
             interpreter=interpreter,
-            use_llm=client is not None,
+            use_llm=False,
         )
 
         # ---------------------------------------------------------
