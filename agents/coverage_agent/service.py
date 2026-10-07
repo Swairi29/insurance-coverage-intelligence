@@ -174,16 +174,52 @@ class CoverageAnalysisService:
                 )
 
             except Exception as exc:
+
                 # -----------------------------------------------------
-                # Step 5: safe fallback
+
+                # Step 5: safe deterministic fallback
+
                 # -----------------------------------------------------
 
                 warnings.append(
+
                     f"The AI could not interpret the wording for '{risk.name}' "
+
                     f"({type(exc).__name__}); a rule-based reading was used instead."
+
                 )
 
-                assessments.append(self._wording_assessment(risk, evidence))
+                deterministic = decide_from_evidence(evidence)
+
+                assessments.append(
+
+                    CoverageAssessment(
+
+                        risk_id=risk.risk_id,
+
+                        risk_name=risk.name,
+
+                        status=deterministic.status,
+
+                        potential_gap=potential_gap_for_status(
+
+                            deterministic.status
+
+                        ),
+
+                        reason=deterministic.reason,
+
+                        evidence=evidence,
+
+                        confidence=deterministic.confidence,
+
+                        method=AnalysisMethod.RULES,
+
+                        matched_signals=deterministic.matched_signals,
+
+                    )
+
+                )
 
         processing_ms = int(
             (time.perf_counter() - started) * 1000
