@@ -1,36 +1,41 @@
 import type { Config } from 'tailwindcss';
 
-// Colours are defined once here (docs/frontend-plan.md §4). Components use the token names,
-// never hex values. Navy (`brand`) is the product itself; indigo (`ai`) marks what the AI does.
+/** A colour token backed by the `--color-<name>` variable (an "r g b" triplet), so opacity
+ *  modifiers such as `bg-brand/50` keep working. */
+const v = (name: string) => `rgb(var(--color-${name}) / <alpha-value>)`;
+
+// Colour tokens are named here and valued in src/index.css (docs/frontend-plan.md §4).
+// Components use the token names, never hex values. `brand` is the product itself; `ai` marks
+// what the AI does.
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        // Page background behind the white cards; a touch cool so the aurora glows blend in.
-        canvas: '#050b18',
-        ink: { DEFAULT: '#e5edf9', heading: '#f8fbff' },
-        // #5a6b82 keeps 4.5:1 contrast on every light background used, tints included.
-        muted: { DEFAULT: '#9aabc4', strong: '#bac8dc' },
-        // `strong` (slate-400) is for dashed drop-zone borders.
-        line: { DEFAULT: '#263a56', strong: '#3b5272' },
+        // Every colour except the aurora is a CSS variable (src/index.css): the dark palette on
+        // screen, the original light palette when printing, so a printed report is dark on white.
+        canvas: v('canvas'),
+        ink: { DEFAULT: v('ink'), heading: v('ink-heading') },
+        muted: { DEFAULT: v('muted'), strong: v('muted-strong') },
+        // `strong` is for dashed drop-zone borders.
+        line: { DEFAULT: v('line'), strong: v('line-strong') },
         brand: {
-          DEFAULT: '#2563eb',
-          dark: '#1d4ed8',
-          tint: '#102746',
-          soft: '#0d2039',
-          border: '#25466d',
-          // Secondary text on a navy background (7:1).
-          muted: '#cbd8ea',
+          DEFAULT: v('brand'),
+          dark: v('brand-dark'),
+          tint: v('brand-tint'),
+          soft: v('brand-soft'),
+          border: v('brand-border'),
+          // Secondary text on a navy background.
+          muted: v('brand-muted'),
         },
-        // The AI layer. DEFAULT is for text and filled buttons (6.3:1 with white); `bright`
-        // (#6366f1, only 4.47:1) is for spinners, bars, borders and focus rings, never text.
+        // The AI layer. DEFAULT is for text and filled buttons; `bright` is for spinners, bars,
+        // borders and focus rings, never text.
         ai: {
-          DEFAULT: '#2563eb',
-          bright: '#38bdf8',
-          dark: '#1d4ed8',
-          tint: '#0b263d',
-          border: '#1d4b70',
+          DEFAULT: v('ai'),
+          bright: v('ai-bright'),
+          dark: v('ai-dark'),
+          tint: v('ai-tint'),
+          border: v('ai-border'),
         },
         // Soft glows for `.bg-aurora` (landing hero and auth pages only, never behind data).
         aurora: {
@@ -41,13 +46,17 @@ export default {
         },
         // Coverage status colours. Always paired with a text label, never colour alone.
         // `dot` is too light for text: only for dots, bars and card edges.
-        status: {
-          covered: { DEFAULT: '#6ee7b7', bg: '#102a2a', border: '#1d5a4c', dot: '#34d399' },
-          conditional: { DEFAULT: '#fcd34d', bg: '#302819', border: '#705522', dot: '#fbbf24' },
-          unclear: { DEFAULT: '#cbd5e1', bg: '#202b3a', border: '#46566c', dot: '#94a3b8' },
-          excluded: { DEFAULT: '#fda4af', bg: '#351d2a', border: '#713344', dot: '#fb7185' },
-          notfound: { DEFAULT: '#fda4af', bg: '#351d2a', border: '#713344', dot: '#fb7185' },
-        },
+        status: Object.fromEntries(
+          ['covered', 'conditional', 'unclear', 'excluded', 'notfound'].map((status) => [
+            status,
+            {
+              DEFAULT: v(`status-${status}`),
+              bg: v(`status-${status}-bg`),
+              border: v(`status-${status}-border`),
+              dot: v(`status-${status}-dot`),
+            },
+          ]),
+        ),
       },
       fontFamily: {
         sans: ['"DM Sans"', 'system-ui', 'sans-serif'],

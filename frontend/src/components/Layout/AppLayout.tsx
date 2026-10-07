@@ -28,14 +28,14 @@ export function AppLayout() {
   };
 
   return (
-    <div className="dark-ui min-h-screen bg-[#050b18] text-slate-100 lg:flex">
+    <div className="dark-ui min-h-screen bg-[#050b18] text-slate-100 lg:flex print:block print:min-h-0 print:bg-white print:text-ink">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:p-3 focus:text-blue-700"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:p-3 focus:text-blue-700 print:hidden"
       >
         Skip to content
       </a>
-      <aside className="hidden w-[250px] shrink-0 flex-col border-r border-white/10 bg-[#071225] px-4 py-6 text-white lg:fixed lg:inset-y-0 lg:flex">
+      <aside className="hidden w-[250px] shrink-0 flex-col border-r border-white/10 bg-[#071225] px-4 py-6 text-white lg:fixed lg:inset-y-0 lg:flex print:hidden">
         <Brand to="/app" tone="dark" />
         <p className="mb-3 mt-10 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
           Workspace
@@ -106,12 +106,12 @@ export function AppLayout() {
       {mobileOpen && (
         <button
           aria-label="Close navigation"
-          className="fixed inset-0 z-40 bg-slate-950/60 lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-950/60 lg:hidden print:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col border-r border-white/10 bg-[#071225] px-4 py-6 text-white transition-transform lg:hidden ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col border-r border-white/10 bg-[#071225] px-4 py-6 text-white transition-transform lg:hidden print:hidden ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="flex items-center justify-between">
           <Brand to="/app" tone="dark" />
@@ -143,8 +143,8 @@ export function AppLayout() {
         </Link>
       </aside>
 
-      <div className="min-w-0 flex-1 lg:ml-[250px]">
-        <header className="sticky top-0 z-30 flex h-[72px] items-center justify-between border-b border-white/10 bg-[#071225]/90 px-4 text-white backdrop-blur sm:px-7 lg:px-10">
+      <div className="min-w-0 flex-1 lg:ml-[250px] print:ml-0">
+        <header className="sticky top-0 z-30 flex h-[72px] items-center justify-between border-b border-white/10 bg-[#071225]/90 px-4 text-white backdrop-blur sm:px-7 lg:px-10 print:hidden">
           <div className="flex items-center gap-3">
             <button
               aria-label="Open navigation"
@@ -173,7 +173,7 @@ export function AppLayout() {
         </header>
         <main
           id="main"
-          className="mx-auto min-h-[calc(100vh-72px)] max-w-[1500px] px-4 py-6 sm:px-7 sm:py-8 lg:px-10 lg:py-10"
+          className="mx-auto min-h-[calc(100vh-72px)] max-w-[1500px] px-4 py-6 sm:px-7 sm:py-8 lg:px-10 lg:py-10 print:min-h-0 print:max-w-none print:px-[14mm] print:py-0"
         >
           <Outlet />
         </main>
