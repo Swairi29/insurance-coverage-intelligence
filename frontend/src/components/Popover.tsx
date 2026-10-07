@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 /**
- * A button that opens a small panel below it. Closes on Escape (focus returns to the button)
- * and on a click outside. Used for the service status and the user menu.
+ * A button that opens a small panel below it (or above, near the bottom of the screen). Closes
+ * on Escape (focus returns to the button) and on a click outside. Used for the service status
+ * and the user menu.
  */
 export function Popover({
   trigger,
@@ -10,6 +11,7 @@ export function Popover({
   triggerClassName,
   title,
   align = 'right',
+  side = 'below',
   children,
 }: {
   trigger: ReactNode;
@@ -19,6 +21,8 @@ export function Popover({
   /** `title` attribute of the button (tooltip). */
   title?: string;
   align?: 'left' | 'right';
+  /** `above` for a button at the bottom of the screen, where a panel below would be cut off. */
+  side?: 'below' | 'above';
   children: (close: () => void) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -62,9 +66,9 @@ export function Popover({
       {open && (
         <div
           id={panelId}
-          className={`absolute top-full z-40 mt-2 w-72 rounded-panel border border-line bg-white p-3 shadow-lift ${
-            align === 'right' ? 'right-0' : 'left-0'
-          }`}
+          className={`absolute z-40 w-72 rounded-panel border border-line bg-white p-3 shadow-lift ${
+            side === 'below' ? 'top-full mt-2' : 'bottom-full mb-2'
+          } ${align === 'right' ? 'right-0' : 'left-0'}`}
         >
           {children(() => setOpen(false))}
         </div>

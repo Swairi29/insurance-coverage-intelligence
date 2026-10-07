@@ -32,7 +32,7 @@ export default function ScenarioAnalysis() {
       onSuccess: (progress) => {
         // Kept for the History label and the workspace's "Retry analysis" button.
         rememberScenarioAnalysis(progress.request_id, progress.created_at, body);
-        navigate(`/app/analyses/${progress.request_id}/running?source=scenario`, {
+        navigate(`/app/analyses/${progress.request_id}/progress?source=scenario`, {
           state: { analysisLabel: scenarioLabel(progress.request_id) },
         });
       },

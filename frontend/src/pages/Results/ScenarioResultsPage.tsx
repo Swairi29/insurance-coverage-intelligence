@@ -64,7 +64,7 @@ export function ScenarioResultsPage({ analysis }: { analysis: ScenarioAnalysisRe
         </Link>
         <div className="flex flex-wrap items-center gap-2">
           <Link
-            to={`/app/analyses/${analysis.request_id}/running?source=scenario`}
+            to={`/app/analyses/${analysis.request_id}/progress?source=scenario`}
             className="px-3 py-2 text-sm font-semibold text-blue-300 hover:underline"
           >
             View analysis stages

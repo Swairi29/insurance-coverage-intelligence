@@ -50,14 +50,15 @@ describe('accessibility (axe)', () => {
       SESSION_KEYS.profileDraft,
       JSON.stringify({ business_name: 'Test Bakery', business_type: 'bakery' }),
     );
-    const { user } = renderApp('/app/analyses/new');
+    const { user } = renderApp('/app/analyses/new/profile');
     await screen.findByRole('checkbox', { name: /sunrise-business-pack/ });
-    await user.click(screen.getByRole('button', { name: 'Run analysis' }));
+    await user.click(screen.getByRole('button', { name: 'Start analysis' }));
     await screen.findByRole('heading', { name: 'Analysis complete' });
     await expectNoViolations();
   });
 
-  it('results with the evidence drawer open', async () => {
+  // Two axe passes over the full coverage table: allow more than the default 15 s on a busy run.
+  it('results with the evidence drawer open', { timeout: 30_000 }, async () => {
     loginAsDemoUser();
     const { user } = renderApp(`/app/analyses/${allStatusesAnalysis.request_id}?tab=coverage`);
     const table = await screen.findByRole('table');

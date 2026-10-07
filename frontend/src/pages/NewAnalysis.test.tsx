@@ -24,12 +24,12 @@ function saveDraft(overrides: Partial<BusinessProfile> = {}) {
 
 async function openNewAnalysis() {
   loginAsDemoUser();
-  const result = renderApp('/app/analyses/new');
+  const result = renderApp('/app/analyses/new/profile');
   await screen.findByRole('heading', { name: 'New analysis' });
   return result;
 }
 
-const runButton = () => screen.getByRole('button', { name: 'Run analysis' });
+const runButton = () => screen.getByRole('button', { name: 'Start analysis' });
 const policyBox = (filename: string) =>
   screen.getByRole('checkbox', { name: new RegExp(filename) });
 
@@ -44,7 +44,7 @@ function manyPolicies(count: number): PolicyDocument[] {
 describe('new analysis: setup', () => {
   it('sends a user without a profile to the profile page first', async () => {
     loginAsDemoUser();
-    renderApp('/app/analyses/new');
+    renderApp('/app/analyses/new/profile');
 
     expect(
       await screen.findByText('Add your business profile first. It is sent with every analysis.'),
@@ -338,6 +338,6 @@ describe('new analysis: errors', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'policy_ids must not contain duplicates.',
     );
-    expect(location()).toBe('/app/analyses/new');
+    expect(location()).toBe('/app/analyses/new/profile');
   });
 });

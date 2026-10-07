@@ -110,7 +110,7 @@ function NewAnalysisForm({ profile }: { profile: BusinessProfile }) {
       onSuccess: (progress) => {
         // Kept for the workspace's "Retry analysis" button.
         rememberAnalysisRequest(progress.request_id, body);
-        navigate(`/app/analyses/${progress.request_id}/running`, {
+        navigate(`/app/analyses/${progress.request_id}/progress`, {
           state: { analysisLabel: profile.business_name },
         });
       },

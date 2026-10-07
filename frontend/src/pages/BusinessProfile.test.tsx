@@ -60,8 +60,8 @@ describe('business profile form', () => {
     await user.type(screen.getByLabelText(/Business name/), 'Sunrise Bakery');
     await user.selectOptions(screen.getByLabelText(/Type of business/), 'bakery');
     await user.type(screen.getByLabelText('Number of employees'), '8');
-    await user.type(screen.getByLabelText('Equipment'), 'Ovens{Enter}');
-    await user.type(screen.getByLabelText('Equipment'), 'Mixers,');
+    await user.type(screen.getByLabelText('Equipment and systems'), 'Ovens{Enter}');
+    await user.type(screen.getByLabelText('Equipment and systems'), 'Mixers,');
     await user.click(screen.getByRole('checkbox', { name: 'Delivery' }));
     await user.click(within(question('Do you accept card payments?')).getByLabelText('Yes'));
     await user.click(within(question('Do you handle cash?')).getByLabelText('No'));
@@ -102,7 +102,7 @@ describe('business profile form', () => {
 
   it('ignores duplicate equipment and lets items be removed', async () => {
     const { user } = await openProfile();
-    const equipment = screen.getByLabelText('Equipment');
+    const equipment = screen.getByLabelText('Equipment and systems');
 
     await user.type(equipment, 'Ovens{Enter}');
     await user.type(equipment, 'ovens{Enter}');

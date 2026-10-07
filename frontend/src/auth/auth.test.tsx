@@ -260,13 +260,22 @@ describe('navigation', () => {
     await screen.findByText('Your workspace');
 
     const nav = screen.getByRole('navigation', { name: 'Main' });
-    await user.click(within(nav).getByRole('link', { name: 'New analysis' }));
-
-    await waitFor(() => expect(location()).toBe('/app/analyses/new'));
-    expect(within(nav).getByRole('link', { name: 'New analysis' })).toHaveAttribute(
+    expect(within(nav).getByRole('link', { name: 'Overview' })).toHaveAttribute(
       'aria-current',
       'page',
     );
+    await user.click(within(nav).getByRole('link', { name: 'History' }));
+
+    await waitFor(() => expect(location()).toBe('/app/analyses'));
+    expect(within(nav).getByRole('link', { name: 'History' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(nav).getByRole('link', { name: 'Overview' })).not.toHaveAttribute('aria-current');
+
+    // Starting an analysis is not History: the nav item only marks the list itself.
+    await user.click(screen.getAllByRole('link', { name: /New Analysis/ })[0]);
+    await waitFor(() => expect(location()).toBe('/app/analyses/new'));
     expect(within(nav).getByRole('link', { name: 'History' })).not.toHaveAttribute('aria-current');
   });
 });

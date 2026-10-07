@@ -38,7 +38,7 @@ export function AppLayout() {
       </a>
       <aside
         aria-label="Sidebar"
-        className="hidden w-[250px] shrink-0 flex-col border-r border-white/10 bg-[#071225] px-4 py-6 text-white lg:fixed lg:inset-y-0 lg:flex print:hidden"
+        className="hidden w-[250px] shrink-0 lg:z-40 flex-col border-r border-white/10 bg-[#071225] px-4 py-6 text-white lg:fixed lg:inset-y-0 lg:flex print:hidden"
       >
         <Brand to="/app" tone="dark" />
         <p className="mb-3 mt-10 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
@@ -65,8 +65,10 @@ export function AppLayout() {
             New Analysis
           </Link>
           <div className="mt-5 border-t border-white/10 pt-4">
+            {/* At the bottom of the sidebar, so the menu opens upwards. */}
             <Popover
-              triggerLabel={`Account menu for ${user?.email ?? 'your account'}`}
+              side="above"
+              align="left"
               triggerClassName="flex w-full items-center gap-3 rounded-xl p-2 text-left hover:bg-white/5"
               trigger={
                 <>
@@ -86,22 +88,7 @@ export function AppLayout() {
                 </>
               }
             >
-              {(close) => (
-                <div className="min-w-48">
-                  <p className="px-2 text-xs text-muted">Signed in as</p>
-                  <p className="truncate px-2 py-1 text-sm font-semibold">{user?.email}</p>
-                  <div className="my-2 border-t border-line" />
-                  <button
-                    className="w-full rounded px-2 py-2 text-left text-sm hover:bg-canvas"
-                    onClick={() => {
-                      close();
-                      signOut();
-                    }}
-                  >
-                    Log out
-                  </button>
-                </div>
-              )}
+              {(close) => <AccountMenu email={user?.email} close={close} onSignOut={signOut} />}
             </Popover>
           </div>
         </div>
@@ -165,13 +152,13 @@ export function AppLayout() {
           <div className="flex items-center gap-3">
             {/* Live: polls /health/agents and lists any agent that is down. */}
             <AgentStatus tone="dark" />
-            <Link
-              to="/app/settings"
-              aria-label="Account settings"
-              className="grid h-10 w-10 place-items-center rounded-full bg-[#102449] text-xs font-bold text-white"
+            <Popover
+              triggerLabel={`Account menu for ${user?.email ?? 'your account'}`}
+              triggerClassName="grid h-10 w-10 place-items-center rounded-full bg-[#102449] text-xs font-bold text-white hover:bg-blue-900"
+              trigger={<span aria-hidden="true">{initials(user?.email)}</span>}
             >
-              {initials(user?.email)}
-            </Link>
+              {(close) => <AccountMenu email={user?.email} close={close} onSignOut={signOut} />}
+            </Popover>
           </div>
         </header>
         <main
@@ -181,6 +168,42 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+    </div>
+  );
+}
+
+/** The account menu, opened from the header avatar or the sidebar account button. */
+function AccountMenu({
+  email,
+  close,
+  onSignOut,
+}: {
+  email: string | undefined;
+  close: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <div className="min-w-48">
+      <p className="px-2 text-xs text-muted">Signed in as</p>
+      <p className="truncate px-2 py-1 text-sm font-semibold text-ink-heading">{email}</p>
+      <div className="my-2 border-t border-line" />
+      <Link
+        to="/app/settings"
+        onClick={close}
+        className="block rounded px-2 py-2 text-sm text-ink hover:bg-white/5"
+      >
+        Settings
+      </Link>
+      <button
+        type="button"
+        className="w-full rounded px-2 py-2 text-left text-sm text-ink hover:bg-white/5"
+        onClick={() => {
+          close();
+          onSignOut();
+        }}
+      >
+        Log out
+      </button>
     </div>
   );
 }

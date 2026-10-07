@@ -1,5 +1,5 @@
 // All routes (docs/frontend-plan.md §4).
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { PublicOnly, RequireAuth } from './auth/RequireAuth';
 import { AppLayout } from './components/Layout/AppLayout';
 import AnalysisWorkspace from './pages/AnalysisWorkspace';
@@ -17,7 +17,6 @@ import Register from './pages/auth/Register';
 import ScenarioAnalysis from './pages/ScenarioAnalysis';
 import Businesses from './pages/Businesses';
 import SettingsPage from './pages/Settings';
-import { Navigate } from 'react-router-dom';
 
 export default function App() {
   return (
@@ -64,7 +63,6 @@ export default function App() {
         <Route path="history" element={<Navigate to="/app/analyses" replace />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="analyses/:requestId" element={<ResultsPage />} />
-        <Route path="analyses/:requestId/running" element={<AnalysisWorkspace />} />
         <Route path="analyses/:requestId/progress" element={<AnalysisWorkspace />} />
         <Route path="*" element={<NotFound />} />
       </Route>

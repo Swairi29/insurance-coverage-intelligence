@@ -267,7 +267,7 @@ function FailureActions({ progress, scenario }: { progress: AnalysisProgress; sc
       startProfile.mutate(profileRequest, {
         onSuccess: (next) => {
           rememberAnalysisRequest(next.request_id, profileRequest);
-          navigate(`/app/analyses/${next.request_id}/running`, {
+          navigate(`/app/analyses/${next.request_id}/progress`, {
             state: { analysisLabel: profileRequest.business.business_name },
           });
         },
@@ -276,7 +276,7 @@ function FailureActions({ progress, scenario }: { progress: AnalysisProgress; sc
       startScenario.mutate(scenarioRequest, {
         onSuccess: (next) => {
           rememberScenarioAnalysis(next.request_id, next.created_at, scenarioRequest);
-          navigate(`/app/analyses/${next.request_id}/running?source=scenario`, {
+          navigate(`/app/analyses/${next.request_id}/progress?source=scenario`, {
             state: { analysisLabel: scenarioLabel(next.request_id) },
           });
         },
