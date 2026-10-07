@@ -342,6 +342,31 @@ class AnalysisRequest(BaseModel):
         return policy_ids
 
 
+class ScenarioAnalysisRequest(BaseModel):
+    """Gateway request for scenario analysis; identity is always taken from JWT."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    scenario: str = Field(min_length=10, max_length=4000)
+    policy_ids: List[str] = Field(min_length=1, max_length=5)
+
+    @field_validator("scenario")
+    @classmethod
+    def _scenario_contains_words(cls, value: str) -> str:
+        if not re.search(r"\w", value):
+            raise ValueError("scenario must contain words.")
+        return value
+
+    @field_validator("policy_ids")
+    @classmethod
+    def _unique_policy_ids(cls, policy_ids: List[str]) -> List[str]:
+        if len(policy_ids) != len(set(policy_ids)):
+            raise ValueError("policy_ids must not contain duplicates.")
+        if any(not 1 <= len(pid) <= 64 for pid in policy_ids):
+            raise ValueError("each policy_id must be 1-64 characters.")
+        return policy_ids
+
+
 class AskQuestionRequest(BaseModel):
     """Body of `POST /api/v1/analyses/{request_id}/questions`.
 

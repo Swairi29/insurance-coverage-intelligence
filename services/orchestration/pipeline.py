@@ -30,9 +30,12 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from agents.explanation_agent.mapping import build_explanation_request
+from services.orchestration.scenario_adapter import ScenarioRiskMappingError, adapt_scenario_risks
 from shared.config.settings import Settings
 from shared.models.business import BusinessProfile
-from shared.schemas.requests import QuestionRequest
+from shared.models.risk import IdentifiedRisk
+from shared.schemas.requests import ExplanationRequest, QuestionRequest
+from shared.schemas.scenario_responses import ScenarioRiskResponse
 from shared.schemas.responses import (
     AnalysisResponse,
     CoverageAnalysisResponse,
@@ -263,7 +266,7 @@ class AnalysisPipeline:
         progress.finished(Stage.RISK_PROFILE, f"{_count(len(profile.risks), 'risk')} identified")
 
         if profile.risks:
-            coverage = self._coverage(request_id, business_id, policy_ids, profile, stage_ms, progress)
+            coverage = self._coverage(request_id, business_id, policy_ids, profile.risks, stage_ms, progress)
         else:
             # Agents 2 and 3 require at least one risk.
             warnings.append(NO_RISKS_WARNING)
@@ -300,10 +303,55 @@ class AnalysisPipeline:
             stage_ms=stage_ms,
         )
 
+    def run_scenario(self, *, request_id: str, business_id: str, scenario: str,
+                     policy_ids: List[str], progress: Optional[ProgressReporter] = None) -> tuple[ScenarioRiskResponse, CoverageAnalysisResponse, Optional[ExplanationResponse], List[str], Dict[str, int]]:
+        """Run the flexible risk agent followed by the unchanged Agents 2–4 chain."""
+        progress = progress or _NoProgress()
+        stage_ms: Dict[str, int] = {}
+        warnings: List[str] = []
+        progress.started(Stage.RISK_PROFILE, "scenario")
+        scenario_result = self._timed(stage_ms, Stage.RISK_PROFILE, progress, lambda: self._client.post_json(
+            Stage.RISK_PROFILE, f"{self._urls.risk}/api/v1/scenario-risk-profile",
+            {"scenario": scenario}, request_id=request_id, timeout=self._timeout,
+            response_model=ScenarioRiskResponse,
+        ))
+        try:
+            risks = adapt_scenario_risks(scenario_result.risks, llm_used=scenario_result.llm_used)
+        except (ScenarioRiskMappingError, ValueError):
+            progress.failed(Stage.RISK_PROFILE, _FAILURE_REASONS[ErrorKind.BAD_RESPONSE])
+            raise AgentCallError(Stage.RISK_PROFILE, ErrorKind.BAD_RESPONSE) from None
+        progress.finished(Stage.RISK_PROFILE, f"{_count(len(risks), 'risk')} identified")
+
+        if risks:
+            coverage = self._coverage(request_id, business_id, policy_ids, risks, stage_ms, progress)
+        else:
+            warnings.append(NO_RISKS_WARNING)
+            for stage in (Stage.POLICY_EVIDENCE, Stage.COVERAGE):
+                progress.skipped(stage, "No risks to check")
+            coverage = CoverageAnalysisResponse(
+                request_id=request_id, business_id=business_id, metadata=CoverageMetadata(llm_used=False),
+            )
+        report: Optional[ExplanationResponse] = None
+        progress.started(Stage.REPORT, _count(len(coverage.assessments), "assessment"))
+        try:
+            report = self._timed(stage_ms, Stage.REPORT, progress, lambda: self._client.post_json(
+                Stage.REPORT, f"{self._urls.explanation}{STAGE_PATHS[Stage.REPORT]}",
+                ExplanationRequest(request_id=request_id, business_id=business_id, business_type=None,
+                                   risks=risks, assessments=coverage.assessments).model_dump(mode="json"),
+                request_id=request_id, timeout=self._report_timeout, response_model=ExplanationResponse,
+            ))
+            _check_echo(Stage.REPORT, report.request_id, request_id, progress)
+            progress.finished(Stage.REPORT, f"{_count(len(report.findings), 'finding')} written")
+        except AgentCallError:
+            warnings.append(REPORT_FAILED_WARNING)
+            report = None
+        warnings.extend(scenario_result.warnings)
+        return scenario_result, coverage, report, warnings, stage_ms
+
     def _coverage(self, request_id: str, business_id: str, policy_ids: List[str],
-                  profile: RiskProfileResponse, stage_ms: Dict[str, int],
+                  profile_risks: List[IdentifiedRisk], stage_ms: Dict[str, int],
                   progress: ProgressReporter) -> CoverageAnalysisResponse:
-        risks = [risk.model_dump(mode="json") for risk in profile.risks]
+        risks = [risk.model_dump(mode="json") for risk in profile_risks]
 
         progress.started(Stage.POLICY_EVIDENCE,
                          f"{_count(len(risks), 'risk')}, {_count(len(policy_ids), 'policy', 'policies')}")

@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/app/profile', label: 'Business profile', end: false },
   { to: '/app/policies', label: 'Policies', end: false },
   { to: '/app/analyses/new', label: 'New analysis', end: false },
+  { to: '/app/scenario-analysis', label: 'Scenario Analysis', end: false },
   { to: '/app/analyses', label: 'History', end: true },
 ];
 

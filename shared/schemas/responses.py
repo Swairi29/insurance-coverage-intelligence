@@ -16,6 +16,7 @@ from shared.models.analysis import EvidenceCitation, Finding, GeneratedBy, Repor
 from shared.models.business import BusinessType
 from shared.models.policy import PolicyDocument, RiskEvidenceResult
 from shared.models.risk import IdentifiedRisk
+from shared.models.scenario_risk import ScenarioRisk
 
 from shared.models.coverage import CoverageAssessment
 
@@ -276,6 +277,21 @@ class AnalysisResponse(BaseModel):
     risk_profile: RiskProfileResponse  # Agent 1
     coverage: CoverageAnalysisResponse  # Agent 3 (Coverage Results page)
     report: Optional[ExplanationResponse] = None  # Agent 4 (Report page); None when status is partial
+    warnings: List[str] = Field(default_factory=list)
+    stage_ms: dict[str, int] = Field(default_factory=dict)
+
+
+class ScenarioAnalysisResponse(BaseModel):
+    """Final response for the separate free-text scenario analysis path."""
+
+    request_id: str
+    business_id: str
+    status: AnalysisStatus
+    created_at: datetime
+    risks: List[ScenarioRisk] = Field(default_factory=list)
+    llm_used: bool
+    coverage: CoverageAnalysisResponse
+    report: Optional[ExplanationResponse] = None
     warnings: List[str] = Field(default_factory=list)
     stage_ms: dict[str, int] = Field(default_factory=dict)
 
