@@ -210,7 +210,7 @@ function Workspace({
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,.85fr)]">
         <section
           aria-labelledby="agents-title"
-          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+          className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
         >
           <h2 id="agents-title" className="text-lg font-bold text-slate-950">
             Analysis stages

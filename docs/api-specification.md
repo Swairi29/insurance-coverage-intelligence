@@ -325,6 +325,10 @@ Run: `uvicorn services.orchestration.api:app --port 8000 --reload`
 | `GET` | `/api/v1/analyses` | Bearer | The user's past runs (`AnalysisSummary[]`, newest first, max 50) |
 | `GET` | `/api/v1/analyses/{request_id}` | Bearer | One stored `AnalysisResponse`; 409 `analysis_running` while it runs; 404 if missing, failed or another user's |
 | `POST` | `/api/v1/analyses/{request_id}/questions` | Bearer | `{"question": "..."}` → Agent 4 → `QuestionAnswerResponse`; 404 if missing or another user's |
+| `POST` | `/api/v1/scenario-analyses` | Bearer | `ScenarioAnalysisRequest` → **202** `AnalysisProgress`; the same four agents run, starting from a free-text scenario |
+| `GET` | `/api/v1/scenario-analyses/{request_id}/status` | Bearer | `AnalysisProgress` for a scenario run; 404 if missing or another user's |
+| `GET` | `/api/v1/scenario-analyses` | Bearer | The user's saved scenario runs (`AnalysisSummary[]`, newest first, max 50) |
+| `GET` | `/api/v1/scenario-analyses/{request_id}` | Bearer | One `ScenarioAnalysisResponse`; 409 `scenario_analysis_running` while it runs; 502 with the stage if it failed; 404 if missing or another user's |
 
 "Bearer" means the header `Authorization: Bearer <access_token>`. The token expires after
 `JWT_EXPIRY_MINUTES`; then log in again.
@@ -405,6 +409,33 @@ restart the status of a saved analysis is rebuilt from its stored result.
 If Agent 1 finds no risks, Agents 2 and 3 are skipped (they need at least one risk) and the
 report has no findings.
 
+### Scenario analysis
+
+The second way to start an analysis: instead of a business profile, the user describes the
+business or situation in their own words. Agent 1 identifies the risks from that text
+(`POST /api/v1/scenario-risk-profile`), and the gateway maps them onto Agent 2's contract;
+Agents 2, 3 and 4 then run exactly as for a profile analysis. It uses the same 202-then-status
+pattern and the same `AnalysisProgress`; the first stage's `endpoint` is the scenario one.
+
+`ScenarioAnalysisRequest` (`shared/schemas/requests.py`):
+
+```json
+{ "scenario": "We run a small bakery in Kandy with two commercial ovens ...", "policy_ids": ["POL-3f2a9c81b0d4"] }
+```
+
+`scenario`: 10-4000 characters, must contain words. `policy_ids`: as for an analysis, 1-5,
+unique, and only the user's own (404 otherwise, before any agent is called).
+
+`ScenarioAnalysisResponse` (`shared/schemas/responses.py`) has the same `request_id`,
+`business_id`, `status`, `created_at`, `coverage`, `report`, `warnings` and `stage_ms` as an
+`AnalysisResponse`; instead of `risk_profile` it has `risks` (each with `name`, `category`,
+`description`, `reason`, `confidence` and the `evidence` quoted from the scenario) and
+`llm_used`.
+
+A finished scenario run is saved like a profile analysis (encrypted, table
+`scenario_analyses`), so it stays in History; failed runs are not saved. The scenario text
+itself is not stored, but a saved result can quote short parts of it as risk evidence.
+
 ### Errors
 
 | Code | When | Body |
@@ -416,7 +447,7 @@ report has no findings.
 | 413 | Upload over `MAX_UPLOAD_MB` (checked before Agent 2 is called) | `GatewayError` |
 | 400 | Agent 2 says the file is not a valid PDF | `GatewayError` |
 | 422 | Invalid body | `ErrorResponse`, without the input values |
-| 409 | The result of an analysis that is still running (`analysis_running`) | `GatewayError` |
+| 409 | The result of an analysis that is still running (`analysis_running`, `scenario_analysis_running`) | `GatewayError` |
 | 502 | An agent refused the call (4xx), failed (5xx) or broke the contract (uploads and questions) | `GatewayError` |
 | 503 | An agent could not be reached (uploads and questions), or login is not configured (`JWT_SECRET_KEY`) | `GatewayError` |
 | 504 | An agent timed out (uploads and questions) | `GatewayError` |
@@ -432,10 +463,11 @@ An Agent 4 failure is **not** an error: the run returns 200 with `status: "parti
 ### Storage
 
 SQLite file at `DATABASE_PATH` (default `./data/app.db`, gitignored), created on first use.
-Tables: `users` (bcrypt hash only), `policies` (which `policy_id` belongs to which business) and
-`analyses`. The full `AnalysisResponse` contains policy excerpts, so it is stored encrypted
-with `DOCUMENT_ENCRYPTION_KEY`, the same key Agent 2 uses for the PDFs. If the key is missing,
-the run is still returned, with a warning that it was not saved.
+Tables: `users` (bcrypt hash only), `policies` (which `policy_id` belongs to which business),
+`analyses` and `scenario_analyses`. The full results contain policy excerpts, so they are stored
+encrypted with `DOCUMENT_ENCRYPTION_KEY`, the same key Agent 2 uses for the PDFs; the summary
+columns (status, date, counts) are plain text for the History list. If the key is missing, the
+run is still returned, with a warning that it was not saved.
 
 ### Configuration
 

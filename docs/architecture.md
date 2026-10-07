@@ -11,7 +11,7 @@
  Orchestration gateway  :8000   services/orchestration/
    api.py       login, policy upload, analysis endpoints
    auth.py      bcrypt passwords, JWT sessions
-   database.py  SQLite: users, policies, analyses (results Fernet-encrypted)
+   database.py  SQLite: users, policies, analyses, scenario_analyses (results Fernet-encrypted)
    pipeline.py  calls the agents in order over HTTP
           │  X-API-Key + X-Request-ID on every call
           ├──────────────► Agent 1  Risk Profiling            :8001  agents/risk_agent/
@@ -44,6 +44,12 @@ models live in `shared/schemas/` and `shared/models/`, so every hop is validated
 
 3. The result is encrypted, saved in SQLite and returned. `GET /api/v1/analyses/{request_id}`
    reads it back later.
+
+**Scenario analysis** is the second way in: `POST /api/v1/scenario-analyses` with a free-text
+description instead of a business profile. Only the first stage differs: Agent 1's
+`/api/v1/scenario-risk-profile` reads the text, and the gateway maps its risks onto the same
+contract Agent 2 expects. Stages 2-4, the status endpoint and the encrypted storage (table
+`scenario_analyses`) work as above. See [api-specification.md](api-specification.md).
 
 ## Design rules
 
@@ -97,9 +103,12 @@ Form, Tailwind). The full plan and the checks done on it are in
   the tab ends it) and checked with `GET /auth/me` on load. Any 401 logs the user out.
 - **Business profile.** The gateway does not store it; the app keeps it in `sessionStorage` and
   sends it with each analysis. A 422 about the profile is shown next to the right form field.
+- **Two ways to start.** New Analysis asks whether to use the business profile or describe a
+  scenario in free text; both open the same agent workspace, and History lists both kinds.
 - **The analysis runs in the background.** `POST /api/v1/analyses` answers 202 at once; the
-  agent workspace (`/app/analyses/{id}/progress`) polls the status endpoint and shows each agent's
-  state, what the gateway handed to it and what came back (counts only). The gateway saves the
+  agent workspace (`/app/analyses/{id}/progress`) polls the status endpoint and shows each stage,
+  with each agent's card and the handoff log under "Show technical details": what the gateway
+  handed to each agent and what came back (counts only). The gateway saves the
   result to History even if the page is closed, and a failed run can be retried from the
   workspace.
 - **Showing results honestly.** Coverage status comes from Agent 3 and is shown with a colour *and*
@@ -107,9 +116,12 @@ Form, Tailwind). The full plan and the checks done on it are in
   used, confidence is a word (High/Medium/Low) rather than a percentage, the disclaimer is always
   visible, and a `partial` result says the report is missing instead of failing. Policy text is
   rendered as plain text only, and clauses flagged by Agent 2 are marked.
+- **Theme and printing.** The app uses a dark theme. Colours are CSS variables
+  (`frontend/src/index.css`): dark values on screen, the light palette when printing, so a
+  printed or PDF report is dark text on white.
 - **Mock API.** `npm run dev:mocks` and the tests use MSW with fixtures made from a real run of all
   four agents (`scripts/make_frontend_fixtures.py`), so the UI can be built and tested without the
-  backend or an LLM.
+  backend or an LLM. Scenario runs are not mocked; they need the backend.
 
 ## Running it
 

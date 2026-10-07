@@ -145,21 +145,28 @@ It is cleared on logout.
 ## 4. Pages and routes
 
 ```
-/                    Landing (public): hero, capabilities, "Get started"
-/login               Log in
-/register            Create account
-/app                 Dashboard: latest analysis summary, quick links      (logged in)
-/app/profile         Business profile form                                (logged in)
-/app/policies        Upload and list policy PDFs                          (logged in)
-/app/analyses/new    Choose policies + confirm profile → run → progress   (logged in)
-/app/analyses        History list                                         (logged in)
-/app/analyses/:id    Results: tabs Report | Coverage | Risk profile       (logged in)
-*                    Not found
+/                              Landing (public): hero, how it works, example, responsible AI, pricing
+/login, /register, /privacy    Log in, create account, privacy and consent notice
+/app                           Overview: setup checklist, latest analysis, recent analyses   (logged in)
+/app/businesses                The saved business profile                                    (logged in)
+/app/profile                   Business profile form                                         (logged in)
+/app/policies                  Upload and list policy PDFs                                   (logged in)
+/app/analyses/new              Choose how to describe the business: profile or scenario      (logged in)
+/app/analyses/new/profile      Choose policies + confirm profile → start                     (logged in)
+/app/analyses/new/scenario     Scenario text + policies → review → start                     (logged in)
+/app/analyses/:id/progress     Agent workspace (?source=scenario for a scenario run)         (logged in)
+/app/analyses                  History: profile and scenario runs                            (logged in)
+/app/analyses/:id              Results: tabs Report | Coverage | Risk profile                (logged in)
+/app/analyses/:id?source=scenario   Scenario results: Overview | Coverage | Risks | Evidence (logged in)
+/app/settings                  Account, responsible use, log out                             (logged in)
+*                              Not found
 ```
 
-The user flow: **Register → Profile → Upload policies → New analysis → Results**. The dashboard
-shows a 3-step checklist (profile done? at least one ready policy? an analysis run?) so new users
-know what to do next.
+`/app/history` and `/app/scenario-analysis` redirect to their current pages.
+
+The user flow: **Register → Profile → Upload policies → New analysis → Results**, or **New
+analysis → Describe a scenario → Results**. The Overview shows a 3-step checklist (profile done?
+at least one ready policy? an analysis run?) so new users know what to do next.
 
 ### Results page (`/app/analyses/:id`)
 
@@ -205,23 +212,26 @@ answers, lists the related risks and cites its clauses with `EvidenceList`; an u
 question gets a grey card with no sources. A 429 says how long to wait. The conversation lives in
 React state only (the server stores nothing) and is hidden when printing.
 
-### Aurora light design rules (redesign)
+### Dark theme design rules (October 2026 redesign)
 
-All tokens are in `frontend/tailwind.config.ts`; components never use hex values.
+The app was redesigned with a dark theme (PR #22). Token names are in
+`frontend/tailwind.config.ts`; their values are CSS variables in `frontend/src/index.css`, so
+components never use hex values for the shared colours.
 
 | Role | Token | Rule |
 |---|---|---|
-| Product, main actions, final report | `brand` (navy #1e3a8a) | Buttons, active nav pill, "Print report" |
-| The AI at work | `ai` (#4f46e5 text/buttons), `ai-bright` (#6366f1 bars, spinners, focus ring) | "Run analysis", running agent, AI labels; `ai-bright` is never used for text (4.47:1) |
-| Page background | `canvas` (#f6f8fc) | Cards are white with `shadow-soft` / `shadow-card` / `shadow-lift` |
-| Aurora glows | `aurora.*`, `.bg-aurora` | Landing hero and auth side panel only, never behind data; text on them uses `muted-strong` or darker (the lightest grey is 4.42:1 there) |
-| Status colours | `status.*` | Text uses the dark shade; `dot` shades are for bars and dots only; white ticks sit on the dark green (5.0:1), never on the bright one (2.5:1) |
-| Radii | `card` 20 px, `panel` 14 px, `control` 10 px, `pill` | Inputs are 44 px tall with a 10 px radius |
+| Page and cards | `canvas` (#050b18), cards #0b1930 | Light text (`ink` #e5edf9, `muted` #9aabc4) on dark surfaces |
+| Product, main actions | `brand` (#2563eb) | Buttons, active nav item, "Print report" |
+| The AI at work | `ai` (#6366f1), `ai-bright` (#818cf8 bars, spinners, focus ring) | "Start analysis", running agent, AI labels; indigo so AI actions stay distinct from `brand` |
+| Status colours | `status.*` | Pale text on a dark tint; "Not found" is outlined (bright border) so it differs from the filled "Excluded" |
+| Printing | the original light palette | `@media print` swaps every token back to the light values (navy `brand`, dark text, light status tints), hides the sidebar and header and restores the 14 mm margins, so a printed or PDF report is dark text on white |
 
+- A few pages keep plain Tailwind slate/white classes; `.dark-ui` remaps them to the dark
+  surface on screen only (`index.css`), never in print.
 - One focus ring for everything: 2 px `ai-bright` outline, set once in `index.css`.
 - All motion is behind `motion-safe:` (running-agent pulse, landing fade-up).
-- `src/a11y.test.tsx` runs axe-core on every redesigned page (colour contrast is not measurable in
-  jsdom, so contrast pairs are checked with a script against the ratios above).
+- `src/a11y.test.tsx` runs axe-core on the main pages (colour contrast is not measurable in
+  jsdom, so contrast pairs were checked with a script).
 - The handoff log shows the real architecture: every line is gateway → agent or agent → gateway.
 
 ---
@@ -655,3 +665,19 @@ Backend findings for the agents' owners (not worked around in the UI):
       gateway, test.
 - [x] Update `docs/architecture.md` and `docs/project-structure.md` to say the frontend is React.
 - [x] Screenshots for the report, and a demo script that walks the flow in step 12.
+
+### Step 15 – Dark redesign and its fixes · October 2026
+
+- [x] PR #22 (redesign): dark theme, sidebar navigation, Overview, Businesses and Settings pages,
+      the profile-or-scenario choice, scenario results, a simpler stage view in the workspace.
+- [x] Printed report: colours are CSS variables with a light print palette; app chrome hidden in
+      print; the scenario report can be printed.
+- [x] Restored what the redesign removed: landing pricing, example and full Responsible AI text,
+      the Overview checklist and latest-analysis card, live agent status in the header.
+- [x] Readability: no light hover or focus backgrounds behind light text; distinct "Not found"
+      badge and AI colour; readable "Potential gap" tag.
+- [x] Scenario runs are saved by the gateway (`scenario_analyses`) and listed in History with
+      profile runs; failed scenario runs can be retried.
+- [x] Account menu opens from the header avatar and opens upwards in the sidebar.
+- [x] Tests updated for the new flows (209 passing); screenshots retaken
+      (`docs/images/frontend/`, 21 images).

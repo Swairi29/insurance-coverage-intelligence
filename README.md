@@ -12,7 +12,7 @@ This project proposes an **Agentic AI-based Insurance Coverage Intelligence Syst
 
 The system takes:
 
-- A business profile
+- A business profile, or a description of the business or situation in the user's own words
 - Existing insurance policy documents
 
 and produces:
@@ -109,16 +109,19 @@ login, stores policies and results, and calls the agents in order. See
 
 | Feature | What the user sees | More detail |
 |---|---|---|
+| **Two ways to start** | **New Analysis** asks how to describe the business: a saved **business profile**, or **Describe a Scenario** in free text. Both go through the same four agents and produce the same report. | [docs/api-specification.md](docs/api-specification.md) |
 | **Business profile** | 11 business types in three groups (food and drink, shops, services), plus **Other** with a free-text description. Only the name and type are required; "Not sure" is never treated as No. | [docs/input-specification.md](docs/input-specification.md) |
+| **Scenario analysis** | Up to 4,000 characters about the business, its equipment, staff, customers or concerns. Agent 1 identifies the risks from the text, quoting the words behind each one. | [docs/api-specification.md](docs/api-specification.md) |
 | **Risk profiling** | Up to 19 business risks in seven categories, each with the profile answers that triggered it. | [docs/risk-taxonomy.md](docs/risk-taxonomy.md) |
 | **Policy upload** | PDFs are checked by content, stored encrypted and split into sections. Instruction-like wording is flagged and never sent to an AI. | [docs/api-specification.md](docs/api-specification.md) |
-| **Agent workspace** | While an analysis runs: each agent's progress and result, and a **handoff log** of every message between the gateway and the agents (counts only, no business data). The run continues if the page is left. | [docs/architecture.md](docs/architecture.md) |
-| **Results** | Report, Coverage and Risk profile tabs. Clicking a risk opens an **evidence panel** with the quoted policy wording (policy, section, page) and which agent produced each part. Every AI-written text is labelled. The report can be printed. | [docs/responsible-ai.md](docs/responsible-ai.md) |
+| **Agent workspace** | While an analysis runs: the four stages and what each returned. **Show technical details** opens each agent's card and a **handoff log** of every message between the gateway and the agents (counts only, no business data). The run continues if the page is left, and a failed run can be retried. | [docs/architecture.md](docs/architecture.md) |
+| **Results** | Report, Coverage and Risk profile tabs. Clicking a risk opens an **evidence panel** with the quoted policy wording (policy, section, page) and which agent produced each part. Every AI-written text is labelled. **Print report** prints every section on clean white pages (or saves a PDF). | [docs/responsible-ai.md](docs/responsible-ai.md) |
+| **History** | Every profile and scenario analysis, newest first, stored encrypted. The Overview page shows a setup checklist and the latest analysis; the header shows whether all four agents are up. | [docs/architecture.md](docs/architecture.md) |
 | **Ask about this analysis** | Questions answered only from the saved analysis and the clauses it found, with citations. Questions it cannot answer are said to be out of scope, not guessed. | [docs/api-specification.md](docs/api-specification.md) |
 | **Consent** | Registration requires agreeing to the privacy and data processing notice (`/privacy`); the notice version and time are stored with the account. | [docs/responsible-ai.md](docs/responsible-ai.md) |
 | **Pricing** | Proposed plans in LKR (Free, Starter, Business, Broker) on the landing page. The prototype takes no payments. | [docs/commercialisation.md](docs/commercialisation.md) |
 
-![Agent workspace: the four agents and the handoff log of a finished run](docs/images/frontend/09-agent-workspace-complete.png)
+![Agent workspace: the four analysis stages, with the technical details (agent cards and handoff log) open, for a finished run](docs/images/frontend/09-agent-workspace-complete.png)
 
 ---
 
@@ -181,9 +184,10 @@ npm install        # once
 npm run dev        # http://127.0.0.1:5173
 ```
 
-Register an account, fill in the business profile, upload policy PDFs and run an analysis. The
-dev server forwards `/api` and `/health` to the gateway on `127.0.0.1:8000`, so the gateway needs
-no CORS. A run opens the agent workspace, which shows each agent as it works. With a local LLM
+Register an account, upload policy PDFs, then choose **New Analysis** and either use a business
+profile or describe a scenario. The dev server forwards `/api` and `/health` to the gateway on
+`127.0.0.1:8000`, so the gateway needs no CORS. A run opens the agent workspace, which shows each
+agent as it works. With a local LLM
 this takes several minutes; the analysis runs on the server and is saved to History, so the page
 can be left.
 
@@ -200,6 +204,8 @@ example the business name `Timeout Ltd`, or the password `wrong`). The mock data
 with `python scripts/make_frontend_fixtures.py` (add `--use-llm` for real LLM wording).
 
 ![Results page: headline, status counts, the disclaimer and the first findings](docs/images/frontend/10-results-report.png)
+
+![New analysis: choose a business profile or describe a scenario](docs/images/frontend/07-new-analysis.png)
 
 More screenshots are in [docs/images/frontend/](docs/images/frontend/), and
 [docs/demo-script.md](docs/demo-script.md) walks through a full demo.
