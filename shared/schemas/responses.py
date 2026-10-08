@@ -13,7 +13,7 @@ from typing import Any, Iterable, List, Mapping, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from shared.models.analysis import EvidenceCitation, Finding, GeneratedBy, ReportSummary
-from shared.models.business import BusinessType
+from shared.models.business import BusinessProfile, BusinessType
 from shared.models.policy import PolicyDocument, RiskEvidenceResult
 from shared.models.risk import IdentifiedRisk
 from shared.models.scenario_risk import ScenarioRisk
@@ -259,6 +259,15 @@ class UserResponse(BaseModel):
     # was recorded.
     consent_version: Optional[str] = None
     consented_at: Optional[datetime] = None
+
+
+class SavedBusinessProfile(BaseModel):
+    """A business profile saved to the user's account (`/api/v1/business-profiles`)."""
+
+    profile_id: str
+    created_at: datetime
+    updated_at: datetime
+    profile: BusinessProfile
 
 
 class AnalysisStatus(str, Enum):

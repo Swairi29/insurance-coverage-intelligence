@@ -39,7 +39,13 @@ from services.orchestration.auth import (
     get_question_limiter,
     register_user,
 )
-from services.orchestration.database import Database, DuplicateEmailError, UserRecord, get_database
+from services.orchestration.database import (
+    Database,
+    DuplicateEmailError,
+    StoredBusinessProfile,
+    UserRecord,
+    get_database,
+)
 from services.orchestration.jobs import (
     JobStore,
     get_job_store,
@@ -48,6 +54,7 @@ from services.orchestration.jobs import (
 )
 from services.orchestration.pipeline import AgentCallError, AnalysisPipeline, ErrorKind, PipelineResult, Stage
 from shared.config.settings import get_settings
+from shared.models.business import BusinessProfile
 from shared.models.policy import PolicyDocument
 from shared.schemas.requests import AnalysisRequest, AskQuestionRequest, LoginRequest, RegisterRequest, ScenarioAnalysisRequest
 from shared.schemas.responses import (
@@ -60,6 +67,7 @@ from shared.schemas.responses import (
     PolicyUploadResponse,
     QuestionAnswerResponse,
     RunState,
+    SavedBusinessProfile,
     ScenarioAnalysisResponse,
     TokenResponse,
     UserResponse,
@@ -70,6 +78,8 @@ logger = logging.getLogger(__name__)
 
 NOT_SAVED_WARNING = "This analysis could not be saved to your history."
 ANALYSIS_FAILED_MESSAGE = "The analysis could not be completed. Please try again."
+# Business profiles one account can keep.
+MAX_BUSINESS_PROFILES = 20
 
 _AGENT_ERRORS = {
     ErrorKind.UNAVAILABLE: (503, "A required analysis service is not available. Please try again later."),
@@ -230,6 +240,85 @@ def upload_policy(
     db.add_policy(document)
     response.headers["X-Request-ID"] = request_id
     return document
+
+
+# --- business profiles -----------------------------------------------------------------------
+# Saved to the account so they survive logout and restarts, and can be picked again for a new
+# analysis. An analysis still sends the profile itself in its body (AnalysisRequest.business).
+
+
+def _profile_error(exc: SecurityConfigError) -> JSONResponse:
+    logger.error("A business profile could not be encrypted or decrypted (%s).", type(exc).__name__)
+    return _error(503, "profiles_unavailable", "Saved business profiles are not available right now.")
+
+
+def _saved_profile(stored: StoredBusinessProfile) -> SavedBusinessProfile:
+    """Raises SecurityConfigError if the stored profile cannot be decrypted."""
+    return SavedBusinessProfile(
+        profile_id=stored.profile_id, created_at=stored.created_at, updated_at=stored.updated_at,
+        profile=BusinessProfile.model_validate_json(decrypt_bytes(stored.encrypted_profile)),
+    )
+
+
+def _profile_not_found() -> JSONResponse:
+    return _error(404, "profile_not_found", "Business profile not found.")
+
+
+@app.get("/api/v1/business-profiles", response_model=List[SavedBusinessProfile])
+def list_business_profiles(user: UserRecord = Depends(get_current_user), db: Database = Depends(get_database)):
+    try:
+        return [_saved_profile(stored) for stored in db.list_business_profiles(user.user_id)]
+    except SecurityConfigError as exc:
+        return _profile_error(exc)
+
+
+@app.post("/api/v1/business-profiles", status_code=201, response_model=SavedBusinessProfile)
+def create_business_profile(body: BusinessProfile, user: UserRecord = Depends(get_current_user),
+                            db: Database = Depends(get_database)):
+    if db.count_business_profiles(user.user_id) >= MAX_BUSINESS_PROFILES:
+        return _error(409, "profile_limit",
+                      f"You can save up to {MAX_BUSINESS_PROFILES} business profiles. Delete one to add another.")
+    try:
+        encrypted = encrypt_bytes(body.model_dump_json().encode("utf-8"))
+    except SecurityConfigError as exc:
+        return _profile_error(exc)
+    stored = db.add_business_profile(user_id=user.user_id, encrypted_profile=encrypted)
+    return SavedBusinessProfile(profile_id=stored.profile_id, created_at=stored.created_at,
+                                updated_at=stored.updated_at, profile=body)
+
+
+@app.get("/api/v1/business-profiles/{profile_id}", response_model=SavedBusinessProfile)
+def get_business_profile(profile_id: str, user: UserRecord = Depends(get_current_user),
+                         db: Database = Depends(get_database)):
+    stored = db.get_business_profile(user_id=user.user_id, profile_id=profile_id)
+    if stored is None:  # also when it belongs to someone else
+        return _profile_not_found()
+    try:
+        return _saved_profile(stored)
+    except SecurityConfigError as exc:
+        return _profile_error(exc)
+
+
+@app.put("/api/v1/business-profiles/{profile_id}", response_model=SavedBusinessProfile)
+def update_business_profile(profile_id: str, body: BusinessProfile,
+                            user: UserRecord = Depends(get_current_user), db: Database = Depends(get_database)):
+    try:
+        encrypted = encrypt_bytes(body.model_dump_json().encode("utf-8"))
+    except SecurityConfigError as exc:
+        return _profile_error(exc)
+    stored = db.update_business_profile(user_id=user.user_id, profile_id=profile_id, encrypted_profile=encrypted)
+    if stored is None:
+        return _profile_not_found()
+    return SavedBusinessProfile(profile_id=stored.profile_id, created_at=stored.created_at,
+                                updated_at=stored.updated_at, profile=body)
+
+
+@app.delete("/api/v1/business-profiles/{profile_id}", status_code=204)
+def delete_business_profile(profile_id: str, user: UserRecord = Depends(get_current_user),
+                            db: Database = Depends(get_database)):
+    if not db.delete_business_profile(user_id=user.user_id, profile_id=profile_id):
+        return _profile_not_found()
+    return Response(status_code=204)
 
 
 # --- analyses --------------------------------------------------------------------------------

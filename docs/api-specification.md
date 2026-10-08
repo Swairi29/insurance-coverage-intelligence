@@ -320,6 +320,11 @@ Run: `uvicorn services.orchestration.api:app --port 8000 --reload`
 | `GET` | `/api/v1/auth/me` | Bearer | `UserResponse` (`user_id`, `email`, `business_id`, `created_at`, `consent_version`, `consented_at`) |
 | `GET` | `/api/v1/policies` | Bearer | The user's uploaded policies, newest first |
 | `POST` | `/api/v1/policies` | Bearer | Multipart `file` (PDF) → Agent 2 → `PolicyUploadResponse` |
+| `GET` | `/api/v1/business-profiles` | Bearer | The user's saved profiles (`SavedBusinessProfile[]`, most recently changed first) |
+| `POST` | `/api/v1/business-profiles` | Bearer | `BusinessProfile` → **201** `SavedBusinessProfile`; 409 `profile_limit` at 20 profiles |
+| `GET` | `/api/v1/business-profiles/{profile_id}` | Bearer | One `SavedBusinessProfile`; 404 if missing or another user's |
+| `PUT` | `/api/v1/business-profiles/{profile_id}` | Bearer | `BusinessProfile` → `SavedBusinessProfile` (replaces the whole profile); 404 if missing or another user's |
+| `DELETE` | `/api/v1/business-profiles/{profile_id}` | Bearer | **204**; 404 if missing or another user's |
 | `POST` | `/api/v1/analyses` | Bearer | `AnalysisRequest` → **202** `AnalysisProgress`; the four agents then run in the background |
 | `GET` | `/api/v1/analyses/{request_id}/status` | Bearer | `AnalysisProgress`: which agent is running, what each was sent and returned (counts only); 404 if missing or another user's |
 | `GET` | `/api/v1/analyses` | Bearer | The user's past runs (`AnalysisSummary[]`, newest first, max 50) |
@@ -352,6 +357,13 @@ Run: `uvicorn services.orchestration.api:app --port 8000 --reload`
   one business's policies away from another's.
 - An analysis may only use the user's own `policy_ids`; otherwise it returns 404 and no agent is
   called.
+- Business profiles are saved to the account so they survive logout and restarts, and can be
+  picked again for a new analysis. The body is a `BusinessProfile` (the same object as
+  `AnalysisRequest.business`, so 422 fields are named without the `business.` prefix). The
+  response is `{"profile_id": "BP-…", "created_at", "updated_at", "profile": BusinessProfile}`.
+  An analysis still sends the profile itself in `business`; it does not take a `profile_id`.
+  Policies belong to the account, not to a profile, so any saved profile can be checked against
+  any of the user's policies.
 - Questions: the body is only `{"question": "..."}` (3-500 characters). The gateway loads the
   analysis with the same ownership check as `GET /analyses/{request_id}` and sends Agent 4 only
   the business type, the question and that analysis's assessments. Each user may ask 10
@@ -441,15 +453,15 @@ itself is not stored, but a saved result can quote short parts of it as risk evi
 | Code | When | Body |
 |---|---|---|
 | 401 | No, invalid or expired token; wrong email or password | `{"detail": ...}` |
-| 404 | A `policy_id` or `request_id` that is not the user's | `GatewayError` |
-| 409 | Email already registered | `GatewayError` |
+| 404 | A `policy_id`, `request_id` or `profile_id` that is not the user's | `GatewayError` |
+| 409 | Email already registered; 20 business profiles already saved (`profile_limit`) | `GatewayError` |
 | 429 | 5 failed logins for one email within 15 minutes (`too_many_attempts`), or more than 10 questions in a minute (`too_many_questions`); both with `Retry-After` seconds | `GatewayError` |
 | 413 | Upload over `MAX_UPLOAD_MB` (checked before Agent 2 is called) | `GatewayError` |
 | 400 | Agent 2 says the file is not a valid PDF | `GatewayError` |
 | 422 | Invalid body | `ErrorResponse`, without the input values |
 | 409 | The result of an analysis that is still running (`analysis_running`, `scenario_analysis_running`) | `GatewayError` |
 | 502 | An agent refused the call (4xx), failed (5xx) or broke the contract (uploads and questions) | `GatewayError` |
-| 503 | An agent could not be reached (uploads and questions), or login is not configured (`JWT_SECRET_KEY`) | `GatewayError` |
+| 503 | An agent could not be reached (uploads and questions), login is not configured (`JWT_SECRET_KEY`), or business profiles cannot be encrypted or read (`profiles_unavailable`, `DOCUMENT_ENCRYPTION_KEY` missing or changed) | `GatewayError` |
 | 504 | An agent timed out (uploads and questions) | `GatewayError` |
 
 An analysis that fails in the background is reported by the status endpoint (`state: "failed"`
@@ -464,10 +476,13 @@ An Agent 4 failure is **not** an error: the run returns 200 with `status: "parti
 
 SQLite file at `DATABASE_PATH` (default `./data/app.db`, gitignored), created on first use.
 Tables: `users` (bcrypt hash only), `policies` (which `policy_id` belongs to which business),
-`analyses` and `scenario_analyses`. The full results contain policy excerpts, so they are stored
+`analyses`, `scenario_analyses` and `business_profiles`. The full results contain policy excerpts, so they are stored
 encrypted with `DOCUMENT_ENCRYPTION_KEY`, the same key Agent 2 uses for the PDFs; the summary
 columns (status, date, counts) are plain text for the History list. If the key is missing, the
-run is still returned, with a warning that it was not saved.
+run is still returned, with a warning that it was not saved. Business profiles are stored
+encrypted with the same key (only the ids and dates are plain text); without the key, the
+profile endpoints return 503 and nothing is saved. Tables are added to an existing database file
+on startup, so no data is lost.
 
 ### Configuration
 
