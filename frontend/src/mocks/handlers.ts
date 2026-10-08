@@ -14,6 +14,8 @@
 //             big.pdf (or > 25 MB)            -> 413 file_too_large
 //             agent-down.pdf                  -> 503 agent_unavailable, stage policy_upload
 //             a name containing "flagged"     -> uploaded with 1 flagged chunk
+//   profiles  employee_count > 250            -> 422 with details (field "employee_count")
+//             a 21st profile                  -> 409 profile_limit
 //   analysis  POST answers 202; GET .../status then walks through the four agents.
 //             business_name "Down Ltd"        -> fails at risk_profile (agent_unavailable)
 //             business_name "Timeout Ltd"     -> fails at coverage (agent_timeout)
@@ -39,6 +41,7 @@ import type {
   LoginRequest,
   PolicyDocument,
   RegisterRequest,
+  SavedBusinessProfile,
   Stage,
   TokenResponse,
   UserResponse,
@@ -58,6 +61,7 @@ const TOKEN_PREFIX = 'mock-token-';
 /** Fake time per agent (risk, policy, coverage, report). Zero in tests. */
 const STAGE_MS = [1200, 1500, 1800, 3500];
 const SLOW_FACTOR = 6;
+const MAX_BUSINESS_PROFILES = 20;
 
 /** Fake server time, so loading states can be seen. Skipped in tests. */
 const wait = (ms: number) => (import.meta.env.MODE === 'test' ? Promise.resolve() : delay(ms));
@@ -97,6 +101,23 @@ function currentUser(request: Request): UserResponse | null {
   const email = token.slice(TOKEN_PREFIX.length);
   // Unknown emails still pass, so a token kept in sessionStorage survives a page reload.
   return db.users.get(email)?.user ?? { ...db.users.values().next().value!.user, email };
+}
+
+const profileNotFound = () => gatewayError(404, 'profile_not_found', 'Business profile not found.');
+
+/** The gateway checks a saved profile like AnalysisRequest.business, without the prefix. */
+function invalidProfile(profile: BusinessProfile) {
+  if (!profile?.business_name?.trim()) {
+    return validationError([
+      { field: 'business_name', message: 'String should have at least 1 character' },
+    ]);
+  }
+  if ((profile.employee_count ?? 0) > 250) {
+    return validationError([
+      { field: 'employee_count', message: 'Input should be less than or equal to 250' },
+    ]);
+  }
+  return null;
 }
 
 const AGENT_MESSAGES: Record<string, string> = {
@@ -308,6 +329,64 @@ export const handlers = [
       { ...document, warnings: [] },
       { headers: { 'X-Request-ID': requestId } },
     );
+  }),
+
+  // business profiles
+  http.get(`${API}/business-profiles`, ({ request }) => {
+    if (!currentUser(request)) return unauthorized();
+    return HttpResponse.json(db.businessProfiles);
+  }),
+
+  http.get(`${API}/business-profiles/:profileId`, ({ request, params }) => {
+    if (!currentUser(request)) return unauthorized();
+    const saved = db.businessProfiles.find((p) => p.profile_id === params.profileId);
+    return saved ? HttpResponse.json(saved) : profileNotFound();
+  }),
+
+  http.post(`${API}/business-profiles`, async ({ request }) => {
+    if (!currentUser(request)) return unauthorized();
+    const profile = (await request.json()) as BusinessProfile;
+    const invalid = invalidProfile(profile);
+    if (invalid) return invalid;
+    if (db.businessProfiles.length >= MAX_BUSINESS_PROFILES) {
+      return gatewayError(
+        409,
+        'profile_limit',
+        `You can save up to ${MAX_BUSINESS_PROFILES} business profiles. Delete one to add another.`,
+      );
+    }
+    await wait(400);
+    const now = new Date().toISOString();
+    const saved: SavedBusinessProfile = {
+      profile_id: `BP-${newId().slice(0, 16)}`,
+      created_at: now,
+      updated_at: now,
+      profile,
+    };
+    db.businessProfiles = [saved, ...db.businessProfiles];
+    return HttpResponse.json(saved, { status: 201 });
+  }),
+
+  http.put(`${API}/business-profiles/:profileId`, async ({ request, params }) => {
+    if (!currentUser(request)) return unauthorized();
+    const profile = (await request.json()) as BusinessProfile;
+    const invalid = invalidProfile(profile);
+    if (invalid) return invalid;
+    const existing = db.businessProfiles.find((p) => p.profile_id === params.profileId);
+    if (!existing) return profileNotFound();
+    await wait(400);
+    const saved = { ...existing, updated_at: new Date().toISOString(), profile };
+    db.businessProfiles = [saved, ...db.businessProfiles.filter((p) => p !== existing)];
+    return HttpResponse.json(saved);
+  }),
+
+  http.delete(`${API}/business-profiles/:profileId`, ({ request, params }) => {
+    if (!currentUser(request)) return unauthorized();
+    const before = db.businessProfiles.length;
+    db.businessProfiles = db.businessProfiles.filter((p) => p.profile_id !== params.profileId);
+    return db.businessProfiles.length < before
+      ? new HttpResponse(null, { status: 204 })
+      : profileNotFound();
   }),
 
   // analyses

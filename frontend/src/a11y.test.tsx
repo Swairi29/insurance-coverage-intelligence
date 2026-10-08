@@ -3,7 +3,6 @@
 // contrast script in docs/frontend-plan.md §4; every other axe rule runs here.
 import { screen, waitFor } from '@testing-library/react';
 import axe from 'axe-core';
-import { SESSION_KEYS } from './lib/session';
 import { allStatusesAnalysis } from './mocks/fixtures';
 import { renderApp } from './test/renderApp';
 import { loginAsDemoUser } from './test/session';
@@ -39,19 +38,37 @@ describe('accessibility (axe)', () => {
 
   it('business profile', async () => {
     loginAsDemoUser();
-    renderApp('/app/profile');
+    renderApp('/app/businesses/new');
     await screen.findByRole('heading', { name: 'Business profile' });
+    await expectNoViolations();
+  });
+
+  it('businesses', async () => {
+    loginAsDemoUser();
+    renderApp('/app/businesses');
+    await screen.findByRole('list', { name: 'Your businesses' });
+    await expectNoViolations();
+  });
+
+  it('new analysis: each step', async () => {
+    loginAsDemoUser();
+    const { user } = renderApp('/app/analyses/new/profile');
+    await screen.findByRole('radio', { name: /Sunrise Bakery/ });
+    await expectNoViolations();
+
+    await user.click(screen.getByRole('button', { name: /Continue to policies/ }));
+    await screen.findByRole('checkbox', { name: /sunrise-business-pack/ });
+    await expectNoViolations();
+
+    await user.click(screen.getByRole('button', { name: /Continue to review/ }));
+    await screen.findByRole('list', { name: 'Chosen policies' });
     await expectNoViolations();
   });
 
   it('agent workspace', async () => {
     loginAsDemoUser();
-    window.sessionStorage.setItem(
-      SESSION_KEYS.profileDraft,
-      JSON.stringify({ business_name: 'Test Bakery', business_type: 'bakery' }),
-    );
-    const { user } = renderApp('/app/analyses/new/profile');
-    await screen.findByRole('checkbox', { name: /sunrise-business-pack/ });
+    const { user } = renderApp('/app/analyses/new/profile?profile=BP-demo0000bakery1&step=review');
+    await screen.findByRole('list', { name: 'Chosen policies' });
     await user.click(screen.getByRole('button', { name: 'Start analysis' }));
     await screen.findByRole('heading', { name: 'Analysis complete' });
     await expectNoViolations();

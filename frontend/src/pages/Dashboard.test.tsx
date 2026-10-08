@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { SESSION_KEYS } from '../lib/session';
+import { db } from '../mocks/db';
 import { analysesFixture } from '../mocks/fixtures';
 import { server } from '../mocks/server';
 import { renderApp } from '../test/renderApp';
@@ -18,6 +18,7 @@ const steps = () =>
 
 describe('dashboard', () => {
   it('starts a new user at step 1 when nothing is done yet', async () => {
+    db.businessProfiles = [];
     server.use(
       http.get('*/api/v1/policies', () => HttpResponse.json([])),
       http.get('*/api/v1/analyses', () => HttpResponse.json([])),
@@ -32,22 +33,24 @@ describe('dashboard', () => {
     expect(analysis).toHaveTextContent('(to do)');
     expect(within(profile).getByRole('link', { name: 'Add profile' })).toHaveAttribute(
       'href',
-      '/app/profile',
+      '/app/businesses/new',
     );
     expect(await screen.findByText(/No analyses yet/)).toBeInTheDocument();
   });
 
   it('points to the next unfinished step', async () => {
-    window.sessionStorage.setItem(
-      SESSION_KEYS.profileDraft,
-      JSON.stringify({ business_name: 'Test Bakery', business_type: 'bakery' }),
-    );
+    // The demo account has one saved business.
     server.use(http.get('*/api/v1/analyses', () => HttpResponse.json([])));
     await openDashboard();
 
     await screen.findByText('2 policies ready.');
     const [profile, policies, analysis] = steps();
+    expect(await within(profile).findByText('Sunrise Bakery, bakery.')).toBeInTheDocument();
     expect(profile).toHaveTextContent('(done)');
+    expect(within(profile).getByRole('link', { name: 'Manage businesses' })).toHaveAttribute(
+      'href',
+      '/app/businesses',
+    );
     expect(policies).toHaveTextContent('(done)');
     expect(analysis).toHaveAttribute('aria-current', 'step');
     expect(within(analysis).getByRole('link', { name: 'New analysis' })).toHaveAttribute(

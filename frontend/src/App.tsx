@@ -49,7 +49,10 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="businesses" element={<Businesses />} />
-        <Route path="profile" element={<BusinessProfile />} />
+        <Route path="businesses/new" element={<BusinessProfile />} />
+        <Route path="businesses/:profileId" element={<BusinessProfile />} />
+        {/* Profiles are saved to the account now: the old single-profile page is the list. */}
+        <Route path="profile" element={<Navigate to="/app/businesses" replace />} />
         <Route path="policies" element={<Policies />} />
         <Route path="analyses/new" element={<NewAnalysis />} />
         <Route path="analyses/new/profile" element={<NewAnalysis profileFlow />} />

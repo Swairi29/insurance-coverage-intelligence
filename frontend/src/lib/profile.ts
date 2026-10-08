@@ -1,5 +1,6 @@
-// The business profile: form values, conversion to the API's BusinessProfile, the
-// sessionStorage draft (plan §3.6) and mapping server 422 errors onto form fields.
+// The business profile: form values, conversion to the API's BusinessProfile, the paths of
+// the profile pages and mapping server 422 errors onto form fields. Profiles are saved to the
+// account (api/businessProfiles.ts).
 
 import type {
   BusinessProfile,
@@ -7,7 +8,6 @@ import type {
   SalesChannel,
   ValidationErrorDetail,
 } from '../api/types';
-import { SESSION_KEYS, readSession, removeSession, writeSession } from './session';
 
 /** Limits from shared/models/business.py. */
 export const PROFILE_LIMITS = {
@@ -171,25 +171,33 @@ export function toFormValues(profile: BusinessProfile): ProfileFormValues {
   };
 }
 
-// --- draft (sessionStorage, cleared on logout) ---------------------------------------------
+// --- paths ------------------------------------------------------------------------------
 
-export function loadProfileDraft(): BusinessProfile | null {
-  const raw = readSession(SESSION_KEYS.profileDraft);
-  if (!raw) return null;
-  try {
-    const value = JSON.parse(raw) as Partial<BusinessProfile>;
-    if (typeof value.business_name === 'string' && typeof value.business_type === 'string') {
-      return value as BusinessProfile;
-    }
-  } catch {
-    // corrupted draft: start again
-  }
-  removeSession(SESSION_KEYS.profileDraft);
-  return null;
+/** The steps of a new profile analysis, in order. */
+export const ANALYSIS_STEPS = ['business', 'policies', 'review'] as const;
+export type AnalysisStep = (typeof ANALYSIS_STEPS)[number];
+
+/**
+ * A new profile analysis, at `step` (default: step 1, choosing the business), with this
+ * business already chosen when given.
+ */
+export function analysisFlowPath(profileId?: string, step: AnalysisStep = 'business'): string {
+  const params = new URLSearchParams();
+  if (profileId) params.set('profile', profileId);
+  if (step !== 'business') params.set('step', step);
+  const query = params.toString();
+  return query ? `/app/analyses/new/profile?${query}` : '/app/analyses/new/profile';
 }
 
-export function saveProfileDraft(profile: BusinessProfile): void {
-  writeSession(SESSION_KEYS.profileDraft, JSON.stringify(profile));
+/**
+ * The form to add a business (no id) or edit one. `forAnalysis` brings the user back to the
+ * new-analysis flow after saving, with that business chosen, instead of to the Businesses list.
+ */
+export function profileFormPath(profileId?: string, { forAnalysis = false } = {}): string {
+  const base = profileId
+    ? `/app/businesses/${encodeURIComponent(profileId)}`
+    : '/app/businesses/new';
+  return forAnalysis ? `${base}?next=analysis` : base;
 }
 
 // --- server errors ------------------------------------------------------------------------
