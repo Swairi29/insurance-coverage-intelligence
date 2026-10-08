@@ -221,10 +221,13 @@ class PipelineResult:
 
 class AnalysisPipeline:
     def __init__(self, client: AgentClient, urls: AgentUrls, *,
-                 timeout: float, report_timeout: float, question_timeout: float = 150.0):
+                 timeout: float, report_timeout: float, question_timeout: float = 150.0,
+                 coverage_timeout: float | None = None):
         self._client = client
         self._urls = urls
         self._timeout = timeout
+        # Agent 3 asks the LLM once per risk, so it gets longer than Agents 1-2.
+        self._coverage_timeout = coverage_timeout or timeout
         self._report_timeout = report_timeout
         self._question_timeout = question_timeout
 
@@ -238,6 +241,7 @@ class AnalysisPipeline:
             AgentClient(http, api_key=api_key),
             AgentUrls.from_settings(settings),
             timeout=settings.request_timeout_seconds,
+            coverage_timeout=settings.coverage_timeout_seconds,
             report_timeout=settings.explanation_timeout_seconds,
             question_timeout=settings.question_timeout_seconds,
         )
@@ -375,7 +379,7 @@ class AnalysisPipeline:
                 "risks": risks,
                 "evidence_results": [result.model_dump(mode="json") for result in evidence.results],
             },
-            request_id=request_id, timeout=self._timeout, response_model=CoverageAnalysisResponse,
+            request_id=request_id, timeout=self._coverage_timeout, response_model=CoverageAnalysisResponse,
         ))
         _check_echo(Stage.COVERAGE, coverage.request_id, request_id, progress)
         if coverage.business_id != business_id:

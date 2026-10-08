@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from agents.coverage_agent.interpreter import TextGenerator
+from agents.coverage_agent.interpreter import LLMUnavailableError, TextGenerator
 from shared.config.settings import Settings, get_settings
 from shared.llm.gemini_client import GeminiClient
 from shared.llm.ollama_client import OllamaClient
@@ -47,6 +47,11 @@ class CoverageLLMProvider:
         self.active_provider: str | None = None
         self.active_model: str | None = None
 
+        # One provider is created per request. Once Gemini has failed (often its rate
+        # limit), the remaining risks go straight to Ollama instead of waiting through
+        # Gemini's retries again for every risk.
+        self.primary_failed = False
+
     def generate_text(
         self,
         prompt: str,
@@ -60,7 +65,7 @@ class CoverageLLMProvider:
         # 1. Try primary provider: Gemini
         # ---------------------------------------------------------
 
-        if self.primary is not None:
+        if self.primary is not None and not self.primary_failed:
             try:
                 response = self.primary.generate_text(
                     prompt,
@@ -80,9 +85,10 @@ class CoverageLLMProvider:
                 return response
 
             except Exception as exc:
+                self.primary_failed = True
                 logger.warning(
                     "Coverage Agent primary LLM failed (%s): %s. "
-                    "Trying Ollama fallback.",
+                    "Using the fallback for the rest of this request.",
                     type(exc).__name__,
                     str(exc),
                 )
@@ -123,7 +129,7 @@ class CoverageLLMProvider:
         # wording.py as the deterministic fallback.
         # ---------------------------------------------------------
 
-        raise RuntimeError(
+        raise LLMUnavailableError(
             "No Coverage Agent LLM provider was available."
         )
 
@@ -166,7 +172,8 @@ def _build_ollama_client(
         client = OllamaClient(
             model=settings.ollama_model,
             host=settings.ollama_host,
-            timeout=settings.explanation_llm_budget_seconds,
+            # Agent 3's own budget: one call may not outlast it.
+            timeout=settings.coverage_llm_budget_seconds,
         )
 
         return (

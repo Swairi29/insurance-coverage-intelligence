@@ -97,6 +97,20 @@ def test_agent_4_gets_the_longer_timeout(agents):
     assert agents.call(REPORT_PATH).extensions["timeout"]["read"] == 50
 
 
+def test_agent_3_gets_its_own_timeout(agents):
+    # Agent 3 asks the LLM once per risk: a flat 60 s cut long runs off (2026-10-08).
+    run(agents, timeout=5, coverage_timeout=30, report_timeout=50)
+
+    assert agents.call(EVIDENCE_PATH).extensions["timeout"]["read"] == 5
+    assert agents.call(COVERAGE_PATH).extensions["timeout"]["read"] == 30
+
+
+def test_agent_3_timeout_defaults_to_the_agent_timeout(agents):
+    run(agents, timeout=5)
+
+    assert agents.call(COVERAGE_PATH).extensions["timeout"]["read"] == 5
+
+
 # --- no risks ------------------------------------------------------------------------------
 
 

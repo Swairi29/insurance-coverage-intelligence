@@ -489,7 +489,8 @@ on startup, so no data is lost.
 | Variable | Default | Effect |
 |---|---|---|
 | `RISK_AGENT_URL` … `EXPLANATION_AGENT_URL` | `http://127.0.0.1:8001` … `8004` | Agent base URLs |
-| `REQUEST_TIMEOUT_SECONDS` | `60` | Per-call timeout for Agents 1-3 and uploads |
+| `REQUEST_TIMEOUT_SECONDS` | `60` | Per-call timeout for Agents 1-2 and uploads |
+| `COVERAGE_TIMEOUT_SECONDS` | `300` | Agent 3, which asks the LLM once per risk. It stops asking after `COVERAGE_LLM_BUDGET_SECONDS` (default 90; each Ollama call is limited to it too), reads the remaining risks with the wording rules and adds the warning "The AI took too long, so N risks were read with the coverage rules instead.", so it answers in time. When no LLM answers at all, it stops asking for the rest of the request |
 | `EXPLANATION_TIMEOUT_SECONDS` | `600` | Agent 4 (a local model can take minutes; Agent 4 stops using the LLM after `EXPLANATION_LLM_BUDGET_SECONDS`, so it answers in time) |
 | `QUESTION_TIMEOUT_SECONDS` | `150` | Agent 4 for one question; longer than Gemini's retries, so Agent 4 can still fall back to the rule-based answer |
 | `INTERNAL_API_KEY` | - | Sent as `X-API-Key` to every agent; must match theirs |

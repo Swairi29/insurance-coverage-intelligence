@@ -79,6 +79,12 @@ model on CPU can take minutes. Agent 4 itself stops asking the LLM after
 `EXPLANATION_LLM_BUDGET_SECONDS` (default 280 s) and uses template wording for the rest, so a
 complete report always reaches the gateway before that timeout.
 
+Agent 3 asks the LLM once per risk, one after another, so it also gets its own timeout
+(`COVERAGE_TIMEOUT_SECONDS`, default 300 s). It stops asking after
+`COVERAGE_LLM_BUDGET_SECONDS` (default 90 s), and as soon as no LLM answers at all, and reads
+the remaining risks with its wording rules, with a warning. Before this, an 18-risk analysis
+on Gemini's free tier ran past the flat 60 s limit and failed at the coverage stage.
+
 ## Security
 
 - **Users → gateway**: bcrypt-hashed passwords and short-lived HS256 JWTs (`JWT_SECRET_KEY`). A

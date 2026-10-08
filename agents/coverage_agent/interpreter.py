@@ -66,6 +66,10 @@ class LLMInvalidResponseError(Exception):
     """Raised when the LLM response cannot be safely used."""
 
 
+class LLMUnavailableError(RuntimeError):
+    """No LLM provider answered (all of them failed or timed out)."""
+
+
 @dataclass
 class InterpretationResult:
     """Validated interpretation plus metadata."""

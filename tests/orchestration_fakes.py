@@ -100,9 +100,11 @@ class FakeAgents:
     def http_client(self) -> httpx.Client:
         return httpx.Client(transport=httpx.MockTransport(self))
 
-    def pipeline(self, api_key: str = API_KEY, *, timeout: float = 5, report_timeout: float = 50) -> AnalysisPipeline:
+    def pipeline(self, api_key: str = API_KEY, *, timeout: float = 5, report_timeout: float = 50,
+                 coverage_timeout: float | None = None) -> AnalysisPipeline:
         return AnalysisPipeline(AgentClient(self.http_client(), api_key=api_key), URLS,
-                                timeout=timeout, report_timeout=report_timeout)
+                                timeout=timeout, report_timeout=report_timeout,
+                                coverage_timeout=coverage_timeout)
 
     def paths(self) -> List[str]:
         return [request.url.path for request in self.calls]

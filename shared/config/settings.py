@@ -72,6 +72,13 @@ class Settings(BaseSettings):
     # LLM_TIMEOUT_SECONDS and LLM_MAX_RETRIES.) Past it, the rule-based answer is used.
     qa_llm_timeout_seconds: float = Field(default=60.0, gt=0)
 
+    # --- Coverage & Gap Analysis (Agent 3) ---
+    # Time Agent 3 may spend asking the LLM, one risk at a time. No new call starts after
+    # it, and each Ollama call is limited to it; the remaining risks are read with the
+    # wording rules. Keep COVERAGE_TIMEOUT_SECONDS above about 3x this, because the last
+    # call can still run (Gemini with retries, then Ollama) after the budget is spent.
+    coverage_llm_budget_seconds: float = Field(default=90.0, gt=0)
+
     # --- Orchestration gateway ---
     # 127.0.0.1 rather than localhost: on Windows "localhost" tries IPv6 first
     # and adds ~2 s per call, because uvicorn only listens on IPv4.
@@ -82,6 +89,9 @@ class Settings(BaseSettings):
     # Per-call timeout for Agents 1-3, and a longer one for Agent 4, because a
     # local model on CPU can take minutes to write a large report.
     request_timeout_seconds: float = Field(default=60.0, gt=0)
+    # Gateway -> Agent 3. Longer than Agents 1-2, because Agent 3 asks the LLM once per
+    # risk; it must outlast COVERAGE_LLM_BUDGET_SECONDS so Agent 3 always gets to answer.
+    coverage_timeout_seconds: float = Field(default=300.0, gt=0)
     explanation_timeout_seconds: float = Field(default=600.0, gt=0)
     # Gateway -> Agent 4 for one question. Longer than one answer can take
     # (Gemini: LLM_TIMEOUT_SECONDS x (LLM_MAX_RETRIES + 1) plus pauses; Ollama:

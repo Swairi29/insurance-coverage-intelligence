@@ -117,6 +117,7 @@ def analyse_coverage(
         service = CoverageAnalysisService(
             interpreter=interpreter,
             use_llm=llm_provider is not None,
+            llm_budget_seconds=settings.coverage_llm_budget_seconds,
         )
 
         # ---------------------------------------------------------

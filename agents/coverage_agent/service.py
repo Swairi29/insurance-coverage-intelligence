@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
 
 from shared.models.coverage import (
     AnalysisMethod,
@@ -19,6 +19,7 @@ from shared.models.risk import IdentifiedRisk
 from agents.coverage_agent.interpreter import (
     CoverageInterpreter,
     LLMInvalidResponseError,
+    LLMUnavailableError,
 )
 from agents.coverage_agent.rules import (
     decide_from_evidence,
@@ -46,9 +47,16 @@ class CoverageAnalysisService:
         *,
         interpreter: CoverageInterpreter | None = None,
         use_llm: bool = True,
+        llm_budget_seconds: float | None = None,
+        clock: Callable[[], float] = time.perf_counter,
     ) -> None:
         self.interpreter = interpreter
         self.use_llm = use_llm
+        # The LLM is asked once per risk, one after another. After this many seconds no
+        # new call starts and the remaining risks are read with the wording rules, so a
+        # long list of risks cannot make the gateway give up on Agent 3 (None: no limit).
+        self.llm_budget_seconds = llm_budget_seconds
+        self._clock = clock
 
     def analyse(
         self,
@@ -69,6 +77,12 @@ class CoverageAnalysisService:
 
         llm_used = False
         llm_model: str | None = None
+
+        llm_started = self._clock()
+        # Why the LLM is no longer asked ("budget" or "unavailable"), and how many risks
+        # were read with the wording rules because of it.
+        llm_stopped: str | None = None
+        skipped = 0
 
         for risk in risks:
 
@@ -107,6 +121,13 @@ class CoverageAnalysisService:
             if not self.use_llm or self.interpreter is None:
                 # No LLM: read the wording with rules (agents/coverage_agent/wording.py).
                 assessments.append(self._wording_assessment(risk, evidence))
+                continue
+
+            if llm_stopped is None and self._budget_spent(llm_started):
+                llm_stopped = "budget"
+            if llm_stopped is not None:
+                assessments.append(self._wording_assessment(risk, evidence))
+                skipped += 1
                 continue
 
             try:
@@ -175,6 +196,12 @@ class CoverageAnalysisService:
 
             except Exception as exc:
 
+                # A bad answer only affects this risk. When no LLM could be reached,
+                # asking again for every remaining risk would only repeat the same
+                # wait, so the rest use the wording rules.
+                if isinstance(exc, LLMUnavailableError):
+                    llm_stopped = "unavailable"
+
                 # -----------------------------------------------------
 
                 # Step 5: safe deterministic fallback
@@ -221,6 +248,18 @@ class CoverageAnalysisService:
 
                 )
 
+        if skipped:
+            cause = (
+                "The AI took too long"
+                if llm_stopped == "budget"
+                else "The AI was not available"
+            )
+            warnings.append(
+                f"{cause}, so {skipped} "
+                f"{'risk was' if skipped == 1 else 'risks were'} "
+                "read with the coverage rules instead."
+            )
+
         processing_ms = int(
             (time.perf_counter() - started) * 1000
         )
@@ -231,6 +270,12 @@ class CoverageAnalysisService:
             llm_used=llm_used,
             llm_model=llm_model,
             processing_ms=processing_ms,
+        )
+
+    def _budget_spent(self, llm_started: float) -> bool:
+        return (
+            self.llm_budget_seconds is not None
+            and self._clock() - llm_started >= self.llm_budget_seconds
         )
 
     @staticmethod
