@@ -179,7 +179,7 @@ frontend/
     │   ├── Layout/AppLayout.tsx    # sidebar, header (agent status, account menu)
     │   ├── form/                   # TagInput, TriStateField (Yes / No / Not sure)
     │   └── ui/                     # Button, TextField, Alert, Spinner, Skeleton, PageHeader
-    ├── lib/                        # labels, formatting, profile draft, result helpers,
+    ├── lib/                        # labels, formatting, profile form + paths, result helpers,
     │                               #   pricing, scenario runs started in this tab
     ├── pages/
     │   ├── Landing.tsx, NotFound.tsx

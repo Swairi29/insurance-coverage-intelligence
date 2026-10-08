@@ -10,6 +10,8 @@ from agents.explanation_agent import llm
 from agents.explanation_agent.llm import (
     MAX_RESPONSE_CHARS,
     ExplanationLLMError,
+    FallbackClient,
+    active_model,
     generate_json,
     get_client,
 )
@@ -149,18 +151,78 @@ def test_get_client_none_when_gemini_not_configured():
     assert get_client(_settings(llm_provider="gemini")) == (None, None, None)
 
 
-def test_get_client_builds_gemini_client(monkeypatch):
-    created = {}
+class StubGemini:
+    created = []
 
-    class StubGemini:
-        def __init__(self, settings):
-            created["settings"] = settings
+    def __init__(self, settings):
+        StubGemini.created.append(settings)
 
+
+def test_get_client_builds_gemini_with_an_ollama_fallback(monkeypatch):
+    StubGemini.created = []
     monkeypatch.setattr(llm, "GeminiClient", StubGemini)
-    settings = _settings(llm_provider="gemini", gemini_api_key="test-key", llm_model="gemini-test")
+    settings = _settings(llm_provider="gemini", gemini_api_key="test-key", llm_model="gemini-test",
+                         llm_max_retries=2)
+
     client, provider, model = get_client(settings)
-    assert isinstance(client, StubGemini) and created["settings"] is settings
+
+    assert isinstance(client, FallbackClient)
     assert (provider, model) == ("gemini", "gemini-test")
+    # The fallback replaces Gemini's retries: a 429 goes straight to the local model.
+    assert StubGemini.created[0].llm_max_retries == 0
+    assert settings.llm_max_retries == 2  # the shared settings are untouched
+    assert isinstance(client._fallback, OllamaClient)
+
+
+def test_get_client_gemini_alone_without_an_ollama_model(monkeypatch):
+    StubGemini.created = []
+    monkeypatch.setattr(llm, "GeminiClient", StubGemini)
+    settings = _settings(llm_provider="gemini", gemini_api_key="test-key", llm_model="gemini-test",
+                         ollama_model=" ")
+
+    client, provider, _ = get_client(settings)
+
+    assert isinstance(client, StubGemini) and StubGemini.created[0] is settings
+    assert provider == "gemini"
+
+
+# --- FallbackClient ---------------------------------------------------------------------
+
+
+def _fallback(gemini, ollama) -> FallbackClient:
+    return FallbackClient(gemini, ollama, primary_name="gemini", primary_model="gemini-test",
+                          fallback_name="ollama", fallback_model="qwen3:4b")
+
+
+def test_fallback_client_uses_gemini_while_it_works():
+    client = _fallback(FakeLLM(["a", "b"]), FakeLLM([]))
+
+    assert [client.generate_text("p1"), client.generate_text("p2")] == ["a", "b"]
+    assert active_model(client, "gemini", "gemini-test") == ("gemini", "gemini-test")
+
+
+def test_fallback_client_switches_to_ollama_after_a_gemini_failure():
+    gemini = FakeLLM([LLMAPIError("rate limited", status_code=429)])
+    ollama = FakeLLM(["first", "second"])
+    client = _fallback(gemini, ollama)
+
+    assert client.generate_text("p1", system_instruction="s", json_output=True) == "first"
+    assert client.generate_text("p2") == "second"
+
+    assert len(gemini.calls) == 1  # not asked again for the second batch
+    assert ollama.calls[0].system_instruction == "s" and ollama.calls[0].json_output is True
+    assert active_model(client, "gemini", "gemini-test") == ("ollama", "qwen3:4b")
+
+
+def test_fallback_client_raises_when_both_fail():
+    client = _fallback(FakeLLM([LLMAPIError("429", status_code=429)]), FakeLLM([OllamaError("down")]))
+
+    with pytest.raises(OllamaError):
+        client.generate_text("p")
+
+
+def test_active_model_of_a_plain_client_is_what_was_configured():
+    assert active_model(FakeLLM([]), "ollama", "qwen3:8b") == ("ollama", "qwen3:8b")
 
 
 def test_get_client_none_when_client_construction_fails(monkeypatch):

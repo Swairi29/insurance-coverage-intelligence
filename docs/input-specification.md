@@ -93,9 +93,10 @@ Before the profile is used (and before any of it can reach an LLM prompt):
 
 ### Where the profile is kept
 
-The gateway does not save the profile on its own. It is stored only inside each saved analysis
-result, encrypted with `DOCUMENT_ENCRYPTION_KEY`. In the web app, the profile form is kept in the
-browser tab's `sessionStorage` and cleared on logout.
+Users save their profiles to their account (`/api/v1/business-profiles`, up to 20 per account),
+encrypted with `DOCUMENT_ENCRYPTION_KEY`, so they survive logout and restarts. A new analysis
+picks one of them and sends its contents as `business`; the analysis itself does not take a
+profile id. The web app keeps no profile in the browser.
 
 ### Example
 

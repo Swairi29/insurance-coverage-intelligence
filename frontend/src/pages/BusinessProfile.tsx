@@ -1,15 +1,20 @@
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { Controller, useForm, useWatch, type Path } from 'react-hook-form';
-import { useLocation, useNavigate } from 'react-router-dom';
-import type { ValidationErrorDetail } from '../api/types';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useBusinessProfile, useSaveBusinessProfile } from '../api/businessProfiles';
+import { isApiError } from '../api/client';
+import type { SavedBusinessProfile, ValidationErrorDetail } from '../api/types';
 import { SALES_CHANNELS } from '../api/types';
+import { ErrorMessage } from '../components/ErrorMessage';
 import { TagInput } from '../components/form/TagInput';
 import { TriStateField } from '../components/form/TriStateField';
 import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
+import { buttonClasses } from '../components/ui/buttonClasses';
 import { INPUT_CLASSES, inputBorder } from '../components/ui/fieldStyles';
 import { TextArea, TextField } from '../components/ui/TextField';
 import { PageHeader } from '../components/ui/PageHeader';
+import { SkeletonLines } from '../components/ui/Skeleton';
 import {
   BUSINESS_TYPE_GROUPS,
   BUSINESS_TYPE_LABELS,
@@ -17,25 +22,66 @@ import {
   PROFILE_LIMITS as LIMITS,
   SALES_CHANNEL_LABELS,
   YES_NO_QUESTIONS,
-  loadProfileDraft,
+  analysisFlowPath,
   profileErrorsFrom,
-  saveProfileDraft,
   toBusinessProfile,
   toFormValues,
   type ProfileFormValues,
 } from '../lib/profile';
 
-/** Navigation state: step 9 sends the user back here with a 422's details. */
+/** Navigation state: a new analysis sends the user back here with a 422's details. */
 export interface ProfilePageState {
   serverErrors?: ValidationErrorDetail[];
-  /** Why the user was sent here, e.g. from the new-analysis page without a profile. */
-  notice?: string;
 }
 
+/** `/app/businesses/new` adds a business; `/app/businesses/:profileId` edits a saved one. */
 export default function BusinessProfile() {
+  const { profileId } = useParams();
+  const saved = useBusinessProfile(profileId ?? '', { enabled: Boolean(profileId) });
+
+  if (!profileId) return <ProfileForm />;
+  if (saved.isPending) {
+    return (
+      <section className="max-w-4xl">
+        <PageHeader eyebrow="Businesses · edit" title="Business profile" />
+        <SkeletonLines label="Loading the business profile" lines={6} />
+      </section>
+    );
+  }
+  if (saved.isError) {
+    const notFound = isApiError(saved.error) && saved.error.status === 404;
+    return (
+      <section className="max-w-4xl space-y-4">
+        <PageHeader eyebrow="Businesses · edit" title="Business profile" />
+        {notFound ? (
+          <Alert tone="error" title="This business profile was not found">
+            It may have been deleted.
+          </Alert>
+        ) : (
+          <ErrorMessage
+            title="The business profile could not be loaded"
+            error={saved.error}
+            onRetry={() => void saved.refetch()}
+          />
+        )}
+        <Link to="/app/businesses" className={buttonClasses('secondary')}>
+          Back to businesses
+        </Link>
+      </section>
+    );
+  }
+  // Keyed, so the form starts again from the saved values if another profile is opened.
+  return <ProfileForm key={saved.data.profile_id} saved={saved.data} />;
+}
+
+function ProfileForm({ saved }: { saved?: SavedBusinessProfile }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [draft] = useState(loadProfileDraft);
+  const [searchParams] = useSearchParams();
+  // Opened from step 1 of a new analysis: go back there after saving, not to the list.
+  const forAnalysis = searchParams.get('next') === 'analysis';
+  const save = useSaveBusinessProfile();
+  const [initial] = useState(() => (saved ? toFormValues(saved.profile) : EMPTY_PROFILE_FORM));
 
   const {
     register,
@@ -43,14 +89,12 @@ export default function BusinessProfile() {
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
-  } = useForm<ProfileFormValues>({
-    defaultValues: draft ? toFormValues(draft) : EMPTY_PROFILE_FORM,
-    mode: 'onTouched',
-  });
+  } = useForm<ProfileFormValues>({ defaultValues: initial, mode: 'onTouched' });
 
-  // Show the errors the gateway found when an analysis was started with this profile.
+  // Errors the gateway found: from saving here, or from an analysis started with this profile.
   const pageState = location.state as ProfilePageState | null;
-  const serverErrors = pageState?.serverErrors;
+  const [saveErrors, setSaveErrors] = useState<ValidationErrorDetail[] | null>(null);
+  const serverErrors = saveErrors ?? pageState?.serverErrors;
   const serverMapped = useMemo(
     () => (serverErrors?.length ? profileErrorsFrom(serverErrors) : null),
     [serverErrors],
@@ -70,25 +114,35 @@ export default function BusinessProfile() {
     });
   }, [serverMapped, setError]);
 
-  const onSubmit = (values: ProfileFormValues) => {
-    saveProfileDraft(toBusinessProfile(values));
-    navigate('/app/policies');
+  const onSubmit = async (values: ProfileFormValues) => {
+    setSaveErrors(null);
+    try {
+      const result = await save.mutateAsync({
+        profileId: saved?.profile_id,
+        profile: toBusinessProfile(values),
+      });
+      navigate(forAnalysis ? analysisFlowPath(result.profile_id, 'policies') : '/app/businesses');
+    } catch (error) {
+      // A 422 goes next to the fields; anything else is shown above the buttons.
+      if (isApiError(error) && error.status === 422) setSaveErrors(error.details);
+    }
   };
 
   const descriptionLength = useWatch({ control, name: 'description' }).length;
   const businessType = useWatch({ control, name: 'business_type' });
   const errorCount = Object.keys(errors).length;
+  const saveFailed = save.isError && !(isApiError(save.error) && save.error.status === 422);
+  const cancelTo = forAnalysis ? analysisFlowPath(saved?.profile_id) : '/app/businesses';
 
   return (
     <section className="max-w-4xl">
       <PageHeader
-        eyebrow="Businesses · profile details"
+        eyebrow={saved ? 'Businesses · edit' : 'Businesses · new'}
         title="Business profile"
-        description="Add the information used by the structured risk profiling flow. Only the business name and type are required. This profile is kept in this browser tab and cleared when you log out."
+        description="Saved to your account, so you can pick this business for any analysis. Only the business name and type are required."
       />
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6 space-y-6">
-        {pageState?.notice && <Alert tone="info">{pageState.notice}</Alert>}
         {(errorCount > 0 || otherServerErrors.length > 0) && (
           <Alert tone="error" title="Please check the highlighted fields">
             {otherServerErrors.length > 0 && (
@@ -101,7 +155,7 @@ export default function BusinessProfile() {
           </Alert>
         )}
 
-        <Card title="Step 1 — Business">
+        <Card title="Business">
           <TextField
             label="Business name"
             required
@@ -191,7 +245,7 @@ export default function BusinessProfile() {
           />
         </Card>
 
-        <Card title="Step 2 — Operations">
+        <Card title="Operations">
           <Controller
             control={control}
             name="equipment"
@@ -243,7 +297,7 @@ export default function BusinessProfile() {
           ))}
         </Card>
 
-        <Card title="Step 3 — Location">
+        <Card title="Location">
           <div className="grid gap-4 sm:grid-cols-3">
             {(['city', 'district', 'country'] as const).map((place) => (
               <TextField
@@ -266,11 +320,17 @@ export default function BusinessProfile() {
           />
         </Card>
 
+        {saveFailed && (
+          <ErrorMessage title="The business profile could not be saved" error={save.error} />
+        )}
+
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" loading={isSubmitting}>
-            Save and continue to policies
+            {forAnalysis ? 'Save and continue' : 'Save business profile'}
           </Button>
-          {draft && <span className="text-xs text-muted">A saved profile was loaded.</span>}
+          <Link to={cancelTo} className={buttonClasses('ghost')}>
+            Cancel
+          </Link>
         </div>
       </form>
     </section>

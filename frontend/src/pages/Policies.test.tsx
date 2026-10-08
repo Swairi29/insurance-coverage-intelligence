@@ -60,9 +60,10 @@ describe('policies page', () => {
     expect(flood).toHaveTextContent('1 page · 2 sections');
     expect(flood).toHaveTextContent('1 section contained text that looked like instructions');
 
+    // Straight to the business profile flow, not back to the choice of input method.
     expect(screen.getByRole('link', { name: 'Start a new analysis →' })).toHaveAttribute(
       'href',
-      '/app/analyses/new',
+      '/app/analyses/new/profile',
     );
   });
 

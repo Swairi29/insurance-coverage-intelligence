@@ -4,8 +4,6 @@
 
 export const SESSION_KEYS = {
   token: 'insureintel.token',
-  /** The business profile draft (plan §3.6), written by the profile page in step 7. */
-  profileDraft: 'insureintel.profileDraft',
   /** Each analysis request by request_id, so a failed run can be retried (lib/analysisRequests). */
   analysisRequests: 'insureintel.analysisRequests',
   scenarioAnalysisIds: 'insureintel.scenarioAnalysisIds',

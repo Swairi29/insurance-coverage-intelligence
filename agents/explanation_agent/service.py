@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Sequence, Set
 
 from agents.explanation_agent.context import FindingPair, classify_evidence, make_excerpt, sanitize
-from agents.explanation_agent.llm import TextGenerator
+from agents.explanation_agent.llm import TextGenerator, active_model
 from agents.explanation_agent.rag import generate_llm_items
 from agents.explanation_agent.templates import (
     headline_for,
@@ -127,10 +127,11 @@ class ExplanationService:
             warnings.extend(_fallback_warnings(problems, template_ids))
 
         processing_ms = int((time.perf_counter() - started) * 1000)
+        provider, model = active_model(self._client, self._provider, self._model)
         logger.info(
             "Report generated: %d findings (%d llm, %d template), provider=%s, %d ms.",
             len(findings), llm_count, len(findings) - llm_count,
-            self._provider if llm_attempted else None, processing_ms,
+            provider if llm_attempted else None, processing_ms,
         )
 
         return ExplanationResponse(
@@ -143,8 +144,8 @@ class ExplanationService:
             warnings=warnings,
             metadata=ExplanationMetadata(
                 llm_used=llm_count > 0,
-                llm_provider=self._provider if llm_attempted else None,
-                llm_model=self._model if llm_attempted else None,
+                llm_provider=provider if llm_attempted else None,
+                llm_model=model if llm_attempted else None,
                 llm_findings=llm_count,
                 template_findings=len(findings) - llm_count,
                 processing_ms=processing_ms,

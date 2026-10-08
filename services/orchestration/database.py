@@ -9,6 +9,8 @@
   columns are kept in plain text for the history list.
 - `scenario_analyses`: finished free-text scenario runs, stored the same way.
   A separate table, because the result has a different shape.
+- `business_profiles`: the business profiles a user saved to their account, so they
+  can be picked again for a new analysis. The profile is stored Fernet-encrypted.
 
 A new connection is opened per operation, because FastAPI runs sync endpoints
 in a thread pool and a sqlite3 connection must stay on one thread.
@@ -68,8 +70,16 @@ CREATE TABLE IF NOT EXISTS scenario_analyses (
     potential_gaps INTEGER NOT NULL,
     result         BLOB NOT NULL
 );
+CREATE TABLE IF NOT EXISTS business_profiles (
+    profile_id     TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL REFERENCES users (user_id),
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL,
+    profile        BLOB NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_analyses_user ON analyses (user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_scenario_analyses_user ON scenario_analyses (user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_business_profiles_user ON business_profiles (user_id, updated_at);
 """
 
 
@@ -87,6 +97,16 @@ class UserRecord:
     # The privacy notice agreed to at sign-up, and when (None for older accounts).
     consent_version: Optional[str] = None
     consented_at: Optional[datetime] = None
+
+
+@dataclass(frozen=True)
+class StoredBusinessProfile:
+    """One saved business profile; `encrypted_profile` is the Fernet-encrypted BusinessProfile JSON."""
+
+    profile_id: str
+    created_at: datetime
+    updated_at: datetime
+    encrypted_profile: bytes
 
 
 # Columns added after the first release, with their type. init_schema adds any that an
@@ -256,6 +276,69 @@ class Database:
             )
             for row in rows
         ]
+
+
+    # --- business profiles ------------------------------------------------------------
+
+    def add_business_profile(self, *, user_id: str, encrypted_profile: bytes) -> StoredBusinessProfile:
+        now = datetime.now(timezone.utc)
+        stored = StoredBusinessProfile(profile_id=f"BP-{uuid.uuid4().hex[:16]}", created_at=now,
+                                       updated_at=now, encrypted_profile=encrypted_profile)
+        with self._connection() as conn:
+            conn.execute(
+                "INSERT INTO business_profiles (profile_id, user_id, created_at, updated_at, profile) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (stored.profile_id, user_id, now.isoformat(), now.isoformat(), encrypted_profile),
+            )
+        return stored
+
+    def list_business_profiles(self, user_id: str) -> List[StoredBusinessProfile]:
+        """The user's profiles, most recently changed first."""
+        with self._connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM business_profiles WHERE user_id = ? ORDER BY updated_at DESC", (user_id,)
+            ).fetchall()
+        return [_stored_profile(row) for row in rows]
+
+    def count_business_profiles(self, user_id: str) -> int:
+        with self._connection() as conn:
+            row = conn.execute("SELECT COUNT(*) FROM business_profiles WHERE user_id = ?", (user_id,)).fetchone()
+        return row[0]
+
+    def get_business_profile(self, *, user_id: str, profile_id: str) -> Optional[StoredBusinessProfile]:
+        """The profile, or None if it does not exist or belongs to another user."""
+        with self._connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM business_profiles WHERE profile_id = ? AND user_id = ?", (profile_id, user_id)
+            ).fetchone()
+        return None if row is None else _stored_profile(row)
+
+    def update_business_profile(self, *, user_id: str, profile_id: str,
+                                encrypted_profile: bytes) -> Optional[StoredBusinessProfile]:
+        """Replace the profile; None if it does not exist or belongs to another user."""
+        with self._connection() as conn:
+            updated = conn.execute(
+                "UPDATE business_profiles SET profile = ?, updated_at = ? WHERE profile_id = ? AND user_id = ?",
+                (encrypted_profile, datetime.now(timezone.utc).isoformat(), profile_id, user_id),
+            ).rowcount
+        return self.get_business_profile(user_id=user_id, profile_id=profile_id) if updated else None
+
+    def delete_business_profile(self, *, user_id: str, profile_id: str) -> bool:
+        """True if the user's profile was deleted, False if there was none to delete."""
+        with self._connection() as conn:
+            deleted = conn.execute(
+                "DELETE FROM business_profiles WHERE profile_id = ? AND user_id = ?", (profile_id, user_id)
+            ).rowcount
+        return deleted > 0
+
+
+def _stored_profile(row: sqlite3.Row) -> StoredBusinessProfile:
+    return StoredBusinessProfile(
+        profile_id=row["profile_id"],
+        created_at=datetime.fromisoformat(row["created_at"]),
+        updated_at=datetime.fromisoformat(row["updated_at"]),
+        encrypted_profile=bytes(row["profile"]),
+    )
 
 
 _ANALYSES = "analyses"

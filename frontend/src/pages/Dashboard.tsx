@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAnalyses, useAnalysis } from '../api/analyses';
+import { useBusinessProfiles } from '../api/businessProfiles';
 import { useScenarioAnalyses } from '../api/scenarioAnalyses';
 import { usePolicies } from '../api/policies';
 import type { AnalysisSummary } from '../api/types';
@@ -12,7 +12,7 @@ import { buttonClasses } from '../components/ui/buttonClasses';
 import { SkeletonLines } from '../components/ui/Skeleton';
 import { Spinner } from '../components/ui/Spinner';
 import { formatDateTime, plural } from '../lib/format';
-import { businessTypeLabel, loadProfileDraft } from '../lib/profile';
+import { businessTypeLabel, profileFormPath } from '../lib/profile';
 import { scenarioLabel } from '../lib/scenarioHistory';
 import { statusCounts } from '../lib/results';
 
@@ -33,7 +33,10 @@ const PANEL = 'rounded-2xl border border-blue-200/10 bg-[#0b1930]/80 p-5 sm:p-6'
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [profile] = useState(loadProfileDraft);
+  const businesses = useBusinessProfiles();
+  const savedCount = businesses.data?.length ?? 0;
+  // The most recently changed business names the workspace.
+  const profile = businesses.data?.[0]?.profile ?? null;
   const policies = usePolicies();
   const analyses = useAnalyses();
   const scenarios = useScenarioAnalyses();
@@ -53,11 +56,13 @@ export default function Dashboard() {
     {
       title: 'Business profile',
       description: profile
-        ? `${profile.business_name}, ${businessTypeLabel(profile).toLowerCase()}.`
-        : 'Kept in this browser tab and sent with each analysis.',
-      done: profile !== null,
-      to: '/app/profile',
-      action: profile ? 'Edit profile' : 'Add profile',
+        ? savedCount === 1
+          ? `${profile.business_name}, ${businessTypeLabel(profile).toLowerCase()}.`
+          : `${savedCount} businesses saved to your account.`
+        : 'Saved to your account and picked for each analysis.',
+      done: businesses.data ? savedCount > 0 : businesses.isError ? false : null,
+      to: profile ? '/app/businesses' : profileFormPath(),
+      action: profile ? 'Manage businesses' : 'Add profile',
     },
     {
       title: policies.data ? `Policies uploaded (${readyCount})` : 'Policies uploaded',
@@ -82,9 +87,11 @@ export default function Dashboard() {
   // Per-run figures come from the latest analysis: adding up every run counts repeats twice.
   const metrics = [
     {
-      label: 'Business profile',
-      value: profile ? 'Saved' : 'Not set',
-      detail: profile?.business_name ?? 'Add your business details',
+      label: 'Business profiles',
+      value: businesses.isPending ? '—' : savedCount,
+      detail: businesses.isError
+        ? 'Could not load businesses'
+        : (profile?.business_name ?? 'Add your business details'),
       accent: 'text-blue-300',
     },
     {

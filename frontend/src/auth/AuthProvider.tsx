@@ -13,10 +13,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>(() => (getToken() ? 'checking' : 'anonymous'));
   const [sessionExpired, setSessionExpired] = useState(false);
 
-  /** Forget everything that belongs to the user: token, profile draft and cached API data. */
+  /** Forget everything that belongs to the user in this tab: token, run requests, cached API data. */
   const clearSession = useCallback(() => {
     clearToken();
-    removeSession(SESSION_KEYS.profileDraft);
     removeSession(SESSION_KEYS.analysisRequests);
     removeSession(SESSION_KEYS.scenarioAnalysisIds);
     queryClient.clear();

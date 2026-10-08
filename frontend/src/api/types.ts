@@ -134,6 +134,15 @@ export interface UserResponse {
 
 // --- policies (shared/models/policy.py) ------------------------------------------------------
 
+/** A business profile saved to the user's account (`/api/v1/business-profiles`). */
+export interface SavedBusinessProfile {
+  /** "BP-" + 16 hex characters. */
+  profile_id: string;
+  created_at: string;
+  updated_at: string;
+  profile: BusinessProfile;
+}
+
 export interface PolicyDocument {
   policy_id: string;
   business_id: string;

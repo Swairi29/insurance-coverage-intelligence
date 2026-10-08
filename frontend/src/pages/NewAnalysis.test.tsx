@@ -1,8 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import type { BusinessProfile, PolicyDocument } from '../api/types';
+import type { BusinessProfile, PolicyDocument, SavedBusinessProfile } from '../api/types';
 import { analysisRequestFor } from '../lib/analysisRequests';
-import { SESSION_KEYS } from '../lib/session';
 import { db } from '../mocks/db';
 import { policiesFixture } from '../mocks/fixtures';
 import { server } from '../mocks/server';
@@ -11,24 +10,48 @@ import { loginAsDemoUser } from '../test/session';
 
 const location = () => screen.getByTestId('location').textContent;
 
-function saveDraft(overrides: Partial<BusinessProfile> = {}) {
-  const profile: BusinessProfile = {
-    business_name: 'Test Bakery',
-    business_type: 'bakery',
-    employee_count: 8,
-    equipment: ['Ovens'],
-    ...overrides,
+const PROFILE_ID = 'BP-test000000000001';
+
+function savedProfile(overrides: Partial<BusinessProfile> = {}, profileId = PROFILE_ID) {
+  const saved: SavedBusinessProfile = {
+    profile_id: profileId,
+    created_at: '2026-09-01T09:00:00Z',
+    updated_at: '2026-09-01T09:00:00Z',
+    profile: {
+      business_name: 'Test Bakery',
+      business_type: 'bakery',
+      employee_count: 8,
+      equipment: ['Ovens'],
+      ...overrides,
+    },
   };
-  window.sessionStorage.setItem(SESSION_KEYS.profileDraft, JSON.stringify(profile));
+  return saved;
 }
 
-async function openNewAnalysis() {
+/** The account has exactly these saved businesses. */
+function saveProfiles(...profiles: SavedBusinessProfile[]) {
+  db.businessProfiles = profiles;
+}
+
+async function openStep(query: string) {
   loginAsDemoUser();
-  const result = renderApp('/app/analyses/new/profile');
+  const result = renderApp(`/app/analyses/new/profile${query}`);
   await screen.findByRole('heading', { name: 'New analysis' });
   return result;
 }
 
+/** Step 3 for the saved "Test Bakery", with the default policies. */
+async function openReview(overrides: Partial<BusinessProfile> = {}) {
+  saveProfiles(savedProfile(overrides));
+  const result = await openStep(`?profile=${PROFILE_ID}&step=review`);
+  await screen.findByRole('list', { name: 'Chosen policies' });
+  return result;
+}
+
+const currentStep = () =>
+  within(screen.getByRole('list', { name: 'Steps' }))
+    .getAllByRole('listitem')
+    .find((item) => item.getAttribute('aria-current') === 'step')!.textContent;
 const runButton = () => screen.getByRole('button', { name: 'Start analysis' });
 const policyBox = (filename: string) =>
   screen.getByRole('checkbox', { name: new RegExp(filename) });
@@ -41,44 +64,99 @@ function manyPolicies(count: number): PolicyDocument[] {
   }));
 }
 
-describe('new analysis: setup', () => {
-  it('sends a user without a profile to the profile page first', async () => {
-    loginAsDemoUser();
-    renderApp('/app/analyses/new/profile');
+describe('new analysis: step 1, the business', () => {
+  it('asks a user without a saved business to add one, and comes back here after', async () => {
+    saveProfiles();
+    await openStep('');
 
-    expect(
-      await screen.findByText('Add your business profile first. It is sent with every analysis.'),
-    ).toBeInTheDocument();
-    expect(location()).toBe('/app/profile');
+    expect(await screen.findByText('Add your business first')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Add business profile' })).toHaveAttribute(
+      'href',
+      '/app/businesses/new?next=analysis',
+    );
+    expect(currentStep()).toContain('Business');
   });
 
-  it('shows the profile summary and preselects the ready policies', async () => {
-    saveDraft();
-    await openNewAnalysis();
-
-    const summary = screen.getByRole('complementary', { name: '2. Check your profile' });
-    expect(summary).toHaveTextContent('Test Bakery');
-    expect(summary).toHaveTextContent('Bakery');
-    expect(summary).toHaveTextContent('Ovens');
-    expect(within(summary).getByRole('link', { name: 'Edit' })).toHaveAttribute(
-      'href',
-      '/app/profile',
+  it('lists the saved businesses, picks the latest, and moves on to the policies', async () => {
+    saveProfiles(
+      savedProfile({ business_name: 'Newer Cafe', business_type: 'cafe' }, 'BP-newer'),
+      savedProfile(),
     );
+    const { user } = await openStep('');
+
+    const newer = await screen.findByRole('radio', { name: /Newer Cafe/ });
+    expect(newer).toBeChecked();
+    expect(screen.getByRole('radio', { name: /Test Bakery/ })).not.toBeChecked();
+    expect(screen.getByRole('link', { name: /Add a new business/ })).toHaveAttribute(
+      'href',
+      '/app/businesses/new?next=analysis',
+    );
+
+    await user.click(screen.getByRole('radio', { name: /Test Bakery/ }));
+    expect(screen.getByRole('link', { name: 'Edit the chosen business' })).toHaveAttribute(
+      'href',
+      `/app/businesses/${PROFILE_ID}?next=analysis`,
+    );
+    await user.click(screen.getByRole('button', { name: /Continue to policies/ }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Which policies should be checked?' }),
+    ).toBeInTheDocument();
+    expect(location()).toBe(`/app/analyses/new/profile?profile=${PROFILE_ID}&step=policies`);
+    expect(currentStep()).toContain('Policies');
+
+    // Back keeps the choice: no need to fill anything in again.
+    await user.click(screen.getByRole('button', { name: /Back/ }));
+    expect(await screen.findByRole('radio', { name: /Test Bakery/ })).toBeChecked();
+  });
+
+  it('adds a new business without leaving the flow', async () => {
+    saveProfiles(savedProfile());
+    const { user } = await openStep('');
+
+    await user.click(await screen.findByRole('link', { name: /Add a new business/ }));
+    await screen.findByRole('heading', { name: 'Business profile' });
+    await user.type(screen.getByLabelText(/Business name/), 'Corner Pharmacy');
+    await user.selectOptions(screen.getByLabelText(/Type of business/), 'pharmacy');
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }));
+
+    // Straight on to the policies, with the new business chosen.
+    expect(
+      await screen.findByRole('heading', { name: 'Which policies should be checked?' }),
+    ).toBeInTheDocument();
+    const added = db.businessProfiles.find((p) => p.profile.business_name === 'Corner Pharmacy')!;
+    expect(added).toBeDefined();
+    expect(location()).toBe(`/app/analyses/new/profile?profile=${added.profile_id}&step=policies`);
+    expect(db.businessProfiles).toHaveLength(2);
+  });
+
+  it('starts again at step 1 when the business in the link no longer exists', async () => {
+    saveProfiles(savedProfile());
+    await openStep('?profile=BP-deleted&step=review');
+
+    expect(await screen.findByRole('radio', { name: /Test Bakery/ })).toBeChecked();
+    expect(currentStep()).toContain('Business');
+  });
+});
+
+describe('new analysis: step 2, the policies', () => {
+  beforeEach(() => saveProfiles(savedProfile()));
+  const openPolicies = () => openStep(`?profile=${PROFILE_ID}&step=policies`);
+
+  it('preselects the ready policies', async () => {
+    await openPolicies();
 
     for (const policy of policiesFixture) {
       expect(
         await screen.findByRole('checkbox', { name: new RegExp(policy.filename) }),
       ).toBeChecked();
     }
-    expect(runButton()).toBeEnabled();
-    // Starting the AI pipeline is an AI action, so it gets the indigo button.
-    expect(runButton()).toHaveClass('bg-ai');
+    expect(screen.getByRole('button', { name: /Continue to review/ })).toBeEnabled();
   });
 
   it('allows at most 5 policies', async () => {
-    saveDraft();
     server.use(http.get('*/api/v1/policies', () => HttpResponse.json(manyPolicies(7))));
-    const { user } = await openNewAnalysis();
+    const { user } = await openPolicies();
 
     await screen.findByRole('checkbox', { name: /policy-1\.pdf/ });
     const boxes = screen.getAllByRole('checkbox');
@@ -93,34 +171,74 @@ describe('new analysis: setup', () => {
     expect(policyBox('policy-7.pdf')).toBeDisabled();
   });
 
-  it('needs at least one policy to run', async () => {
-    saveDraft();
-    const { user } = await openNewAnalysis();
+  it('needs at least one policy to continue', async () => {
+    const { user } = await openPolicies();
 
     for (const policy of policiesFixture) {
       await user.click(await screen.findByRole('checkbox', { name: new RegExp(policy.filename) }));
     }
-    expect(runButton()).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Continue to review/ })).toBeDisabled();
     expect(screen.getByText('Choose at least one policy.')).toBeInTheDocument();
   });
 
-  it('explains what to do when no policy is ready', async () => {
-    saveDraft();
-    server.use(http.get('*/api/v1/policies', () => HttpResponse.json([])));
-    await openNewAnalysis();
+  it('uploads a missing policy here and ticks it', async () => {
+    db.policies = [];
+    server.use(
+      http.post('*/api/v1/policies', () => {
+        const document: PolicyDocument = {
+          ...policiesFixture[0],
+          policy_id: 'POL-new000000001',
+          filename: 'new-cover.pdf',
+          uploaded_at: new Date().toISOString(),
+        };
+        db.policies = [document];
+        return HttpResponse.json({ ...document, warnings: [] });
+      }),
+    );
+    const { user } = await openPolicies();
 
     expect(await screen.findByText('No policies are ready yet')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Upload a policy PDF' })).toHaveAttribute(
-      'href',
-      '/app/policies',
+    expect(screen.getByRole('button', { name: /Continue to review/ })).toBeDisabled();
+
+    const file = new File(['%PDF-1.4'], 'new-cover.pdf', { type: 'application/pdf' });
+    await user.upload(screen.getByLabelText('Upload policy PDFs'), file);
+
+    expect(await screen.findByRole('checkbox', { name: /new-cover\.pdf/ })).toBeChecked();
+    expect(screen.getByRole('button', { name: /Continue to review/ })).toBeEnabled();
+  });
+
+  it('keeps the choice when moving to the review', async () => {
+    const { user } = await openPolicies();
+    await user.click(
+      await screen.findByRole('checkbox', { name: new RegExp(policiesFixture[0].filename) }),
     );
-    expect(runButton()).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: /Continue to review/ }));
+
+    const chosen = await screen.findByRole('list', { name: 'Chosen policies' });
+    expect(chosen).not.toHaveTextContent(policiesFixture[0].filename);
+    expect(chosen).toHaveTextContent(policiesFixture[1].filename);
+    expect(location()).toContain('step=review');
   });
 });
 
-describe('new analysis: agent workspace', () => {
+describe('new analysis: step 3, review and run', () => {
+  it('shows the business and the policies, with a way back to each', async () => {
+    const { user } = await openReview();
+
+    const business = screen.getByRole('region', { name: 'Business' });
+    expect(business).toHaveTextContent('Test Bakery');
+    expect(business).toHaveTextContent('Ovens');
+    // Starting the AI pipeline is an AI action, so it gets the indigo button.
+    expect(runButton()).toHaveClass('bg-ai');
+
+    await user.click(screen.getByRole('button', { name: 'Change policies' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Which policies should be checked?' }),
+    ).toBeInTheDocument();
+  });
+
   it('starts one run, opens the workspace and shows every agent finishing', async () => {
-    saveDraft();
     let requests = 0;
     let sentBody: unknown;
     server.use(
@@ -130,8 +248,7 @@ describe('new analysis: agent workspace', () => {
         return undefined; // fall through to the normal mock handler
       }),
     );
-    const { user } = await openNewAnalysis();
-    await screen.findByRole('checkbox', { name: new RegExp(policiesFixture[0].filename) });
+    const { user } = await openReview();
 
     await user.click(runButton());
 
@@ -169,18 +286,15 @@ describe('new analysis: agent workspace', () => {
     expect(lines[1]).toHaveTextContent('Risk agent → Gateway');
     for (const line of lines) expect(line).toHaveTextContent(/Gateway/);
 
-    const requestId = location()!.split('/')[3];
     expect(screen.getByRole('link', { name: 'View results →' })).toHaveAttribute(
       'href',
-      `/app/analyses/${requestId}`,
+      `/app/analyses/${runId}`,
     );
   });
 
   it('shows the agent that is working while the run is in progress', async () => {
     // "Slow" names keep real timings in the mock, so the first agent is still running.
-    saveDraft({ business_name: 'Slow Bakery' });
-    const { user } = await openNewAnalysis();
-    await screen.findByRole('checkbox', { name: new RegExp(policiesFixture[0].filename) });
+    const { user } = await openReview({ business_name: 'Slow Bakery' });
 
     await user.click(runButton());
 
@@ -211,7 +325,6 @@ describe('new analysis: errors', () => {
   ])(
     '"%s": marks agent %i as failed, skips the rest and offers a retry',
     async (name, failedIndex, message) => {
-      saveDraft({ business_name: name });
       let requests = 0;
       server.use(
         http.post('*/api/v1/analyses', () => {
@@ -219,8 +332,7 @@ describe('new analysis: errors', () => {
           return undefined;
         }),
       );
-      const { user } = await openNewAnalysis();
-      await screen.findByRole('checkbox', { name: new RegExp(policiesFixture[0].filename) });
+      const { user } = await openReview({ business_name: name });
 
       await user.click(runButton());
 
@@ -273,8 +385,7 @@ describe('new analysis: errors', () => {
     );
   });
 
-  it('refreshes the policy list after a 404 policy_not_found', async () => {
-    saveDraft();
+  it('goes back to the policies, refreshed, after a 404 policy_not_found', async () => {
     let policyListLoads = 0;
     server.use(
       http.get('*/api/v1/policies', () => {
@@ -291,33 +402,30 @@ describe('new analysis: errors', () => {
         ),
       ),
     );
-    const { user } = await openNewAnalysis();
-    await screen.findByRole('checkbox', { name: new RegExp(policiesFixture[0].filename) });
+    const { user } = await openReview();
 
     await user.click(runButton());
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'One or more policies were not found for your account.',
-    );
+    expect(
+      await screen.findByRole('heading', { name: 'Which policies should be checked?' }),
+    ).toBeInTheDocument();
     await waitFor(() => expect(policyListLoads).toBe(2));
+    expect(location()).toBe(`/app/analyses/new/profile?profile=${PROFILE_ID}&step=policies`);
   });
 
-  it('sends a 422 about the profile back to the profile page, next to the field', async () => {
-    saveDraft({ employee_count: 300 });
-    const { user } = await openNewAnalysis();
-    await screen.findByRole('checkbox', { name: new RegExp(policiesFixture[0].filename) });
+  it('sends a 422 about the profile to the saved profile, next to the field', async () => {
+    const { user } = await openReview({ employee_count: 300 });
 
     await user.click(runButton());
 
     expect(
       await screen.findByText('Input should be less than or equal to 250'),
     ).toBeInTheDocument();
-    expect(location()).toBe('/app/profile');
+    expect(location()).toBe(`/app/businesses/${PROFILE_ID}?next=analysis`);
     expect(screen.getByLabelText('Number of employees')).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('shows a 422 that is not about the profile on this page', async () => {
-    saveDraft();
     server.use(
       http.post('*/api/v1/analyses', () =>
         HttpResponse.json(
@@ -330,14 +438,13 @@ describe('new analysis: errors', () => {
         ),
       ),
     );
-    const { user } = await openNewAnalysis();
-    await screen.findByRole('checkbox', { name: new RegExp(policiesFixture[0].filename) });
+    const { user } = await openReview();
 
     await user.click(runButton());
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'policy_ids must not contain duplicates.',
     );
-    expect(location()).toBe('/app/analyses/new/profile');
+    expect(location()).toBe(`/app/analyses/new/profile?profile=${PROFILE_ID}&step=review`);
   });
 });

@@ -56,6 +56,24 @@ BAKERY = _load("bakery_mixed.json")
 # --- LLM paths -------------------------------------------------------------------------------------
 
 
+def test_report_names_ollama_when_it_took_over_from_gemini():
+    from agents.explanation_agent.llm import FallbackClient
+    from shared.llm.gemini_client import LLMAPIError
+
+    gemini = FakeLLM([LLMAPIError("rate limited", status_code=429)])
+    ollama = FakeLLM(_batched("bakery_mixed_good.json"))
+    client = FallbackClient(gemini, ollama, primary_name="gemini", primary_model="gemini-test",
+                            fallback_name="ollama", fallback_model="qwen3:4b")
+    service = ExplanationService(client=client, provider="gemini", model="gemini-test")
+
+    report = service.generate(BAKERY)
+
+    assert all(f.generated_by is GeneratedBy.LLM for f in report.findings)
+    assert LLM_UNAVAILABLE_WARNING not in report.warnings
+    assert (report.metadata.llm_provider, report.metadata.llm_model) == ("ollama", "qwen3:4b")
+    assert len(gemini.calls) == 1 and len(ollama.calls) == 2
+
+
 def test_good_llm_report():
     service, fake = _service(_batched("bakery_mixed_good.json"))
     report = service.generate(BAKERY)

@@ -28,7 +28,7 @@ from string import Template
 from typing import List, Optional, Set
 
 from agents.explanation_agent.context import find_glossary_terms, load_glossary, make_excerpt
-from agents.explanation_agent.llm import ExplanationLLMError, TextGenerator, generate_json
+from agents.explanation_agent.llm import ExplanationLLMError, TextGenerator, active_model, generate_json
 from agents.explanation_agent.qa import (
     QuestionContext,
     best_clause_for,
@@ -256,6 +256,7 @@ class QuestionService:
             "Question answered: generated_by=%s, answerable=%s, %d citations, flagged=%s, %d ms.",
             generated_by.value, answerable, len(citations), context.flagged, processing_ms,
         )
+        provider, model = active_model(self._client, self._provider, self._model)
         return QuestionAnswerResponse(
             request_id=request.request_id,
             answerable=answerable,
@@ -266,8 +267,8 @@ class QuestionService:
             disclaimer=QA_DISCLAIMER,
             metadata=AnswerMetadata(
                 llm_used=generated_by is GeneratedBy.LLM,
-                llm_provider=self._provider if llm_attempted else None,
-                llm_model=self._model if llm_attempted else None,
+                llm_provider=provider if llm_attempted else None,
+                llm_model=model if llm_attempted else None,
                 processing_ms=processing_ms,
             ),
         )

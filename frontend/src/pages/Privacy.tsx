@@ -38,7 +38,8 @@ export default function Privacy() {
               </li>
               <li>
                 The business profile you enter (type, description, equipment, how you operate,
-                location). It is kept in this browser tab and sent with each analysis.
+                location). It is saved to your account, encrypted, and sent with each analysis you
+                run for that business.
               </li>
               <li>The insurance policy PDFs you upload.</li>
               <li>The results of each analysis you run.</li>
@@ -70,12 +71,20 @@ export default function Privacy() {
 
           <Section title="4. AI processing">
             <p>
-              When AI wording is switched on, the relevant policy clauses, the risks found and your
-              questions are sent to the configured AI model to write explanations. Depending on how
-              the service is set up, that is either a model running on the same machine (Ollama) or
-              Google&apos;s Gemini API. Your business name is never sent to the AI. Clauses that
-              look like hidden instructions are withheld from the AI. Every AI-written part is
-              labelled, and every finding links to the policy wording it is based on.
+              When AI is switched on, it is used in three places: your business details are sent to
+              suggest extra risks; the policy clauses found for each risk are sent to decide its
+              coverage status; and those clauses, the risks found and your questions are sent to
+              write explanations and answers. Depending on how the service is set up, that is a
+              model running on the same machine (Ollama) or Google&apos;s Gemini API; risk
+              suggestions use Gemini. Your business name is never sent to the AI, and emails and
+              long numbers in your description are masked first. Clauses that look like hidden
+              instructions never reach the AI that writes your report; the coverage AI receives them
+              marked as data it must not follow. Every AI-written part is labelled, and every
+              finding links to the policy wording it is based on. See the{' '}
+              <Link to="/responsible-ai" className="font-semibold text-brand hover:underline">
+                Responsible AI notes
+              </Link>
+              .
             </p>
           </Section>
 

@@ -69,6 +69,31 @@ describe('routes', () => {
       screen.getByRole('heading', { name: 'How InsureIntel uses your data' }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Your business name is never sent to the AI/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Responsible AI notes' })).toHaveAttribute(
+      'href',
+      '/responsible-ai',
+    );
+  });
+
+  it('shows the Responsible AI notes in the app, linked from the landing page', async () => {
+    const { user } = renderApp('/');
+    const link = screen.getByRole('link', { name: 'Read the full Responsible AI notes →' });
+    expect(link).toHaveAttribute('href', '/responsible-ai');
+    expect(link).not.toHaveAttribute('target');
+
+    await user.click(link);
+
+    expect(
+      await screen.findByRole('heading', { name: 'How InsureIntel uses AI, and its limits' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Where AI is used' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: 'Hidden instructions in documents' }),
+    ).toHaveTextContent('never sent to the AI that writes your report');
+    expect(screen.getByRole('link', { name: 'privacy and consent notice' })).toHaveAttribute(
+      'href',
+      '/privacy',
+    );
   });
 
   it('shows a not-found page for an unknown URL', () => {

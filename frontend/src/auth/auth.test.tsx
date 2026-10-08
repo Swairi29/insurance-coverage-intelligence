@@ -182,7 +182,6 @@ describe('register and logout', () => {
     });
     expect(window.sessionStorage.getItem(SESSION_KEYS.token)).not.toBeNull();
 
-    window.sessionStorage.setItem(SESSION_KEYS.profileDraft, '{"business_name":"x"}');
     await user.click(menu);
     expect(within(header).getByText('owner@newshop.test')).toBeInTheDocument();
     await user.click(within(header).getByRole('button', { name: 'Log out' }));
@@ -190,7 +189,6 @@ describe('register and logout', () => {
     await screen.findByRole('heading', { name: 'Welcome back' });
     expect(location()).toBe('/login');
     expect(window.sessionStorage.getItem(SESSION_KEYS.token)).toBeNull();
-    expect(window.sessionStorage.getItem(SESSION_KEYS.profileDraft)).toBeNull();
     // A normal logout is not an expired session.
     expect(screen.queryByText(/session has expired/)).not.toBeInTheDocument();
   });
@@ -251,11 +249,6 @@ describe('signup form', () => {
 describe('navigation', () => {
   it('shows the main navigation and marks the current page', async () => {
     storedToken(`mock-token-${demoUser.email}`);
-    // New analysis needs a saved profile, or it sends the user to the profile page.
-    window.sessionStorage.setItem(
-      SESSION_KEYS.profileDraft,
-      JSON.stringify({ business_name: 'Test Bakery', business_type: 'bakery' }),
-    );
     const { user } = renderApp('/app');
     await screen.findByText('Your workspace');
 

@@ -177,8 +177,8 @@ answer the question. A test checks that rule-based answers pass the same checks.
 - Only the business type, the question and the analysis's assessments are sent to Agent 4;
   never the business name.
 - With `LLM_PROVIDER=gemini`, the question and the chosen clauses are sent to **Google's Gemini
-  API**, as the report's evidence already is. With `LLM_PROVIDER=ollama` nothing leaves the
-  machine.
+  API**, as the report's evidence already is; if Gemini fails, the local Ollama model answers
+  instead. With `LLM_PROVIDER=ollama` nothing leaves the machine.
 - Questions and answers are not stored, and the question text is never logged (only the
   analysis ID, timings, `generated_by` and validator codes).
 - Each user may ask 10 questions per minute; an analysis belonging to another user returns 404

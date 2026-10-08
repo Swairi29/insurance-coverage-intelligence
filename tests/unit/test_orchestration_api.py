@@ -8,7 +8,7 @@ import pytest
 from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
-from services.orchestration.api import NOT_SAVED_WARNING, app, get_pipeline
+from services.orchestration.api import MAX_BUSINESS_PROFILES, NOT_SAVED_WARNING, app, get_pipeline
 from services.orchestration.auth import LoginLimiter, QuestionLimiter, get_login_limiter, get_question_limiter
 from services.orchestration.database import Database, get_database
 from services.orchestration.jobs import JobStore, get_job_store
@@ -223,6 +223,11 @@ def test_login_without_jwt_secret_is_503(client, monkeypatch):
     ("post", "/api/v1/analyses"),
     ("get", "/api/v1/analyses/run-1"),
     ("get", "/api/v1/analyses/run-1/status"),
+    ("get", "/api/v1/business-profiles"),
+    ("post", "/api/v1/business-profiles"),
+    ("get", "/api/v1/business-profiles/BP-1"),
+    ("put", "/api/v1/business-profiles/BP-1"),
+    ("delete", "/api/v1/business-profiles/BP-1"),
 ])
 @pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer not-a-token"}, {"Authorization": "Basic abc"}])
 def test_protected_endpoints_need_a_valid_token(client, agents, method, path, headers):
@@ -230,6 +235,147 @@ def test_protected_endpoints_need_a_valid_token(client, agents, method, path, he
 
     assert response.status_code == 401
     assert agents.calls == []
+
+
+# --- business profiles -----------------------------------------------------------------------
+
+PROFILES = "/api/v1/business-profiles"
+
+
+def save_profile(client, headers, profile=BUSINESS) -> dict:
+    response = client.post(PROFILES, json=profile, headers=headers)
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_saved_profile_is_listed_and_read_back(client):
+    headers = login(client)
+
+    saved = save_profile(client, headers)
+
+    assert saved["profile_id"].startswith("BP-") and saved["profile"]["business_name"] == BUSINESS_NAME
+    assert client.get(PROFILES, headers=headers).json() == [saved]
+    assert client.get(f"{PROFILES}/{saved['profile_id']}", headers=headers).json() == saved
+
+
+def test_saved_profile_can_be_used_to_start_an_analysis(client):
+    headers = login(client)
+    saved = save_profile(client, headers)
+
+    response = client.post("/api/v1/analyses", headers=headers,
+                           json={"business": saved["profile"], "policy_ids": [upload(client, headers)]})
+
+    assert response.status_code == 202, response.text
+
+
+def test_profiles_are_listed_most_recently_changed_first(client):
+    headers = login(client)
+    first = save_profile(client, headers)
+    second = save_profile(client, headers, {**BUSINESS, "business_name": "Second Shop"})
+
+    client.put(f"{PROFILES}/{first['profile_id']}", json={**BUSINESS, "employee_count": 9}, headers=headers)
+
+    listed = client.get(PROFILES, headers=headers).json()
+    assert [p["profile_id"] for p in listed] == [first["profile_id"], second["profile_id"]]
+    assert listed[0]["profile"]["employee_count"] == 9
+
+
+def test_update_replaces_the_profile(client):
+    headers = login(client)
+    saved = save_profile(client, headers)
+
+    response = client.put(f"{PROFILES}/{saved['profile_id']}", headers=headers,
+                          json={"business_name": "Renamed", "business_type": "cafe"})
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["profile_id"] == saved["profile_id"] and body["created_at"] == saved["created_at"]
+    assert body["updated_at"] >= saved["updated_at"]
+    stored = client.get(f"{PROFILES}/{saved['profile_id']}", headers=headers).json()["profile"]
+    assert stored["business_name"] == "Renamed" and stored["equipment"] == []
+
+
+def test_delete_removes_the_profile(client):
+    headers = login(client)
+    saved = save_profile(client, headers)
+
+    assert client.delete(f"{PROFILES}/{saved['profile_id']}", headers=headers).status_code == 204
+
+    assert client.get(PROFILES, headers=headers).json() == []
+    assert client.delete(f"{PROFILES}/{saved['profile_id']}", headers=headers).status_code == 404
+
+
+def test_another_users_profile_is_404(client):
+    owner = login(client)
+    saved = save_profile(client, owner)
+    other = login(client, "other@example.com")
+    path = f"{PROFILES}/{saved['profile_id']}"
+
+    assert client.get(PROFILES, headers=other).json() == []
+    assert client.get(path, headers=other).status_code == 404
+    assert client.put(path, json=BUSINESS, headers=other).status_code == 404
+    assert client.delete(path, headers=other).status_code == 404
+    assert client.get(path, headers=owner).json() == saved  # untouched
+
+
+def test_invalid_profile_is_422_without_echo(client):
+    headers = login(client)
+
+    response = client.post(PROFILES, json={**BUSINESS, "employee_count": 99999}, headers=headers)
+
+    assert response.status_code == 422
+    assert response.json()["details"][0]["field"] == "employee_count"
+    assert "99999" not in response.text and BUSINESS_NAME not in response.text
+    assert client.get(PROFILES, headers=headers).json() == []
+
+
+def test_profiles_are_stored_encrypted(client, db):
+    headers = login(client)
+    save_profile(client, headers)
+
+    with sqlite3.connect(db._path) as conn:
+        (blob,) = conn.execute("SELECT profile FROM business_profiles").fetchone()
+    conn.close()
+    assert BUSINESS_NAME.encode() not in bytes(blob)
+
+
+def test_profile_limit(client, monkeypatch):
+    monkeypatch.setattr("services.orchestration.api.MAX_BUSINESS_PROFILES", 2)
+    headers = login(client)
+    save_profile(client, headers)
+    save_profile(client, headers)
+
+    response = client.post(PROFILES, json=BUSINESS, headers=headers)
+
+    assert response.status_code == 409 and response.json()["error"] == "profile_limit"
+    assert MAX_BUSINESS_PROFILES == 20  # the real limit is unchanged
+
+
+def test_profiles_without_an_encryption_key_are_503(client, monkeypatch):
+    headers = login(client)
+    monkeypatch.delenv("DOCUMENT_ENCRYPTION_KEY")
+    get_settings.cache_clear()
+
+    response = client.post(PROFILES, json=BUSINESS, headers=headers)
+
+    assert response.status_code == 503 and response.json()["error"] == "profiles_unavailable"
+    assert BUSINESS_NAME not in response.text
+
+
+def test_existing_database_gets_the_business_profiles_table(tmp_path):
+    path = tmp_path / "old.db"
+    with sqlite3.connect(path) as conn:  # a database from before profiles were saved
+        conn.execute("CREATE TABLE users (user_id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, "
+                     "password_hash TEXT NOT NULL, business_id TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL)")
+        conn.execute("INSERT INTO users VALUES ('u1', 'old@example.com', 'x', 'B-1', '2026-01-01T00:00:00+00:00')")
+    conn.close()
+
+    db = Database(path)
+    db.init_schema()
+
+    stored = db.add_business_profile(user_id="u1", encrypted_profile=b"secret")
+    assert db.list_business_profiles("u1") == [stored]
+    assert db.get_user("u1").email == "old@example.com"
 
 
 # --- policies --------------------------------------------------------------------------------

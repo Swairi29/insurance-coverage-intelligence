@@ -5,6 +5,7 @@ import { AppLayout } from './components/Layout/AppLayout';
 import AnalysisWorkspace from './pages/AnalysisWorkspace';
 import Landing from './pages/Landing';
 import Privacy from './pages/Privacy';
+import ResponsibleAI from './pages/ResponsibleAI';
 import NotFound from './pages/NotFound';
 import BusinessProfile from './pages/BusinessProfile';
 import Dashboard from './pages/Dashboard';
@@ -23,6 +24,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/privacy" element={<Privacy />} />
+      <Route path="/responsible-ai" element={<ResponsibleAI />} />
       <Route
         path="/login"
         element={
@@ -49,7 +51,10 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="businesses" element={<Businesses />} />
-        <Route path="profile" element={<BusinessProfile />} />
+        <Route path="businesses/new" element={<BusinessProfile />} />
+        <Route path="businesses/:profileId" element={<BusinessProfile />} />
+        {/* Profiles are saved to the account now: the old single-profile page is the list. */}
+        <Route path="profile" element={<Navigate to="/app/businesses" replace />} />
         <Route path="policies" element={<Policies />} />
         <Route path="analyses/new" element={<NewAnalysis />} />
         <Route path="analyses/new/profile" element={<NewAnalysis profileFlow />} />

@@ -66,7 +66,7 @@ export function EvidenceDrawer({
       text:
         assessment.method === 'rules'
           ? 'Decided the status with its coverage rules.'
-          : 'Decided the status with its coverage rules, checked with an AI model.',
+          : 'Decided the status with an AI model, citing the policy wording found.',
     },
     ...(finding
       ? [

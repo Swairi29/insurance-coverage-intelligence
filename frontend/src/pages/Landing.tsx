@@ -9,7 +9,6 @@ import { AGENTS, AGENT_STAGES } from '../lib/labels';
 import { ANNUAL_MONTHS_CHARGED, PRICING_TIERS, formatLkr } from '../lib/pricing';
 
 const REPO_URL = 'https://github.com/Swairi29/insurance-coverage-intelligence';
-const RESPONSIBLE_AI_URL = `${REPO_URL}/blob/main/docs/responsible-ai.md`;
 
 const NAV = [
   { href: '#how-it-works', label: 'How it works' },
@@ -45,11 +44,11 @@ const RESPONSIBLE_AI = [
   },
   {
     title: 'Privacy',
-    text: 'Policies and results are encrypted at rest, clauses with hidden instructions are withheld from the AI, and logs hold counts only.',
+    text: 'Policies, profiles and results are encrypted at rest, clauses with hidden instructions never reach the AI that writes your report, and logs hold counts only.',
   },
   {
     title: 'Human oversight',
-    text: 'Coverage statuses come from rules the AI cannot change, and every potential gap asks you to confirm with your insurer or broker.',
+    text: 'Every coverage status must cite your policy wording, the report writer cannot change it, and every potential gap asks you to confirm with your insurer or broker.',
   },
 ];
 
@@ -282,14 +281,12 @@ export default function Landing() {
                 </li>
               ))}
             </ul>
-            <a
-              href={RESPONSIBLE_AI_URL}
-              target="_blank"
-              rel="noreferrer"
+            <Link
+              to="/responsible-ai"
               className="mt-5 inline-block text-sm font-bold text-blue-700 hover:underline"
             >
               Read the full Responsible AI notes →
-            </a>
+            </Link>
           </div>
         </section>
 
@@ -374,14 +371,9 @@ export default function Landing() {
           </p>
           <ul className="flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold">
             <li>
-              <a
-                href={RESPONSIBLE_AI_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="hover:text-white"
-              >
+              <Link to="/responsible-ai" className="hover:text-white">
                 Responsible AI notes
-              </a>
+              </Link>
             </li>
             <li>
               <Link to="/privacy" className="hover:text-white">

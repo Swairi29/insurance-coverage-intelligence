@@ -147,12 +147,16 @@ It is cleared on logout.
 ```
 /                              Landing (public): hero, how it works, example, responsible AI, pricing
 /login, /register, /privacy    Log in, create account, privacy and consent notice
+/responsible-ai                Responsible AI notes in plain language                        (public)
 /app                           Overview: setup checklist, latest analysis, recent analyses   (logged in)
-/app/businesses                The saved business profile                                    (logged in)
-/app/profile                   Business profile form                                         (logged in)
+/app/businesses                The businesses saved to the account                           (logged in)
+/app/businesses/new            Add a business (?next=analysis returns to the new analysis)   (logged in)
+/app/businesses/:profileId     Edit a saved business (?next=analysis as above)               (logged in)
+/app/profile                   Old link: redirects to /app/businesses                        (logged in)
 /app/policies                  Upload and list policy PDFs                                   (logged in)
 /app/analyses/new              Choose how to describe the business: profile or scenario      (logged in)
-/app/analyses/new/profile      Choose policies + confirm profile → start                     (logged in)
+/app/analyses/new/profile      1 business → 2 policies (upload here too) → 3 review → start  (logged in)
+                               State in the URL: ?profile=…&step=policies|review&policies=…
 /app/analyses/new/scenario     Scenario text + policies → review → start                     (logged in)
 /app/analyses/:id/progress     Agent workspace (?source=scenario for a scenario run)         (logged in)
 /app/analyses                  History: profile and scenario runs                            (logged in)
@@ -296,7 +300,7 @@ best. Each member also owns one shared component that the others use.
 
 ### Member 1 – Risk Profiling (Agent 1)
 
-- **Business profile form** (`/app/profile`). Fields: business name and type (bakery / restaurant /
+- **Business profile form** (`/app/businesses/new`, `/app/businesses/:profileId`). Fields: business name and type (bakery / restaurant /
   retail shop), description, employee count (0–250), equipment (a tag input, up to 50 items),
   sales channels (checkboxes), yes/no/unknown for card payments, cash, customer data and single
   location, and location (city, district, country, flood-prone yes/no/unknown). "Unknown" must be
@@ -487,7 +491,7 @@ Tick a step here when its PR is merged.
 - [x] `Login.tsx` and `Register.tsx`. They handle 401, 409, 422, 429 (the button is disabled for
       the `Retry-After` time) and 503. After registering, the user is logged in automatically.
 - [x] `components/Layout/`: the nav (Dashboard, Profile, Policies, New analysis, History), the
-      user's email and Logout. Logout clears the token, the profile draft and the query cache.
+      user's email and Logout. Logout clears the token, the remembered run requests and the query cache.
 - [x] `/app` checks the stored token with `GET /auth/me` on load.
 - [x] A `NotFound` page.
 - **Done when:** register → login → protected page → logout works on mocks. There are tests for
@@ -681,3 +685,22 @@ Backend findings for the agents' owners (not worked around in the UI):
 - [x] Account menu opens from the header avatar and opens upwards in the sidebar.
 - [x] Tests updated for the new flows (209 passing); screenshots retaken
       (`docs/images/frontend/`, 21 images).
+
+### Saved business profiles
+
+- [x] Profiles are saved to the account (`/api/v1/business-profiles`), not the browser tab, so
+      they survive logout and restarts; an account can keep up to 20.
+- [x] Businesses page lists them with Analyse, Edit and Delete (with a confirmation).
+- [x] New analysis is three steps: pick or add a business → pick or upload policies → review and
+      run. Adding a business or a policy returns to the same step; Back goes one step back.
+- [x] The Policies page's "Start a new analysis" goes straight to the profile flow.
+- [x] Screenshots retaken: 04, 05, 07, 17, and new 22 (Businesses), 23-24 (analysis steps 2-3).
+
+### Responsible AI page
+
+- [x] `/responsible-ai` (public): plain-language Responsible AI notes, linked from the landing page,
+      its footer and the privacy notice, instead of the GitHub copy of `docs/responsible-ai.md`.
+- [x] Copy corrected to match the agents: Agent 3's AI decides the status (it must cite a clause it
+      was given; rules decide when no wording is found or the AI fails); flagged clauses are withheld
+      from Agent 4 only, while Agent 3 receives them marked as untrusted data.
+- [x] Screenshot 25 (`25-responsible-ai.png`).
