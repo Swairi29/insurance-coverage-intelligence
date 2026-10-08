@@ -146,3 +146,24 @@ def test_provider_reports_unavailable_when_nothing_answers():
         pass
     else:
         raise AssertionError("expected LLMUnavailableError")
+
+
+def test_gemini_is_not_retried_when_ollama_is_the_fallback(monkeypatch):
+    from agents.coverage_agent import llm_provider
+    from shared.config.settings import Settings
+
+    created = []
+
+    class StubGemini:
+        def __init__(self, settings):
+            created.append(settings)
+
+    monkeypatch.setattr(llm_provider, "GeminiClient", StubGemini)
+    settings = Settings(llm_provider="gemini", gemini_api_key="test-key", llm_model="gemini-test",
+                        ollama_model="qwen3:4b", explanation_use_llm=True, llm_max_retries=2)
+
+    provider = llm_provider.create_coverage_llm_provider(settings)
+
+    assert provider.fallback is not None
+    assert created[0].llm_max_retries == 0
+    assert settings.llm_max_retries == 2

@@ -214,12 +214,16 @@ def create_coverage_llm_provider(
     # -------------------------------------------------------------
 
     if provider == "gemini":
-        gemini, gemini_model = _build_gemini_client(
+        ollama, ollama_model = _build_ollama_client(
             settings
         )
 
-        ollama, ollama_model = _build_ollama_client(
-            settings
+        # With Ollama as the fallback, a Gemini 429 is not retried: the local
+        # model answers straight away instead of waiting out the rate limit.
+        gemini, gemini_model = _build_gemini_client(
+            settings.model_copy(update={"llm_max_retries": 0})
+            if ollama is not None
+            else settings
         )
 
         return CoverageLLMProvider(

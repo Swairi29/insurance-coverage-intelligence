@@ -199,7 +199,7 @@ An LLM failure is **not** an error: the report is still returned with template w
 |---|---|---|
 | `EXPLANATION_USE_LLM` | `true` | `false` = template wording only, no LLM calls |
 | `EXPLANATION_LLM_BUDGET_SECONDS` | `280` | Time for LLM wording per report. No batch starts after it and each Ollama call is limited to it; the remaining findings get template wording and the warning "...took too long to generate." Keep it under half of `EXPLANATION_TIMEOUT_SECONDS` |
-| `LLM_PROVIDER` | `gemini` | `gemini` or `ollama` |
+| `LLM_PROVIDER` | `gemini` | `gemini` or `ollama`. With `gemini`, the first Gemini failure (e.g. HTTP 429) switches the rest of that report or answer to the local `OLLAMA_MODEL`, and Gemini is not retried; `metadata.llm_provider` / `llm_model` name the model that answered |
 | `OLLAMA_MODEL` / `OLLAMA_HOST` | `qwen3:8b` / `http://localhost:11434` | Local model |
 | `GEMINI_API_KEY` / `LLM_MODEL` | - | Cloud model |
 | `INTERNAL_API_KEY` | - | Required by every agent endpoint |

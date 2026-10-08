@@ -149,7 +149,9 @@ Copy `.env.example` to `.env` and fill in the three secrets:
 | `JWT_SECRET_KEY` | signing login tokens (login is refused without it) | `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
 
 LLM (optional): `LLM_PROVIDER=ollama` with a local `OLLAMA_MODEL`, or `LLM_PROVIDER=gemini`
-with `GEMINI_API_KEY`. Every agent still works without an LLM, using rules and template wording.
+with `GEMINI_API_KEY`. With Gemini, Agents 3 and 4 switch to the local `OLLAMA_MODEL` as soon as a
+Gemini call fails (for example its free-tier rate limit, HTTP 429), without retrying Gemini, so
+keep Ollama running. Every agent still works without an LLM, using rules and template wording.
 On a 16 GB laptop use `OLLAMA_MODEL=qwen3:4b` (`qwen3:8b` does not fit) and close large apps while
 a report is written; Agent 4 then takes about 5–6 minutes. Agent 1's AI step only uses Gemini, so
 without `GEMINI_API_KEY` it is rule-based.
