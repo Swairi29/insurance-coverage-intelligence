@@ -239,3 +239,18 @@ npm run lint       # ESLint + Prettier
 npm run typecheck  # TypeScript
 npm run build      # production build in frontend/dist
 ```
+
+## 👥 Contributors
+
+IT3041 Information Retrieval and Web Analytics, SLIIT, Year 3 Semester 2. Each member owned one
+agent end to end (design, code, tests and documentation); everyone worked on the shared data
+contracts and the React frontend.
+
+| Member | GitHub | Owned | Main code |
+|---|---|---|---|
+| Hasini | [@hasangi2002](https://github.com/hasangi2002) | Agent 1: Risk Profiling, including free-text scenario risks; frontend redesign and scenario screens | `agents/risk_agent/`, `shared/models/` |
+| Amami Gunathilake | [@amamigunathilake](https://github.com/amamigunathilake) | Agent 2: Policy Intelligence (information retrieval) | `agents/policy_agent/`, `shared/` settings and security utilities |
+| Sejan Rathnasekara | [@Pasiya990](https://github.com/Pasiya990) | Agent 3: Coverage & Gap Analysis, including the LLM clause interpreter | `agents/coverage_agent/` |
+| Swairi Gamage | [@Swairi29](https://github.com/Swairi29) | Agent 4: Explanation & Recommendation; orchestration gateway; saved profiles and the analysis flow | `agents/explanation_agent/`, `services/orchestration/` |
+
+Lecturer in charge: Mr. Samadhi Chathuranga Rathnayake.
