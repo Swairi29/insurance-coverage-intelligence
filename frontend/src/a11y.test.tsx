@@ -23,6 +23,7 @@ describe('accessibility (axe)', () => {
     ['login', '/login', 'Welcome back'],
     ['signup', '/register', 'Create your account'],
     ['privacy notice', '/privacy', 'How InsureIntel uses your data'],
+    ['responsible AI notes', '/responsible-ai', 'How InsureIntel uses AI, and its limits'],
   ])('%s page', async (_name, route, heading) => {
     renderApp(route);
     await screen.findByRole('heading', { level: 1, name: heading });

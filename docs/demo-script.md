@@ -40,7 +40,7 @@ every time, and no waiting. Use a browser window about 1440 px wide.
 
 | # | Do | Say |
 |---|---|---|
-| 1 | **Landing page**: scroll through "How the four agents work together", the example finding and "Built responsibly" | SMEs often do not know which of their risks their policies cover. Four agents check that, step by step, and every result points to the policy wording behind it. |
+| 1 | **Landing page**: scroll through "How the four agents work together", the example finding and "Built responsibly", then open **Read the full Responsible AI notes** | SMEs often do not know which of their risks their policies cover. Four agents check that, step by step, and every result points to the policy wording behind it. |
 | 2 | Scroll to **Pricing** | The proposed plans in LKR, from a free tier to a broker plan; paying yearly costs 10 months. The prototype takes no payments. The reasoning behind the figures is in `docs/commercialisation.md`. |
 | 3 | **Get started** → register a new account. Open the **privacy and data processing notice** link, then tick the box | Passwords need 8 characters and are hashed with bcrypt; login uses a JWT; five wrong logins lock the account for 15 minutes. An account cannot be created without agreeing to the notice: the server checks the notice version and records when the user agreed. |
 | 4 | **Overview** | The setup checklist: add the business profile, upload policies, run a first analysis; the next step is highlighted. **All services up** in the header shows that all four agents are running; click it to see each one. |

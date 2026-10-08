@@ -147,6 +147,7 @@ It is cleared on logout.
 ```
 /                              Landing (public): hero, how it works, example, responsible AI, pricing
 /login, /register, /privacy    Log in, create account, privacy and consent notice
+/responsible-ai                Responsible AI notes in plain language                        (public)
 /app                           Overview: setup checklist, latest analysis, recent analyses   (logged in)
 /app/businesses                The businesses saved to the account                           (logged in)
 /app/businesses/new            Add a business (?next=analysis returns to the new analysis)   (logged in)
@@ -693,4 +694,13 @@ Backend findings for the agents' owners (not worked around in the UI):
 - [x] New analysis is three steps: pick or add a business → pick or upload policies → review and
       run. Adding a business or a policy returns to the same step; Back goes one step back.
 - [x] The Policies page's "Start a new analysis" goes straight to the profile flow.
-- [ ] Retake screenshots 05, 07 and 17 (`docs/images/frontend/`).
+- [x] Screenshots retaken: 04, 05, 07, 17, and new 22 (Businesses), 23-24 (analysis steps 2-3).
+
+### Responsible AI page
+
+- [x] `/responsible-ai` (public): plain-language Responsible AI notes, linked from the landing page,
+      its footer and the privacy notice, instead of the GitHub copy of `docs/responsible-ai.md`.
+- [x] Copy corrected to match the agents: Agent 3's AI decides the status (it must cite a clause it
+      was given; rules decide when no wording is found or the AI fails); flagged clauses are withheld
+      from Agent 4 only, while Agent 3 receives them marked as untrusted data.
+- [x] Screenshot 25 (`25-responsible-ai.png`).

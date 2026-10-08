@@ -59,7 +59,7 @@ const DEMO_BUSINESS_PROFILE: SavedBusinessProfile = {
     business_type: 'bakery',
     description: 'A bakery producing bread, cakes and pastries, with a small café area.',
     employee_count: 8,
-    equipment: ['Ovens', 'Refrigerators', 'POS system'],
+    equipment: ['Ovens', 'Refrigerators', 'Mixers'],
     operations: {
       sales_channels: ['in_store', 'delivery'],
       accepts_card_payments: true,
@@ -68,10 +68,10 @@ const DEMO_BUSINESS_PROFILE: SavedBusinessProfile = {
       operates_single_location: true,
     },
     location: {
-      city: 'Colombo',
-      district: 'Colombo',
+      city: 'Kandy',
+      district: 'Kandy',
       country: 'Sri Lanka',
-      flood_prone_area: null,
+      flood_prone_area: true,
     },
   },
 };

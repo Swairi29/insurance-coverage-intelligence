@@ -77,9 +77,14 @@ function BusinessCard({ saved }: { saved: SavedBusinessProfile }) {
   const remove = useDeleteBusinessProfile();
   const [confirming, setConfirming] = useState(false);
   const { profile } = saved;
-  const location = [profile.location?.city, profile.location?.district, profile.location?.country]
-    .filter(Boolean)
-    .join(', ');
+  // "Kandy, Kandy, Sri Lanka" reads as a mistake: a district named like its city is shown once.
+  const location = [
+    ...new Set(
+      [profile.location?.city, profile.location?.district, profile.location?.country].filter(
+        Boolean,
+      ),
+    ),
+  ].join(', ');
   const headingId = `business-${saved.profile_id}`;
 
   return (

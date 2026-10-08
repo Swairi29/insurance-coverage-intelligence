@@ -5,6 +5,7 @@ import { AppLayout } from './components/Layout/AppLayout';
 import AnalysisWorkspace from './pages/AnalysisWorkspace';
 import Landing from './pages/Landing';
 import Privacy from './pages/Privacy';
+import ResponsibleAI from './pages/ResponsibleAI';
 import NotFound from './pages/NotFound';
 import BusinessProfile from './pages/BusinessProfile';
 import Dashboard from './pages/Dashboard';
@@ -23,6 +24,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/privacy" element={<Privacy />} />
+      <Route path="/responsible-ai" element={<ResponsibleAI />} />
       <Route
         path="/login"
         element={

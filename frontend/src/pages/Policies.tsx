@@ -118,7 +118,7 @@ function PolicyItem({ policy }: { policy: PolicyDocument }) {
           <WarningIcon className="mt-px h-3.5 w-3.5 shrink-0" />
           {plural(policy.flagged_chunk_count, 'section')} contained text that looked like
           instructions. {policy.flagged_chunk_count === 1 ? 'It is' : 'They are'} kept as policy
-          wording but never sent to the AI.
+          wording but never sent to the AI that writes your report.
         </p>
       )}
     </li>
