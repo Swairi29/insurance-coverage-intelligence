@@ -10,7 +10,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from agents.policy_agent.retriever import SemanticRetriever
+from agents.policy_agent.retriever import HybridRetriever, SemanticRetriever
 from agents.policy_agent.service import (
     FileTooLargeError,
     InvalidPdfError,
@@ -71,8 +71,11 @@ async def upload_policy(
 
 def _build_retrieval_service() -> PolicyRetrievalService:
     """Build the retrieval service using whichever backend is configured."""
-    if get_settings().retrieval_backend == "semantic":
+    backend = get_settings().retrieval_backend
+    if backend == "semantic":
         return PolicyRetrievalService(retriever=SemanticRetriever())
+    if backend == "hybrid":
+        return PolicyRetrievalService(retriever=HybridRetriever())
     return PolicyRetrievalService()
 
 

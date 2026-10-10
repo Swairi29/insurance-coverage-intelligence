@@ -76,6 +76,12 @@ def test_retrieval_backend_can_be_set_to_semantic(monkeypatch):
     assert settings.retrieval_backend == "semantic"
 
 
+def test_retrieval_backend_can_be_set_to_hybrid(monkeypatch):
+    monkeypatch.setenv("RETRIEVAL_BACKEND", "hybrid")
+    settings = Settings()
+    assert settings.retrieval_backend == "hybrid"
+
+
 def test_retrieval_backend_rejects_unknown_values(monkeypatch):
     monkeypatch.setenv("RETRIEVAL_BACKEND", "bm25")
     with pytest.raises(ValidationError):
