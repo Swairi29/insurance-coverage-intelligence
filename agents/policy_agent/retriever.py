@@ -9,6 +9,8 @@ No LLM is involved here - this is classic information retrieval:
    risk IDs, so this agent does not silently break if Agent 1's taxonomy changes.
 2. `TfidfRetriever` fits a TF-IDF vectorizer on the candidate chunks and ranks
    them by cosine similarity to the query.
+3. `HybridRetriever` runs TF-IDF and semantic retrieval together, so clauses
+   worded differently from the query are still found.
 
 Only matches at or above `MIN_RELEVANCE_SCORE` are returned - "no evidence
 found" is a valid, honest result, not something papered over by forcing back
@@ -164,3 +166,42 @@ class SemanticRetriever:
             if score >= self._min_score:
                 ranked.append((by_id[chunk_id], score))
         return ranked
+
+
+class HybridRetriever:
+    """Keyword (TF-IDF) and semantic retrieval combined.
+
+    TF-IDF only matches words the query shares with a clause, so cover written
+    in different words ("conflagration", "blaze") scores zero; semantic search
+    matches meaning but is weaker on exact terms. Here a chunk is returned if
+    *either* backend finds it relevant - each still applies its own minimum
+    score - and its score is the higher of the two. The overall top `top_k` by
+    that score is always within the union of each backend's own top `top_k`,
+    so asking each backend for `top_k` is enough.
+    """
+
+    def __init__(
+        self,
+        keyword_retriever: Optional[Retriever] = None,
+        semantic_retriever: Optional[Retriever] = None,
+    ) -> None:
+        self._retrievers = (
+            keyword_retriever or TfidfRetriever(),
+            semantic_retriever or SemanticRetriever(),
+        )
+
+    def retrieve(
+        self, query: str, chunks: Sequence[PolicyChunk], top_k: int = 8
+    ) -> List[Tuple[PolicyChunk, float]]:
+        if not query.strip() or not chunks:
+            return []
+
+        best: Dict[str, Tuple[PolicyChunk, float]] = {}
+        for retriever in self._retrievers:
+            for chunk, score in retriever.retrieve(query, chunks, top_k):
+                current = best.get(chunk.chunk_id)
+                if current is None or score > current[1]:
+                    best[chunk.chunk_id] = (chunk, score)
+
+        ranked = sorted(best.values(), key=lambda pair: pair[1], reverse=True)
+        return ranked[:top_k]

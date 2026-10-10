@@ -11,7 +11,12 @@ from typing import List
 import pytest
 from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
 
-from agents.policy_agent.retriever import SemanticRetriever, TfidfRetriever, build_query
+from agents.policy_agent.retriever import (
+    HybridRetriever,
+    SemanticRetriever,
+    TfidfRetriever,
+    build_query,
+)
 from shared.models.policy import PolicyChunk
 from shared.models.risk import IdentifiedRisk
 
@@ -225,3 +230,66 @@ def test_semantic_retriever_handles_duplicate_chunk_ids_gracefully():
     # must return at most one result for the duplicated id.
     results = retriever.retrieve("fire burning cover", chunks, top_k=8)
     assert len({c.chunk_id for c, _ in results}) == len(results)
+
+
+# --- HybridRetriever ----------------------------------------------------------------------
+
+class StubRetriever:
+    """Returns fixed results, so the merging logic can be tested on its own."""
+
+    def __init__(self, results):
+        self._results = results
+
+    def retrieve(self, query, chunks, top_k=8):
+        return self._results[:top_k]
+
+
+def test_hybrid_returns_a_chunk_found_by_only_one_backend():
+    a, b = chunk("Clause A.", chunk_id="a"), chunk("Clause B.", chunk_id="b")
+    retriever = HybridRetriever(StubRetriever([(a, 0.4)]), StubRetriever([(b, 0.3)]))
+
+    results = retriever.retrieve("fire", [a, b], top_k=8)
+
+    assert {c.chunk_id for c, _ in results} == {"a", "b"}
+
+
+def test_hybrid_keeps_one_result_per_chunk_with_the_higher_score():
+    a = chunk("Clause A.", chunk_id="a")
+    retriever = HybridRetriever(StubRetriever([(a, 0.2)]), StubRetriever([(a, 0.6)]))
+
+    results = retriever.retrieve("fire", [a], top_k=8)
+
+    assert len(results) == 1
+    assert results[0][1] == 0.6
+
+
+def test_hybrid_ranks_best_first_and_respects_top_k():
+    a, b, c = (chunk(f"Clause {x}.", chunk_id=x) for x in "abc")
+    retriever = HybridRetriever(
+        StubRetriever([(a, 0.3), (b, 0.1)]), StubRetriever([(c, 0.5)])
+    )
+
+    results = retriever.retrieve("fire", [a, b, c], top_k=2)
+
+    assert [ch.chunk_id for ch, _ in results] == ["c", "a"]
+
+
+def test_hybrid_empty_query_or_chunks_returns_no_results():
+    a = chunk("Clause A.", chunk_id="a")
+    retriever = HybridRetriever(StubRetriever([(a, 0.9)]), StubRetriever([(a, 0.9)]))
+
+    assert retriever.retrieve("   ", [a], top_k=8) == []
+    assert retriever.retrieve("fire", [], top_k=8) == []
+
+
+def test_hybrid_finds_a_clause_the_keyword_retriever_misses():
+    # "fire" is an English stop word, so TF-IDF alone scores this clause 0.
+    fire_clause = chunk("Loss caused by fire is covered.", chunk_id="fire")
+    query = build_query(risk())
+    keyword = TfidfRetriever()
+    semantic = SemanticRetriever(embedding_function=FakeEmbeddingFunction())
+
+    assert keyword.retrieve(query, [fire_clause], top_k=8) == []
+    results = HybridRetriever(keyword, semantic).retrieve(query, [fire_clause], top_k=8)
+
+    assert [c.chunk_id for c, _ in results] == ["fire"]
