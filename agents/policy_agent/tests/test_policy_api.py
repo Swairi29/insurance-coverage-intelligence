@@ -159,6 +159,45 @@ def test_upload_rejects_malformed_business_ids_without_touching_disk(business_id
     assert not (tmp_path / "processed").exists()
 
 
+# --- validation errors never echo the caller's input (SA-11) -------------------------------
+
+def test_upload_validation_error_does_not_echo_the_input():
+    response = upload(business_id="SECRET business name")
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"] == "validation_error"
+    assert body["details"][0]["field"] == "business_id"
+    assert "SECRET" not in response.text
+    assert '"input"' not in response.text
+    assert '"ctx"' not in response.text
+
+
+def test_retrieve_validation_error_does_not_echo_the_input():
+    response = client.post(
+        "/api/v1/retrieve-policy-evidence",
+        json={"business_id": "B001", "policy_ids": "not-a-list", "risks": []},
+        headers=HEADERS,
+    )
+
+    assert response.status_code == 422
+    fields = {d["field"] for d in response.json()["details"]}
+    assert {"policy_ids", "risks"} <= fields
+    assert "not-a-list" not in response.text
+    assert '"input"' not in response.text
+
+
+def test_malformed_json_is_rejected_without_echoing_it():
+    response = client.post(
+        "/api/v1/retrieve-policy-evidence",
+        content=b'{"business_id": "B001", "policy_ids": [',
+        headers={**HEADERS, "Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 422
+    assert '"input"' not in response.text
+
+
 # --- retrieve-policy-evidence ------------------------------------------------------------
 
 def test_retrieve_evidence_after_upload_returns_matches():
