@@ -1,0 +1,60 @@
+{
+  "results_by_value": {
+    "empty": {
+      "business_id_sent": "",
+      "status": 422,
+      "stored_business_id": null,
+      "detail": [
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "business_id"
+          ],
+          "msg": "Field required",
+          "input": null
+        }
+      ]
+    },
+    "whitespace_only": {
+      "business_id_sent": "   ",
+      "status": 500,
+      "stored_business_id": null,
+      "detail": "Policy upload could not be processed."
+    },
+    "300_characters": {
+      "business_id_sent": "T22xxxxxxxxxxxxxxxxx...(300 chars)",
+      "status": 500,
+      "stored_business_id": null,
+      "detail": "Policy upload could not be processed."
+    },
+    "spaces_and_symbols": {
+      "business_id_sent": "T22 has spaces & symbols 20261010010428",
+      "status": 200,
+      "stored_business_id": "T22 has spaces & symbols 20261010010428",
+      "detail": null
+    },
+    "non_ascii": {
+      "business_id_sent": "T22-\u00fcn\u00efc\u00f8d\u00e9-20261010010428",
+      "status": 200,
+      "stored_business_id": "T22-\u00fcn\u00efc\u00f8d\u00e9-20261010010428",
+      "detail": null
+    },
+    "forward_slash_nested": {
+      "business_id_sent": "T22-parent-20261010010428/child",
+      "status": 200,
+      "stored_business_id": "T22-parent-20261010010428/child",
+      "detail": null
+    }
+  },
+  "new_entries_in_upload_and_processed_dirs": [
+    "data\\processed\\T22 has spaces & symbols 20261010010428",
+    "data\\processed\\T22-parent-20261010010428",
+    "data\\processed\\T22-\u00fcn\u00efc\u00f8d\u00e9-20261010010428",
+    "data\\sample_policies\\T22 has spaces & symbols 20261010010428",
+    "data\\sample_policies\\T22-parent-20261010010428",
+    "data\\sample_policies\\T22-\u00fcn\u00efc\u00f8d\u00e9-20261010010428"
+  ],
+  "entries_outside_data_dirs": [],
+  "captured_at": "2026-10-10T01:04:29.325646+00:00"
+}

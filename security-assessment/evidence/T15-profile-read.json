@@ -1,0 +1,14 @@
+{
+  "profile_owner": "user A",
+  "profile_id": "BP-b7c65504db8c4163",
+  "b_get": {
+    "status": 404,
+    "body": {
+      "error": "profile_not_found",
+      "message": "Business profile not found."
+    }
+  },
+  "b_list_contains_a_profile": false,
+  "b_response_contains_a_business_name": false,
+  "captured_at": "2026-10-10T00:41:56.551690+00:00"
+}

@@ -1,0 +1,353 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+--- TC-02 saved to TC-02.json
+{
+  "upload": {
+    "status": 200,
+    "body": {
+      "policy_id": "POL-3fc4ecd0fde4",
+      "business_id": "TC02",
+      "filename": "tc02_multi_clause.pdf",
+      "status": "ready",
+      "page_count": 5,
+      "chunk_count": 0,
+      "flagged_chunk_count": 0,
+      "uploaded_at": "2026-10-10T00:39:16.441440Z",
+      "warnings": []
+    }
+  },
+  "runs_by_top_k": {
+    "1": {
+      "status": 200,
+      "evidence_count": 0,
+      "body": {
+        "business_id": "TC02",
+        "results": [
+          {
+            "risk_id": "FIRE_COOKING",
+            "evidence": []
+          }
+        ]
+      }
+    },
+    "50": {
+      "status": 200,
+      "evidence_count": 0,
+      "body": {
+        "business_id": "TC02",
+        "results": [
+          {
+            "risk_id": "FIRE_COOKING",
+            "evidence": []
+          }
+        ]
+      }
+    },
+    "51": {
+      "status": 422,
+      "evidence_count": null,
+      "body": {
+        "detail": [
+          {
+            "type": "less_than_equal",
+            "loc": [
+              "body",
+              "top_k"
+            ],
+            "msg": "Input should be less than or equal to 50",
+            "input": 51,
+            "ctx": {
+              "le": 50
+            }
+          }
+        ]
+      }
+    },
+    "0": {
+      "status": 422,
+      "evidence_count": null,
+      "body": {
+        "detail": [
+          {
+            "type": "greater_than_equal",
+            "loc": [
+              "body",
+              "top_k"
+            ],
+ 
+
+--- TC-03 saved to TC-03.json
+{
+  "upload": {
+    "policy_id": "POL-59b7a4f70660",
+    "business_id": "TC03",
+    "filename": "tc03_fire_theft.pdf",
+    "status": "ready",
+    "page_count": 1,
+    "chunk_count": 0,
+    "flagged_chunk_count": 0,
+    "uploaded_at": "2026-10-10T00:39:16.460848Z",
+    "warnings": []
+  },
+  "query_risk": "CYB_DATA_BREACH",
+  "status": 200,
+  "body": {
+    "business_id": "TC03",
+    "results": [
+      {
+        "risk_id": "CYB_DATA_BREACH",
+        "evidence": []
+      }
+    ]
+  },
+  "captured_at": "2026-10-10T00:39:16.463400+00:00"
+}
+
+--- TC-04 saved to TC-04.json
+{
+  "live_backend": "tfidf",
+  "stuffed_policy_id": "POL-a77343e98489",
+  "genuine_policy_id": "POL-8e41741445d4",
+  "status": 200,
+  "ranking": [],
+  "body": {
+    "business_id": "TC04",
+    "results": [
+      {
+        "risk_id": "FIRE_COOKING",
+        "evidence": []
+      }
+    ]
+  },
+  "captured_at": "2026-10-10T00:39:16.511255+00:00"
+}
+
+--- TC-05 saved to TC-05.json
+{
+  "query": "Fire from cooking and baking equipment fire burning flame smoke damage explosion ignition",
+  "ranking_by_backend": {
+    "tfidf": [
+      {
+        "policy": "GENUINE",
+        "score": 0.0638,
+        "text": "SECTION 1 - FIRE COVER: This policy covers loss or damage to the insured premise"
+      },
+      {
+        "policy": "STUFFED",
+        "score": 0.0,
+        "text": "fire fire fire fire fire fire fire fire fire fire fire fire\nfire fire fire fire "
+      }
+    ],
+    "semantic": [
+      {
+        "policy": "GENUINE",
+        "score": 0.367,
+        "text": "SECTION 1 - FIRE COVER: This policy covers loss or damage to the insured premise"
+      },
+      {
+        "policy": "STUFFED",
+        "score": 0.3039,
+        "text": "fire fire fire fire fire fire fire fire fire fire fire fire\nfire fire fire fire "
+      }
+    ]
+  },
+  "captured_at": "2026-10-10T00:39:17.903452+00:00"
+}
+
+--- TC-07 saved to TC-07.json
+{
+  "source_text": "SECTION 7 - FIRE: Accidental fire damage to the bakery ovens is covered up to LKR 500,000.",
+  "returned_texts": [],
+  "body_clause_found_verbatim": false,
+  "status": 200,
+  "body": {
+    "business_id": "TC07",
+    "results": [
+      {
+        "risk_id": "FIRE_COOKING",
+        "evidence": []
+      }
+    ]
+  },
+  "captured_at": "2026-10-10T00:39:17.914791+00:00"
+}
+
+--- TC-09 saved to TC-09.json
+{
+  "status": 400,
+  "body": {
+    "detail": "The uploaded file is not a valid PDF."
+  },
+  "captured_at": "2026-10-10T00:39:17.917215+00:00"
+}
+
+--- TC-10 saved to TC-10.json
+{
+  "configured_limit_mb": 25,
+  "upload_size_mb": 26.0,
+  "status": 413,
+  "body": {
+    "detail": "The uploaded file exceeds the 25 MB limit."
+  },
+  "captured_at": "2026-10-10T00:39:18.068241+00:00"
+}
+
+--- TC-11 saved to TC-11.json
+{
+  "upload_status": 200,
+  "upload": {
+    "policy_id": "POL-7582917d6fc4",
+    "business_id": "TC11",
+    "filename": "tc11_adversarial.pdf",
+    "status": "ready",
+    "page_count": 1,
+    "chunk_count": 1,
+    "flagged_chunk_count": 1,
+    "uploaded_at": "2026-10-10T00:39:18.077120Z",
+    "warnings": [
+      "1 chunk(s) contained instruction-like phrasing and were flagged for review."
+    ]
+  },
+  "retrieve_status": 200,
+  "retrieve_body": {
+    "business_id": "TC11",
+    "results": [
+      {
+        "risk_id": "FIRE_COOKING",
+        "evidence": []
+      }
+    ]
+  },
+  "captured_at": "2026-10-10T00:39:18.084367+00:00"
+}
+
+--- TC-12 saved to TC-12.json
+{
+  "bytes_uploaded": 500,
+  "status": 200,
+  "body": {
+    "policy_id": "POL-39e99bdef68d",
+    "business_id": "TC12",
+    "filename": "tc12_truncated.pdf",
+    "status": "ready",
+    "page_count": 1,
+    "chunk_count": 0,
+    "flagged_chunk_count": 0,
+    "uploaded_at": "2026-10-10T00:39:18.886901Z",
+    "warnings": []
+  },
+  "captured_at": "2026-10-10T00:39:18.888029+00:00"
+}
+
+--- TC-19 saved to TC-19.json
+{
+  "note": "Called port 8002 directly with the shared X-API-Key and no user login. Second call asks for business TC04's evidence purely by naming business_id TC04.",
+  "direct_call_status": 200,
+  "evidence_returned": 0,
+  "body": {
+    "business_id": "TC04",
+    "results": [
+      {
+        "risk_id": "FIRE_COOKING",
+        "evidence": []
+      }
+    ]
+  },
+  "captured_at": "2026-10-10T00:39:18.892566+00:00"
+}
+
+--- TC-20 saved to TC-20.json
+{
+  "missing_key": {
+    "status": 401,
+    "body": {
+      "detail": "Missing or invalid API key."
+    }
+  },
+  "wrong_key": {
+    "status": 401,
+    "body": {
+      "detail": "Missing or invalid API key."
+    }
+  },
+  "same_message": true,
+  "captured_at": "2026-10-10T00:39:18.895641+00:00"
+}
+
+--- TC-22 saved to TC-22.json
+{
+  "malformed_json": {
+    "status": 422,
+    "leaks_internal_detail": false,
+    "body": {
+      "detail": [
+        {
+          "type": "json_invalid",
+          "loc": [
+            "body",
+            39
+          ],
+          "msg": "JSON decode error",
+          "input": {},
+          "ctx": {
+            "error": "Expecting value"
+          }
+        }
+      ]
+    }
+  },
+  "wrong_types": {
+    "status": 422,
+    "leaks_internal_detail": false,
+    "body": {
+      "detail": [
+        {
+          "type": "list_type",
+          "loc": [
+            "body",
+            "policy_ids"
+          ],
+          "msg": "Input should be a valid list",
+          "input": "not-a-list"
+        },
+        {
+          "type": "string_type",
+          "loc": [
+            "body",
+            "risks",
+            0,
+            "risk_id"
+          ],
+          "msg": "Input should be a valid string",
+          "input": 123
+        },
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "risks",
+            0,
+            "name"
+          ],
+          "msg": "Field required",
+          "input": {
+            "risk_id": 123
+          }
+        },
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "risks",
+            0,
+            "category"
+          ],
+          "msg": "Field required",
+          "input": {
+            "risk_id": 123
+          }
+        },
+        {
+          "type": "missing",
+          "loc": 
+
+All Agent 2 tests finished.

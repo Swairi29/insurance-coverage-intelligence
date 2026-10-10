@@ -1,0 +1,17 @@
+{
+  "live_backend": "tfidf",
+  "status": 200,
+  "ranking_best_first": [
+    {
+      "kind": "stuffed",
+      "score": 0.6936,
+      "text": "smoke explosion burning flame ignition damage smoke explosion burning "
+    },
+    {
+      "kind": "genuine",
+      "score": 0.1937,
+      "text": "Damage to the insured premises caused by smoke or explosion is covered"
+    }
+  ],
+  "captured_at": "2026-10-10T00:39:22.276039+00:00"
+}

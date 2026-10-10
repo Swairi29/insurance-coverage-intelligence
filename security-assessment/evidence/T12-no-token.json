@@ -1,0 +1,38 @@
+{
+  "GET /api/v1/auth/me": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    },
+    "www_authenticate": "Bearer"
+  },
+  "GET /api/v1/policies": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    },
+    "www_authenticate": "Bearer"
+  },
+  "GET /api/v1/analyses": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    },
+    "www_authenticate": "Bearer"
+  },
+  "POST /api/v1/analyses": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    },
+    "www_authenticate": "Bearer"
+  },
+  "GET /api/v1/policies (Basic scheme instead of Bearer)": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    },
+    "www_authenticate": "Bearer"
+  },
+  "captured_at": "2026-10-10T00:40:02.440760+00:00"
+}

@@ -3,10 +3,13 @@
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from agents.policy_agent.api import router
 from agents.policy_agent.service import load_index_from_disk
+from shared.schemas.responses import ErrorResponse
 
 
 @asynccontextmanager
@@ -25,6 +28,15 @@ app = FastAPI(
 )
 
 app.include_router(router)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    # FastAPI's default 422 body echoes the caller's input (which may be a
+    # business_id or policy text); the shared ErrorResponse keeps only field
+    # paths and messages.
+    body = ErrorResponse.from_validation_errors(exc.errors())
+    return JSONResponse(status_code=422, content=body.model_dump())
 
 
 @app.get("/health")

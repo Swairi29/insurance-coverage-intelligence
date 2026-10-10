@@ -1,0 +1,12 @@
+{
+  "limit_mb": 25,
+  "upload_mb": 26.0,
+  "gateway_status": 413,
+  "gateway_body": {
+    "error": "file_too_large",
+    "message": "The file is larger than 25 MB.",
+    "request_id": "468522dd370d459896486cdd976bc900"
+  },
+  "agent2_upload_requests_during_test": 0,
+  "captured_at": "2026-10-10T01:04:29.893935+00:00"
+}

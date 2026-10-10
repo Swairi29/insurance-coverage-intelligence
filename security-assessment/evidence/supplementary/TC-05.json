@@ -1,0 +1,30 @@
+{
+  "query": "Fire from cooking and baking equipment fire burning flame smoke damage explosion ignition",
+  "ranking_by_backend": {
+    "tfidf": [
+      {
+        "policy": "GENUINE",
+        "score": 0.0638,
+        "text": "SECTION 1 - FIRE COVER: This policy covers loss or damage to the insured premise"
+      },
+      {
+        "policy": "STUFFED",
+        "score": 0.0,
+        "text": "fire fire fire fire fire fire fire fire fire fire fire fire\nfire fire fire fire "
+      }
+    ],
+    "semantic": [
+      {
+        "policy": "GENUINE",
+        "score": 0.367,
+        "text": "SECTION 1 - FIRE COVER: This policy covers loss or damage to the insured premise"
+      },
+      {
+        "policy": "STUFFED",
+        "score": 0.3039,
+        "text": "fire fire fire fire fire fire fire fire fire fire fire fire\nfire fire fire fire "
+      }
+    ]
+  },
+  "captured_at": "2026-10-10T00:39:17.903452+00:00"
+}

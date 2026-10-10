@@ -1,0 +1,9 @@
+{
+  "configured_limit_mb": 25,
+  "upload_size_mb": 26.0,
+  "status": 413,
+  "body": {
+    "detail": "The uploaded file exceeds the 25 MB limit."
+  },
+  "captured_at": "2026-10-07T15:56:58.271412+00:00"
+}

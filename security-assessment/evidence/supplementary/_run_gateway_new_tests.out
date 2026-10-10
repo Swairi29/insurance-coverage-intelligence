@@ -1,0 +1,175 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+setup: {'user_a': '355b759e-c57b-4af4-b055-b98477ed4573', 'user_b': '645fb6c0-b6b8-4e82-a9a9-84c873ff3405', 'create_status': 201, 'profile_a': 'BP-b7c65504db8c4163'}
+
+--- TC-24
+{
+  "GET list": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    }
+  },
+  "POST create": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    }
+  },
+  "GET one": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    }
+  },
+  "PUT update": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    }
+  },
+  "DELETE": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    }
+  },
+  "GET saved scenario list": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    }
+  },
+  "captured_at": "2026-10-10T00:41:56.537194+00:00"
+}
+
+--- TC-25
+{
+  "profile_owner": "user A",
+  "profile_id": "BP-b7c65504db8c4163",
+  "b_get": {
+    "status": 404,
+    "body": {
+      "error": "profile_not_found",
+      "message": "Business profile not found."
+    }
+  },
+  "b_list_contains_a_profile": false,
+  "b_response_contains_a_business_name": false,
+  "captured_at": "2026-10-10T00:41:56.551690+00:00"
+}
+
+--- TC-26
+{
+  "b_put": {
+    "status": 404,
+    "body": {
+      "error": "profile_not_found",
+      "message": "Business profile not found."
+    }
+  },
+  "a_profile_name_after": "Confidential Bakery 20261010004155",
+  "a_profile_unchanged": true,
+  "captured_at": "2026-10-10T00:41:56.566816+00:00"
+}
+
+--- TC-27
+{
+  "b_delete": {
+    "status": 404,
+    "body": {
+      "error": "profile_not_found",
+      "message": "Business profile not found."
+    }
+  },
+  "a_profile_still_exists": true,
+  "captured_at": "2026-10-10T00:41:56.579884+00:00"
+}
+
+--- TC-28
+{
+  "profile_id": "BP-b7c65504db8c4163",
+  "stored_bytes": 740,
+  "first_16_bytes": "gAAAAABqyYnUB-Gf",
+  "looks_like_fernet_token": true,
+  "business_name_visible_in_raw_bytes": false,
+  "description_visible_in_raw_bytes": false,
+  "captured_at": "2026-10-10T00:41:56.589057+00:00"
+}
+
+--- TC-30
+{
+  "sql_style_profile_id": {
+    "status": 404,
+    "body": {
+      "error": "profile_not_found",
+      "message": "Business profile not found."
+    }
+  },
+  "body_with_user_id_field": {
+    "status": 422,
+    "body": {
+      "error": "validation_error",
+      "message": "The request could not be processed because some input was invalid.",
+      "details": [
+        {
+          "field": "user_id",
+          "message": "Extra inputs are not permitted"
+        }
+      ]
+    }
+  },
+  "business_name_500_chars": {
+    "status": 422,
+    "body": {
+      "error": "validation_error",
+      "message": "The request could not be processed because some input was invalid.",
+      "details": [
+        {
+          "field": "business_name",
+          "message": "String should have at most 100 characters"
+        }
+      ]
+    }
+  },
+  "echoes_input_values": false,
+  "long_name_value_in_response": false,
+  "captured_at": "2026-10-10T00:41:56.605545+00:00"
+}
+
+--- TC-31
+{
+  "creates_1_to_21_statuses": [
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    409
+  ],
+  "first_rejected_at": 21,
+  "after_limit": {
+    "status": 409,
+    "body": {
+      "error": "profile_limit",
+      "message": "You can save up to 20 business profiles. Delete one to add another."
+    }
+  },
+  "captured_at": "2026-10-10T00:41:57.561814+00:00"
+}
+
+Done.

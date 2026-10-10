@@ -1,0 +1,27 @@
+{
+  "upload_status": 200,
+  "upload": {
+    "policy_id": "POL-9502c243f34b",
+    "business_id": "TC11",
+    "filename": "tc11_adversarial.pdf",
+    "status": "ready",
+    "page_count": 1,
+    "chunk_count": 1,
+    "flagged_chunk_count": 1,
+    "uploaded_at": "2026-10-07T15:56:58.284065Z",
+    "warnings": [
+      "1 chunk(s) contained instruction-like phrasing and were flagged for review."
+    ]
+  },
+  "retrieve_status": 200,
+  "retrieve_body": {
+    "business_id": "TC11",
+    "results": [
+      {
+        "risk_id": "FIRE_COOKING",
+        "evidence": []
+      }
+    ]
+  },
+  "captured_at": "2026-10-07T15:56:58.292343+00:00"
+}

@@ -1,0 +1,16 @@
+{
+  "missing_key": {
+    "status": 401,
+    "body": {
+      "detail": "Missing or invalid API key."
+    }
+  },
+  "wrong_key": {
+    "status": 401,
+    "body": {
+      "detail": "Missing or invalid API key."
+    }
+  },
+  "same_message": true,
+  "captured_at": "2026-10-07T15:56:58.736876+00:00"
+}

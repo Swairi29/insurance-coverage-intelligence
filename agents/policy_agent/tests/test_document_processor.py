@@ -11,6 +11,8 @@ import fitz
 import pytest
 
 from agents.policy_agent.document_processor import (
+    _segment_by_section,
+    _split_heading,
     build_chunks,
     chunk_page_text,
     clean_text,
@@ -232,6 +234,52 @@ def test_heading_like_lines_are_detected(line):
 )
 def test_ordinary_lines_are_not_detected_as_headings(line):
     assert detect_section(line) is None
+
+
+# --- clause text on the same line as its heading (SA-02) --------------------------------
+
+def test_clause_after_a_colon_is_split_from_its_heading():
+    label, text = _split_heading("SECTION 4 - FIRE: Smoke and explosion damage is covered.")
+    assert label == "SECTION 4 - FIRE"
+    assert text == "Smoke and explosion damage is covered."
+
+
+@pytest.mark.parametrize(
+    "heading", ["SECTION 4 - EXCLUSIONS", "Section 2: Definitions", "Clause 12(a) Notification"]
+)
+def test_title_only_headings_have_no_clause_text(heading):
+    assert _split_heading(heading) == (heading, "")
+
+
+def test_a_heading_like_full_sentence_is_kept_as_text():
+    line = "Clause 3 Theft of stock following forcible entry is covered."
+    assert _split_heading(line) == (line, line)
+
+
+def test_same_line_clause_becomes_searchable_body_text():
+    segments = _segment_by_section(
+        "SECTION 4 - FIRE: Smoke and explosion damage is covered.\n"
+        "SECTION 5 - FLOOD: Flood damage is excluded."
+    )
+    assert segments == [
+        ("SECTION 4 - FIRE", "Smoke and explosion damage is covered."),
+        ("SECTION 5 - FLOOD", "Flood damage is excluded."),
+    ]
+
+
+def test_same_line_and_two_line_layouts_give_the_same_chunk():
+    # Regression for SA-02: the one-line layout used to produce 0 chunks.
+    same_line = make_pdf([["SECTION 4 - FIRE: Smoke and explosion damage is covered."]])
+    two_lines = make_pdf([["SECTION 4 - FIRE", "Smoke and explosion damage is covered."]])
+
+    def chunk_texts(pdf):
+        chunks, _ = build_chunks(
+            pdf, policy_id="POL010", business_id="B001", chunk_size=4000, chunk_overlap=100
+        )
+        return [(c.section, c.text) for c in chunks]
+
+    assert chunk_texts(same_line) == chunk_texts(two_lines)
+    assert chunk_texts(same_line) == [("SECTION 4 - FIRE", "Smoke and explosion damage is covered.")]
 
 
 # --- chunk_page_text ----------------------------------------------------------------------

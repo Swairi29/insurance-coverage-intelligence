@@ -11,7 +11,14 @@ from typing import List
 import pytest
 from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
 
-from agents.policy_agent.retriever import SemanticRetriever, TfidfRetriever, build_query
+from agents.policy_agent.retriever import (
+    STOP_WORDS,
+    HybridRetriever,
+    SemanticRetriever,
+    TfidfRetriever,
+    _SYNONYMS,
+    build_query,
+)
 from shared.models.policy import PolicyChunk
 from shared.models.risk import IdentifiedRisk
 
@@ -147,6 +154,42 @@ def test_scores_are_always_within_zero_and_one():
     assert all(0.0 <= score <= 1.0 for _, score in results)
 
 
+def test_plain_fire_clause_is_retrieved_for_a_fire_risk():
+    # Regression for SA-03: "fire" used to be dropped as an English stop word,
+    # so this clause scored 0 and no evidence was returned.
+    retriever = TfidfRetriever()
+    fire_clause = chunk("Loss caused by fire is covered.", chunk_id="fire")
+
+    results = retriever.retrieve(build_query(risk()), [fire_clause], top_k=8)
+
+    assert [c.chunk_id for c, _ in results] == ["fire"]
+
+
+def test_third_party_wording_is_searchable():
+    retriever = TfidfRetriever()
+    clause = chunk("Claims by a third party for injury are covered.", chunk_id="tp")
+
+    results = retriever.retrieve("third party liability", [clause], top_k=8)
+
+    assert [c.chunk_id for c, _ in results] == ["tp"]
+
+
+def test_no_synonym_keyword_is_discarded_as_a_stop_word():
+    # Short grammar words inside phrases ("by", "of", "to") may still be dropped.
+    words = {
+        word
+        for terms in _SYNONYMS.values()
+        for term in terms
+        for word in term.lower().replace("-", " ").split()
+        if len(word) > 3
+    }
+    assert not words & set(STOP_WORDS)
+
+
+def test_ordinary_stop_words_are_still_removed():
+    assert {"the", "is", "and", "of"} <= set(STOP_WORDS)
+
+
 def test_retriever_does_not_mutate_the_input_chunk_list():
     retriever = TfidfRetriever(min_score=0.0)
     chunks = [chunk("Fire damage cover.", chunk_id="a"), chunk("Theft cover.", chunk_id="b")]
@@ -225,3 +268,73 @@ def test_semantic_retriever_handles_duplicate_chunk_ids_gracefully():
     # must return at most one result for the duplicated id.
     results = retriever.retrieve("fire burning cover", chunks, top_k=8)
     assert len({c.chunk_id for c, _ in results}) == len(results)
+
+
+# --- HybridRetriever ----------------------------------------------------------------------
+
+class StubRetriever:
+    """Returns fixed results, so the merging logic can be tested on its own."""
+
+    def __init__(self, results):
+        self._results = results
+
+    def retrieve(self, query, chunks, top_k=8):
+        return self._results[:top_k]
+
+
+def test_hybrid_returns_a_chunk_found_by_only_one_backend():
+    a, b = chunk("Clause A.", chunk_id="a"), chunk("Clause B.", chunk_id="b")
+    retriever = HybridRetriever(StubRetriever([(a, 0.4)]), StubRetriever([(b, 0.3)]))
+
+    results = retriever.retrieve("fire", [a, b], top_k=8)
+
+    assert {c.chunk_id for c, _ in results} == {"a", "b"}
+
+
+def test_hybrid_keeps_one_result_per_chunk_with_the_higher_score():
+    a = chunk("Clause A.", chunk_id="a")
+    retriever = HybridRetriever(StubRetriever([(a, 0.2)]), StubRetriever([(a, 0.6)]))
+
+    results = retriever.retrieve("fire", [a], top_k=8)
+
+    assert len(results) == 1
+    assert results[0][1] == 0.6
+
+
+def test_hybrid_ranks_best_first_and_respects_top_k():
+    a, b, c = (chunk(f"Clause {x}.", chunk_id=x) for x in "abc")
+    retriever = HybridRetriever(
+        StubRetriever([(a, 0.3), (b, 0.1)]), StubRetriever([(c, 0.5)])
+    )
+
+    results = retriever.retrieve("fire", [a, b, c], top_k=2)
+
+    assert [ch.chunk_id for ch, _ in results] == ["c", "a"]
+
+
+def test_hybrid_empty_query_or_chunks_returns_no_results():
+    a = chunk("Clause A.", chunk_id="a")
+    retriever = HybridRetriever(StubRetriever([(a, 0.9)]), StubRetriever([(a, 0.9)]))
+
+    assert retriever.retrieve("   ", [a], top_k=8) == []
+    assert retriever.retrieve("fire", [], top_k=8) == []
+
+
+class SynonymAwareEmbeddingFunction(FakeEmbeddingFunction):
+    """Fake embedding that knows a "blaze" is a fire, as a real model would."""
+
+    def __call__(self, input: Documents) -> Embeddings:
+        return super().__call__([text.lower().replace("blaze", "fire") for text in input])
+
+
+def test_hybrid_finds_a_paraphrased_clause_the_keyword_retriever_misses():
+    # "blaze" shares no words with the fire query, so TF-IDF alone scores it 0.
+    blaze_clause = chunk("Loss from a blaze at the premises is indemnified.", chunk_id="blaze")
+    query = build_query(risk())
+    keyword = TfidfRetriever()
+    semantic = SemanticRetriever(embedding_function=SynonymAwareEmbeddingFunction())
+
+    assert keyword.retrieve(query, [blaze_clause], top_k=8) == []
+    results = HybridRetriever(keyword, semantic).retrieve(query, [blaze_clause], top_k=8)
+
+    assert [c.chunk_id for c, _ in results] == ["blaze"]

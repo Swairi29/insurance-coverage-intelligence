@@ -1,0 +1,39 @@
+{
+  "GET list": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    }
+  },
+  "POST create": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    }
+  },
+  "GET one": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    }
+  },
+  "PUT update": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    }
+  },
+  "DELETE": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    }
+  },
+  "GET saved scenario list": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    }
+  },
+  "captured_at": "2026-10-10T00:41:56.537194+00:00"
+}

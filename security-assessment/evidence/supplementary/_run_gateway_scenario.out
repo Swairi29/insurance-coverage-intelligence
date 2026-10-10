@@ -1,0 +1,25 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+--- TC-29
+{
+  "request_id": "559bd2251241455ebad915bb0ef82253",
+  "final_state_for_owner": "complete",
+  "a_history_contains_own_scenario": true,
+  "b_history_contains_a_scenario": false,
+  "b_get_result": {
+    "status": 404,
+    "body": {
+      "error": "scenario_analysis_not_found",
+      "message": "Scenario Analysis not found."
+    }
+  },
+  "b_get_status": {
+    "status": 404,
+    "body": {
+      "error": "scenario_analysis_not_found",
+      "message": "Scenario Analysis not found."
+    }
+  },
+  "captured_at": "2026-10-10T00:46:40.320156+00:00"
+}
+
+Done.

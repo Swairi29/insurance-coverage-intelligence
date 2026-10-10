@@ -56,8 +56,9 @@ class Settings(BaseSettings):
     ocr_enabled: bool = True
     # Full path to tesseract.exe, only needed if it is not already on PATH.
     tesseract_cmd: Optional[str] = None
-    # "tfidf" (default, keyword-based) or "semantic" (embedding-based, ChromaDB).
-    retrieval_backend: Literal["tfidf", "semantic"] = "tfidf"
+    # "tfidf" (default, keyword-based), "semantic" (embedding-based, ChromaDB) or
+    # "hybrid" (both: a clause is returned if either finds it relevant).
+    retrieval_backend: Literal["tfidf", "semantic", "hybrid"] = "tfidf"
 
     # --- Explanation & Recommendation (Agent 4) ---
     # False = the report uses standard template wording only, and no LLM is called.

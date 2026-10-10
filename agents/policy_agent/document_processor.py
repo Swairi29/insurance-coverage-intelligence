@@ -119,12 +119,39 @@ def detect_section(line: str) -> Optional[str]:
     return None
 
 
+# Text after a heading's colon counts as clause text, not part of the title,
+# once it is a sentence or at least this many words ("Section 2: Definitions"
+# stays a title).
+_MIN_CLAUSE_WORDS_AFTER_COLON = 4
+
+
+def _split_heading(heading: str) -> Tuple[str, str]:
+    """Split a heading line into `(section_label, clause_text)`.
+
+    Policies often put a clause on the same line as its label, e.g.
+    "SECTION 4 - FIRE: Smoke and explosion damage is covered." The whole line
+    matches a heading pattern, but the clause must stay searchable: the label
+    becomes the section and the rest becomes body text. A heading-like line
+    that is a full sentence with no colon is kept as both, so no wording is lost.
+    """
+    label, colon, rest = heading.partition(":")
+    rest = rest.strip()
+    if colon and rest and (
+        rest.endswith((".", ";")) or len(rest.split()) >= _MIN_CLAUSE_WORDS_AFTER_COLON
+    ):
+        return label.strip(), rest
+    if not colon and heading.endswith((".", ";")):
+        return heading, heading
+    return heading, ""
+
+
 def _segment_by_section(cleaned_page_text: str) -> List[Tuple[Optional[str], str]]:
     """Split one page's cleaned text into `(section_or_None, body_text)` pieces.
 
-    A new segment starts every time a heading-like line is found. Blank lines
-    inside a segment are kept (as paragraph separators for `chunk_page_text`),
-    but a segment with no non-blank content is dropped.
+    A new segment starts every time a heading-like line is found; any clause
+    text on that same line starts the segment's body (see `_split_heading`).
+    Blank lines inside a segment are kept (as paragraph separators for
+    `chunk_page_text`), but a segment with no non-blank content is dropped.
     """
     segments: List[Tuple[Optional[str], List[str]]] = []
     current_section: Optional[str] = None
@@ -135,8 +162,8 @@ def _segment_by_section(cleaned_page_text: str) -> List[Tuple[Optional[str], str
         if heading is not None:
             if any(l.strip() for l in current_lines):
                 segments.append((current_section, current_lines))
-            current_section = heading
-            current_lines = []
+            current_section, clause_text = _split_heading(heading)
+            current_lines = [clause_text] if clause_text else []
             continue
         current_lines.append(line)
 

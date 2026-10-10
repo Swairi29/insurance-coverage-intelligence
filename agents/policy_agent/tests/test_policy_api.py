@@ -131,6 +131,73 @@ def test_upload_flags_injection_like_content_as_a_warning():
     assert any("flagged" in w for w in body["warnings"])
 
 
+@pytest.mark.parametrize("business_id", ["B-3f9a1c2b7d4e8f01", "B001", "SHOT_T03", "x" * 64])
+def test_upload_accepts_plain_business_ids(business_id):
+    response = upload(business_id=business_id)
+    assert response.status_code == 200
+    assert response.json()["business_id"] == business_id
+
+
+@pytest.mark.parametrize(
+    "business_id",
+    [
+        "",
+        "   ",
+        "x" * 65,
+        "B001 has spaces & symbols",
+        "B-ünïcødé",
+        "parent/child",
+        "..",
+    ],
+)
+def test_upload_rejects_malformed_business_ids_without_touching_disk(business_id, tmp_path):
+    # Regression for SA-10: these used to become folder names, or cause a 500.
+    response = upload(business_id=business_id)
+
+    assert response.status_code == 422
+    assert not (tmp_path / "uploads").exists()
+    assert not (tmp_path / "processed").exists()
+
+
+# --- validation errors never echo the caller's input (SA-11) -------------------------------
+
+def test_upload_validation_error_does_not_echo_the_input():
+    response = upload(business_id="SECRET business name")
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"] == "validation_error"
+    assert body["details"][0]["field"] == "business_id"
+    assert "SECRET" not in response.text
+    assert '"input"' not in response.text
+    assert '"ctx"' not in response.text
+
+
+def test_retrieve_validation_error_does_not_echo_the_input():
+    response = client.post(
+        "/api/v1/retrieve-policy-evidence",
+        json={"business_id": "B001", "policy_ids": "not-a-list", "risks": []},
+        headers=HEADERS,
+    )
+
+    assert response.status_code == 422
+    fields = {d["field"] for d in response.json()["details"]}
+    assert {"policy_ids", "risks"} <= fields
+    assert "not-a-list" not in response.text
+    assert '"input"' not in response.text
+
+
+def test_malformed_json_is_rejected_without_echoing_it():
+    response = client.post(
+        "/api/v1/retrieve-policy-evidence",
+        content=b'{"business_id": "B001", "policy_ids": [',
+        headers={**HEADERS, "Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 422
+    assert '"input"' not in response.text
+
+
 # --- retrieve-policy-evidence ------------------------------------------------------------
 
 def test_retrieve_evidence_after_upload_returns_matches():
@@ -200,6 +267,24 @@ def test_retrieval_service_uses_semantic_backend_when_configured(monkeypatch):
             created.append(self)
 
     monkeypatch.setattr(policy_api, "SemanticRetriever", FakeSemanticRetriever)
+
+    service = policy_api._build_retrieval_service()
+
+    assert len(created) == 1
+    assert service._retriever is created[0]
+
+
+def test_retrieval_service_uses_hybrid_backend_when_configured(monkeypatch):
+    monkeypatch.setenv("RETRIEVAL_BACKEND", "hybrid")
+    get_settings.cache_clear()
+
+    created = []
+
+    class FakeHybridRetriever:
+        def __init__(self):
+            created.append(self)
+
+    monkeypatch.setattr(policy_api, "HybridRetriever", FakeHybridRetriever)
 
     service = policy_api._build_retrieval_service()
 

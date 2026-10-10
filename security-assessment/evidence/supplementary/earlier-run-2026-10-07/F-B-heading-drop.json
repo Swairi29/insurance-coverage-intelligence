@@ -1,0 +1,15 @@
+{
+  "same_line_upload": {
+    "status": "ready",
+    "page_count": 1,
+    "chunk_count": 0,
+    "warnings": []
+  },
+  "separate_lines_upload": {
+    "status": "ready",
+    "page_count": 1,
+    "chunk_count": 1,
+    "warnings": []
+  },
+  "captured_at": "2026-10-07T16:00:01.016559+00:00"
+}

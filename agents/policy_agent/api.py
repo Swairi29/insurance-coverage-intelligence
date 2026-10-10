@@ -10,7 +10,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from agents.policy_agent.retriever import SemanticRetriever
+from agents.policy_agent.retriever import HybridRetriever, SemanticRetriever
 from agents.policy_agent.service import (
     FileTooLargeError,
     InvalidPdfError,
@@ -30,13 +30,19 @@ router = APIRouter(
     dependencies=[Depends(require_internal_api_key)],
 )
 
+# `business_id` becomes a folder name on disk, so only plain identifiers are
+# accepted - the gateway's own format ("B-" + 16 hex characters) and test ids
+# like "B001" match. Spaces, slashes or other characters are rejected with 422
+# instead of creating unexpected folders or failing with a 500.
+BUSINESS_ID_PATTERN = r"^[A-Za-z0-9_-]{1,64}$"
+
 
 @router.post(
     "/api/v1/policies",
     response_model=PolicyUploadResponse,
 )
 async def upload_policy(
-    business_id: str = Form(...),
+    business_id: str = Form(..., pattern=BUSINESS_ID_PATTERN),
     file: UploadFile = File(...),
 ) -> PolicyUploadResponse:
     """Validate, encrypt, store and chunk one uploaded policy PDF."""
@@ -71,8 +77,11 @@ async def upload_policy(
 
 def _build_retrieval_service() -> PolicyRetrievalService:
     """Build the retrieval service using whichever backend is configured."""
-    if get_settings().retrieval_backend == "semantic":
+    backend = get_settings().retrieval_backend
+    if backend == "semantic":
         return PolicyRetrievalService(retriever=SemanticRetriever())
+    if backend == "hybrid":
+        return PolicyRetrievalService(retriever=HybridRetriever())
     return PolicyRetrievalService()
 
 

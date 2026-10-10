@@ -1,0 +1,85 @@
+{
+  "upload": {
+    "status": 200,
+    "body": {
+      "policy_id": "POL-3fc4ecd0fde4",
+      "business_id": "TC02",
+      "filename": "tc02_multi_clause.pdf",
+      "status": "ready",
+      "page_count": 5,
+      "chunk_count": 0,
+      "flagged_chunk_count": 0,
+      "uploaded_at": "2026-10-10T00:39:16.441440Z",
+      "warnings": []
+    }
+  },
+  "runs_by_top_k": {
+    "1": {
+      "status": 200,
+      "evidence_count": 0,
+      "body": {
+        "business_id": "TC02",
+        "results": [
+          {
+            "risk_id": "FIRE_COOKING",
+            "evidence": []
+          }
+        ]
+      }
+    },
+    "50": {
+      "status": 200,
+      "evidence_count": 0,
+      "body": {
+        "business_id": "TC02",
+        "results": [
+          {
+            "risk_id": "FIRE_COOKING",
+            "evidence": []
+          }
+        ]
+      }
+    },
+    "51": {
+      "status": 422,
+      "evidence_count": null,
+      "body": {
+        "detail": [
+          {
+            "type": "less_than_equal",
+            "loc": [
+              "body",
+              "top_k"
+            ],
+            "msg": "Input should be less than or equal to 50",
+            "input": 51,
+            "ctx": {
+              "le": 50
+            }
+          }
+        ]
+      }
+    },
+    "0": {
+      "status": 422,
+      "evidence_count": null,
+      "body": {
+        "detail": [
+          {
+            "type": "greater_than_equal",
+            "loc": [
+              "body",
+              "top_k"
+            ],
+            "msg": "Input should be greater than or equal to 1",
+            "input": 0,
+            "ctx": {
+              "ge": 1
+            }
+          }
+        ]
+      }
+    }
+  },
+  "captured_at": "2026-10-10T00:39:16.451539+00:00"
+}

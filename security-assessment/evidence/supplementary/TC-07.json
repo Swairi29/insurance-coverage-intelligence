@@ -1,0 +1,16 @@
+{
+  "source_text": "SECTION 7 - FIRE: Accidental fire damage to the bakery ovens is covered up to LKR 500,000.",
+  "returned_texts": [],
+  "body_clause_found_verbatim": false,
+  "status": 200,
+  "body": {
+    "business_id": "TC07",
+    "results": [
+      {
+        "risk_id": "FIRE_COOKING",
+        "evidence": []
+      }
+    ]
+  },
+  "captured_at": "2026-10-10T00:39:17.914791+00:00"
+}
