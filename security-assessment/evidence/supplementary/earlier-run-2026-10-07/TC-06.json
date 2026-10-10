@@ -1,0 +1,39 @@
+{
+  "policy_a": "POL-5fe7994fed49",
+  "business_a": "B-125664b98a8341c4",
+  "business_b": "B-e69e6adda94c47f5",
+  "b_lists_own_policies": {
+    "status": 200,
+    "contains_policy_a": false
+  },
+  "b_starts_analysis_with_a_policy": {
+    "status": 404,
+    "body": {
+      "error": "policy_not_found",
+      "message": "One or more policies were not found for your account.",
+      "request_id": "b64b6a6f479242788b253ea53111a662"
+    }
+  },
+  "b_starts_scenario_with_a_policy": {
+    "status": 404,
+    "body": {
+      "error": "policy_not_found",
+      "message": "One or more policies were not found for your account.",
+      "request_id": "e08a4cc59d1b4d2bbb707e707eca2ff0"
+    }
+  },
+  "b_sends_a_business_id_in_body": {
+    "status": 422,
+    "body": {
+      "error": "validation_error",
+      "message": "The request could not be processed because some input was invalid.",
+      "details": [
+        {
+          "field": "business_id",
+          "message": "Extra inputs are not permitted"
+        }
+      ]
+    }
+  },
+  "captured_at": "2026-10-07T16:07:24.994956+00:00"
+}

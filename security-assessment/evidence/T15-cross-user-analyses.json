@@ -1,0 +1,27 @@
+{
+  "analysis_owner": "user A",
+  "request_id": "11477d39e56c46439525ea11fc03f476",
+  "b_get_result": {
+    "status": 404,
+    "body": {
+      "error": "analysis_not_found",
+      "message": "Analysis not found."
+    }
+  },
+  "b_get_status": {
+    "status": 404,
+    "body": {
+      "error": "analysis_not_found",
+      "message": "Analysis not found."
+    }
+  },
+  "b_asks_question": {
+    "status": 404,
+    "body": {
+      "error": "analysis_not_found",
+      "message": "Analysis not found."
+    }
+  },
+  "b_history_contains_a_analysis": false,
+  "captured_at": "2026-10-10T00:44:48.425934+00:00"
+}

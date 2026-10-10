@@ -1,0 +1,208 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+setup: {'user_a': 'B-383f096a0ef443fd', 'user_b': 'B-959ee3a8458d4699', 'upload_a_status': 200, 'policy_a': 'POL-4456eced93d9'}
+
+--- TC-13
+{
+  "GET /api/v1/auth/me": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    },
+    "www_authenticate": "Bearer"
+  },
+  "GET /api/v1/policies": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    },
+    "www_authenticate": "Bearer"
+  },
+  "GET /api/v1/analyses": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    },
+    "www_authenticate": "Bearer"
+  },
+  "POST /api/v1/analyses": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    },
+    "www_authenticate": "Bearer"
+  },
+  "GET /api/v1/policies (Basic scheme instead of Bearer)": {
+    "status": 401,
+    "body": {
+      "detail": "Not logged in or session expired."
+    },
+    "www_authenticate": "Bearer"
+  },
+  "captured_at": "2026-10-10T00:40:02.440760+00:00"
+}
+
+--- TC-06
+{
+  "policy_a": "POL-4456eced93d9",
+  "business_a": "B-383f096a0ef443fd",
+  "business_b": "B-959ee3a8458d4699",
+  "b_lists_own_policies": {
+    "status": 200,
+    "contains_policy_a": false
+  },
+  "b_starts_analysis_with_a_policy": {
+    "status": 404,
+    "body": {
+      "error": "policy_not_found",
+      "message": "One or more policies were not found for your account.",
+      "request_id": "4dc68cf5163040e9a7643e77bc67c8ba"
+    }
+  },
+  "b_starts_scenario_with_a_policy": {
+    "status": 404,
+    "body": {
+      "error": "policy_not_found",
+      "message": "One or more policies were not found for your account.",
+      "request_id": "5d45c25519ae46dc8e3fa517752d7cef"
+    }
+  },
+  "b_sends_a_business_id_in_body": {
+    "status": 422,
+    "body": {
+      "error": "validation_error",
+      "message": "The request could not be processed because some input was invalid.",
+      "details": [
+        {
+          "field": "business_id",
+          "message": "Extra inputs are not permitted"
+        }
+      ]
+    }
+  },
+  "captured_at": "2026-10-10T00:40:02.458584+00:00"
+}
+
+--- TC-08
+{
+  "request_id": "11477d39e56c46439525ea11fc03f476",
+  "final_state": "complete",
+  "result_status": 200,
+  "real_chunk_ids_for_policy": [
+    "POL-4456eced93d9-p1-1",
+    "POL-4456eced93d9-p1-2",
+    "POL-4456eced93d9-p1-3"
+  ],
+  "coverage_cited_ids": [
+    "POL-4456eced93d9-p1-1",
+    "POL-4456eced93d9-p1-2",
+    "POL-4456eced93d9-p1-3"
+  ],
+  "report_cited_ids": [
+    "POL-4456eced93d9-p1-1",
+    "POL-4456eced93d9-p1-2",
+    "POL-4456eced93d9-p1-3"
+  ],
+  "ungrounded_ids": [],
+  "coverage_text_mismatch": [],
+  "assessments": [
+    {
+      "risk_id": "EMP_INJURY",
+      "status": "not_found",
+      "method": "rules",
+      "evidence_ids": []
+    },
+    {
+      "risk_id": "BI_UTILITY_OUTAGE",
+      "status": "not_found",
+      "method": "rules",
+      "evidence_ids": []
+    },
+    {
+      "risk_id": "FIRE_COOKING",
+      "status": "covered",
+      "method": "rules+llm",
+      "evidence_ids": [
+        "POL-4456eced93d9-p1-1"
+      ]
+    },
+    {
+      "risk_id": "EQP_BREAKDOWN",
+      "status": "excluded",
+      "method": "rules+llm",
+      "evidence_ids": [
+        "POL-4456eced93d9-p1-3"
+      ]
+    },
+    {
+      "risk_id": "EQP_REFRIGERATION",
+      "status": "excluded",
+      "method": "rules+llm",
+      "evidence_ids": [
+        "POL-4456eced93d9-p1-3"
+      ]
+    },
+    {
+      "risk_id": "EMP_DISHONESTY",
+      "status": "covered",
+      "method": "rules+llm",
+      "evidence_ids": [
+        "POL-4456eced93d9-p1-2"
+      ]
+    },
+    {
+      "risk_id": "BI_PREMISES_CLOSURE",
+      "status": "covered",
+      "method": "rules+llm",
+      "evidence_ids": [
+        "
+
+--- TC-18
+{
+  "analysis_owner": "user A",
+  "request_id": "11477d39e56c46439525ea11fc03f476",
+  "b_get_result": {
+    "status": 404,
+    "body": {
+      "error": "analysis_not_found",
+      "message": "Analysis not found."
+    }
+  },
+  "b_get_status": {
+    "status": 404,
+    "body": {
+      "error": "analysis_not_found",
+      "message": "Analysis not found."
+    }
+  },
+  "b_asks_question": {
+    "status": 404,
+    "body": {
+      "error": "analysis_not_found",
+      "message": "Analysis not found."
+    }
+  },
+  "b_history_contains_a_analysis": false,
+  "captured_at": "2026-10-10T00:44:48.425934+00:00"
+}
+
+--- TC-23
+{
+  "client_to_gateway": "http://127.0.0.1:8000",
+  "https_on_gateway": "HTTPS not available (ConnectError)",
+  "gateway_to_agent_urls": {
+    "risk_agent_url": "http://localhost:8001",
+    "policy_agent_url": "http://localhost:8002",
+    "coverage_agent_url": "http://localhost:8003",
+    "explanation_agent_url": "http://localhost:8004"
+  },
+  "listening_addresses": [
+    "127.0.0.1:8000",
+    "127.0.0.1:8001",
+    "127.0.0.1:8002",
+    "127.0.0.1:8003",
+    "127.0.0.1:8004"
+  ],
+  "captured_at": "2026-10-10T00:44:48.503036+00:00"
+}
+
+Gateway tests finished.

@@ -1,0 +1,132 @@
+{
+  "request_id": "11477d39e56c46439525ea11fc03f476",
+  "final_state": "complete",
+  "result_status": 200,
+  "real_chunk_ids_for_policy": [
+    "POL-4456eced93d9-p1-1",
+    "POL-4456eced93d9-p1-2",
+    "POL-4456eced93d9-p1-3"
+  ],
+  "coverage_cited_ids": [
+    "POL-4456eced93d9-p1-1",
+    "POL-4456eced93d9-p1-2",
+    "POL-4456eced93d9-p1-3"
+  ],
+  "report_cited_ids": [
+    "POL-4456eced93d9-p1-1",
+    "POL-4456eced93d9-p1-2",
+    "POL-4456eced93d9-p1-3"
+  ],
+  "ungrounded_ids": [],
+  "coverage_text_mismatch": [],
+  "assessments": [
+    {
+      "risk_id": "EMP_INJURY",
+      "status": "not_found",
+      "method": "rules",
+      "evidence_ids": []
+    },
+    {
+      "risk_id": "BI_UTILITY_OUTAGE",
+      "status": "not_found",
+      "method": "rules",
+      "evidence_ids": []
+    },
+    {
+      "risk_id": "FIRE_COOKING",
+      "status": "covered",
+      "method": "rules+llm",
+      "evidence_ids": [
+        "POL-4456eced93d9-p1-1"
+      ]
+    },
+    {
+      "risk_id": "EQP_BREAKDOWN",
+      "status": "excluded",
+      "method": "rules+llm",
+      "evidence_ids": [
+        "POL-4456eced93d9-p1-3"
+      ]
+    },
+    {
+      "risk_id": "EQP_REFRIGERATION",
+      "status": "excluded",
+      "method": "rules+llm",
+      "evidence_ids": [
+        "POL-4456eced93d9-p1-3"
+      ]
+    },
+    {
+      "risk_id": "EMP_DISHONESTY",
+      "status": "covered",
+      "method": "rules+llm",
+      "evidence_ids": [
+        "POL-4456eced93d9-p1-2"
+      ]
+    },
+    {
+      "risk_id": "BI_PREMISES_CLOSURE",
+      "status": "covered",
+      "method": "rules+llm",
+      "evidence_ids": [
+        "POL-4456eced93d9-p1-1"
+      ]
+    },
+    {
+      "risk_id": "LIA_FOOD_SAFETY",
+      "status": "not_found",
+      "method": "rules",
+      "evidence_ids": []
+    },
+    {
+      "risk_id": "PROP_THEFT",
+      "status": "covered",
+      "method": "rules",
+      "evidence_ids": [
+        "POL-4456eced93d9-p1-2",
+        "POL-4456eced93d9-p1-1"
+      ]
+    },
+    {
+      "risk_id": "FIRE_ELECTRICAL",
+      "status": "excluded",
+      "method": "rules",
+      "evidence_ids": [
+        "POL-4456eced93d9-p1-1",
+        "POL-4456eced93d9-p1-3"
+      ]
+    },
+    {
+      "risk_id": "CYB_PAYMENT_FRAUD",
+      "status": "not_found",
+      "method": "rules",
+      "evidence_ids": []
+    },
+    {
+      "risk_id": "FIRE_COMBUSTIBLES",
+      "status": "covered",
+      "method": "rules",
+      "evidence_ids": [
+        "POL-4456eced93d9-p1-1"
+      ]
+    },
+    {
+      "risk_id": "PROP_WEATHER",
+      "status": "unclear",
+      "method": "rules",
+      "evidence_ids": [
+        "POL-4456eced93d9-p1-1"
+      ]
+    },
+    {
+      "risk_id": "LIA_PUBLIC",
+      "status": "unclear",
+      "method": "rules",
+      "evidence_ids": [
+        "POL-4456eced93d9-p1-1"
+      ]
+    }
+  ],
+  "warnings": [],
+  "captured_at": "2026-10-10T00:44:48.409786+00:00"
+}

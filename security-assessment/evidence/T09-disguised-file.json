@@ -1,0 +1,7 @@
+{
+  "status": 400,
+  "body": {
+    "detail": "The uploaded file is not a valid PDF."
+  },
+  "captured_at": "2026-10-10T00:39:17.917215+00:00"
+}

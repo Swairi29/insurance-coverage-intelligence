@@ -1,0 +1,12 @@
+{
+  "query": "Fire from cooking and baking equipment fire burning flame smoke damage explosion ignition",
+  "policy_says_fire": {
+    "text": "Loss caused by fire is covered.",
+    "evidence": []
+  },
+  "policy_says_explosion": {
+    "text": "Loss caused by explosion is covered.",
+    "evidence": []
+  },
+  "captured_at": "2026-10-10T00:39:22.951836+00:00"
+}

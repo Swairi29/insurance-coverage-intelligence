@@ -1,0 +1,18 @@
+{
+  "client_to_gateway": "http://127.0.0.1:8000",
+  "https_on_gateway": "HTTPS not available (ConnectError)",
+  "gateway_to_agent_urls": {
+    "risk_agent_url": "http://127.0.0.1:8001",
+    "policy_agent_url": "http://127.0.0.1:8002",
+    "coverage_agent_url": "http://127.0.0.1:8003",
+    "explanation_agent_url": "http://127.0.0.1:8004"
+  },
+  "listening_addresses": [
+    "127.0.0.1:8000",
+    "127.0.0.1:8001",
+    "127.0.0.1:8002",
+    "127.0.0.1:8003",
+    "127.0.0.1:8004"
+  ],
+  "captured_at": "2026-10-07T16:10:51.178737+00:00"
+}

@@ -1,0 +1,16 @@
+{
+  "note": "Direct call to port 8002 with only the shared X-API-Key, no user login, naming business_id TC01 (created by a different test earlier).",
+  "status": 200,
+  "evidence_returned": 1,
+  "evidence": [
+    {
+      "chunk_id": "POL-be27449996dd-p1-1",
+      "policy_id": "POL-be27449996dd",
+      "section": "SECTION 1 - FIRE COVER",
+      "page": 1,
+      "text": "This policy covers loss or damage caused by fire, explosion or lightning\nto the insured premises.",
+      "score": 0.12020758839727172
+    }
+  ],
+  "captured_at": "2026-10-07T16:00:01.048153+00:00"
+}

@@ -1,0 +1,16 @@
+{
+  "bytes_uploaded": 500,
+  "status": 200,
+  "body": {
+    "policy_id": "POL-fa970762a79b",
+    "business_id": "TC12",
+    "filename": "tc12_truncated.pdf",
+    "status": "ready",
+    "page_count": 1,
+    "chunk_count": 0,
+    "flagged_chunk_count": 0,
+    "uploaded_at": "2026-10-07T15:56:58.724804Z",
+    "warnings": []
+  },
+  "captured_at": "2026-10-07T15:56:58.726039+00:00"
+}

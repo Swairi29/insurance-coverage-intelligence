@@ -1,0 +1,17 @@
+{
+  "live_backend": "tfidf",
+  "stuffed_policy_id": "POL-a77343e98489",
+  "genuine_policy_id": "POL-8e41741445d4",
+  "status": 200,
+  "ranking": [],
+  "body": {
+    "business_id": "TC04",
+    "results": [
+      {
+        "risk_id": "FIRE_COOKING",
+        "evidence": []
+      }
+    ]
+  },
+  "captured_at": "2026-10-10T00:39:16.511255+00:00"
+}

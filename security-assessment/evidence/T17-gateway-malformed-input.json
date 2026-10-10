@@ -1,0 +1,38 @@
+{
+  "sql_style_profile_id": {
+    "status": 404,
+    "body": {
+      "error": "profile_not_found",
+      "message": "Business profile not found."
+    }
+  },
+  "body_with_user_id_field": {
+    "status": 422,
+    "body": {
+      "error": "validation_error",
+      "message": "The request could not be processed because some input was invalid.",
+      "details": [
+        {
+          "field": "user_id",
+          "message": "Extra inputs are not permitted"
+        }
+      ]
+    }
+  },
+  "business_name_500_chars": {
+    "status": 422,
+    "body": {
+      "error": "validation_error",
+      "message": "The request could not be processed because some input was invalid.",
+      "details": [
+        {
+          "field": "business_name",
+          "message": "String should have at most 100 characters"
+        }
+      ]
+    }
+  },
+  "echoes_input_values": false,
+  "long_name_value_in_response": false,
+  "captured_at": "2026-10-10T00:41:56.605545+00:00"
+}

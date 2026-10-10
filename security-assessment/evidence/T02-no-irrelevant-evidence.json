@@ -1,0 +1,17 @@
+{
+  "upload": {
+    "policy_id": "POL-0a266b48bbb9",
+    "business_id": "TC03R",
+    "filename": "tc03r_fire_theft.pdf",
+    "status": "ready",
+    "page_count": 1,
+    "chunk_count": 2,
+    "flagged_chunk_count": 0,
+    "uploaded_at": "2026-10-10T00:39:22.230229Z",
+    "warnings": []
+  },
+  "query_risk": "CYB_DATA_BREACH",
+  "status": 200,
+  "evidence": [],
+  "captured_at": "2026-10-10T00:39:22.235736+00:00"
+}

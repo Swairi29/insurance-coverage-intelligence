@@ -1,0 +1,4 @@
+# Test inputs are byte-exact; never convert line endings.
+*.pdf binary
+*.png binary
+*.docx binary

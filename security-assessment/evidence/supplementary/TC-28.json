@@ -1,0 +1,9 @@
+{
+  "profile_id": "BP-b7c65504db8c4163",
+  "stored_bytes": 740,
+  "first_16_bytes": "gAAAAABqyYnUB-Gf",
+  "looks_like_fernet_token": true,
+  "business_name_visible_in_raw_bytes": false,
+  "description_visible_in_raw_bytes": false,
+  "captured_at": "2026-10-10T00:41:56.589057+00:00"
+}

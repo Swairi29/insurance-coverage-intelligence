@@ -1,0 +1,26 @@
+{
+  "query": "Fire from cooking and baking equipment fire burning flame smoke damage explosion ignition",
+  "ranking_best_first_by_backend": {
+    "tfidf": [
+      {
+        "doc": "STUFFED",
+        "score": 0.6936
+      },
+      {
+        "doc": "GENUINE",
+        "score": 0.1937
+      }
+    ],
+    "semantic": [
+      {
+        "doc": "STUFFED",
+        "score": 0.6313
+      },
+      {
+        "doc": "GENUINE",
+        "score": 0.4634
+      }
+    ]
+  },
+  "captured_at": "2026-10-07T16:00:00.917155+00:00"
+}

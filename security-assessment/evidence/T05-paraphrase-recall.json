@@ -1,0 +1,32 @@
+{
+  "query": "Fire from cooking and baking equipment fire burning flame smoke damage explosion ignition",
+  "clauses": {
+    "paraphrase_1": "Loss arising from conflagration or combustion at the insured premises is indemnified.",
+    "paraphrase_2": "The insurer will pay for harm to the bakery caused by a blaze or scorching from ovens.",
+    "control": "Damage to the premises caused by smoke, flame or explosion is covered."
+  },
+  "chunk_count": 3,
+  "live_tfidf_returned": [
+    {
+      "clause": "control",
+      "score": 0.4178
+    }
+  ],
+  "scores_no_threshold": {
+    "tfidf": {
+      "paraphrase_1": 0.0,
+      "paraphrase_2": 0.0,
+      "control": 0.4178
+    },
+    "semantic": {
+      "paraphrase_1": 0.2832,
+      "paraphrase_2": 0.5254,
+      "control": 0.5423
+    }
+  },
+  "thresholds": {
+    "tfidf": 0.1,
+    "semantic": 0.2
+  },
+  "captured_at": "2026-10-10T01:04:29.258805+00:00"
+}

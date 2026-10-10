@@ -1,0 +1,20 @@
+{
+  "request_id": "0962563929ac4f4d9a4150151974baa3",
+  "token_from_before_restart_still_valid": true,
+  "status_endpoint": {
+    "status": 404,
+    "body": {
+      "error": "analysis_not_found",
+      "message": "Analysis not found."
+    }
+  },
+  "result_endpoint": {
+    "status": 404,
+    "body": {
+      "error": "analysis_not_found",
+      "message": "Analysis not found."
+    }
+  },
+  "in_history": false,
+  "captured_at": "2026-10-10T01:10:38.161623+00:00"
+}

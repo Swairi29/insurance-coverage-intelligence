@@ -1,0 +1,15 @@
+{
+  "note": "Called port 8002 directly with the shared X-API-Key and no user login. Second call asks for business TC04's evidence purely by naming business_id TC04.",
+  "direct_call_status": 200,
+  "evidence_returned": 0,
+  "body": {
+    "business_id": "TC04",
+    "results": [
+      {
+        "risk_id": "FIRE_COOKING",
+        "evidence": []
+      }
+    ]
+  },
+  "captured_at": "2026-10-07T15:56:58.731911+00:00"
+}

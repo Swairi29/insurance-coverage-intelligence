@@ -1,0 +1,116 @@
+{
+  "malformed_json": {
+    "status": 422,
+    "leaks_internal_detail": false,
+    "body": {
+      "detail": [
+        {
+          "type": "json_invalid",
+          "loc": [
+            "body",
+            39
+          ],
+          "msg": "JSON decode error",
+          "input": {},
+          "ctx": {
+            "error": "Expecting value"
+          }
+        }
+      ]
+    }
+  },
+  "wrong_types": {
+    "status": 422,
+    "leaks_internal_detail": false,
+    "body": {
+      "detail": [
+        {
+          "type": "list_type",
+          "loc": [
+            "body",
+            "policy_ids"
+          ],
+          "msg": "Input should be a valid list",
+          "input": "not-a-list"
+        },
+        {
+          "type": "string_type",
+          "loc": [
+            "body",
+            "risks",
+            0,
+            "risk_id"
+          ],
+          "msg": "Input should be a valid string",
+          "input": 123
+        },
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "risks",
+            0,
+            "name"
+          ],
+          "msg": "Field required",
+          "input": {
+            "risk_id": 123
+          }
+        },
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "risks",
+            0,
+            "category"
+          ],
+          "msg": "Field required",
+          "input": {
+            "risk_id": 123
+          }
+        },
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "risks",
+            0,
+            "reason"
+          ],
+          "msg": "Field required",
+          "input": {
+            "risk_id": 123
+          }
+        },
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "risks",
+            0,
+            "source"
+          ],
+          "msg": "Field required",
+          "input": {
+            "risk_id": 123
+          }
+        },
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "risks",
+            0,
+            "confidence"
+          ],
+          "msg": "Field required",
+          "input": {
+            "risk_id": 123
+          }
+        }
+      ]
+    }
+  },
+  "captured_at": "2026-10-10T00:39:18.899574+00:00"
+}
