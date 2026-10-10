@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Protocol, Sequence, Tuple
 import chromadb
 from chromadb.api.types import EmbeddingFunction
 from chromadb.utils import embedding_functions
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from shared.models.policy import PolicyChunk
@@ -34,6 +34,16 @@ from shared.models.risk import IdentifiedRisk
 SYNONYMS_PATH = Path(__file__).parent / "synonyms.json"
 MIN_RELEVANCE_SCORE = 0.1
 MIN_SEMANTIC_RELEVANCE_SCORE = 0.2
+
+# scikit-learn's general English stop-word list also drops words that carry
+# meaning in policy wording: "fire" (so "Loss caused by fire is covered." scored
+# 0 for a fire risk), "third" (third-party liability), "system" (computer
+# systems), sums and limits ("amount", "full", "part", "interest", "bill") and
+# "empty" (unoccupied-premises exclusions). Those are kept as search terms.
+INSURANCE_TERMS_KEPT = frozenset(
+    {"fire", "third", "system", "amount", "full", "part", "interest", "bill", "empty"}
+)
+STOP_WORDS = sorted(ENGLISH_STOP_WORDS - INSURANCE_TERMS_KEPT)
 
 
 def _load_synonyms(path: Path = SYNONYMS_PATH) -> Dict[str, List[str]]:
@@ -79,7 +89,7 @@ class TfidfRetriever:
             return []
 
         documents = [chunk.text for chunk in chunks]
-        vectorizer = TfidfVectorizer(stop_words="english")
+        vectorizer = TfidfVectorizer(stop_words=STOP_WORDS)
         try:
             matrix = vectorizer.fit_transform([*documents, query])
         except ValueError:
