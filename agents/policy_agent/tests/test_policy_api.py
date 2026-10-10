@@ -131,6 +131,34 @@ def test_upload_flags_injection_like_content_as_a_warning():
     assert any("flagged" in w for w in body["warnings"])
 
 
+@pytest.mark.parametrize("business_id", ["B-3f9a1c2b7d4e8f01", "B001", "SHOT_T03", "x" * 64])
+def test_upload_accepts_plain_business_ids(business_id):
+    response = upload(business_id=business_id)
+    assert response.status_code == 200
+    assert response.json()["business_id"] == business_id
+
+
+@pytest.mark.parametrize(
+    "business_id",
+    [
+        "",
+        "   ",
+        "x" * 65,
+        "B001 has spaces & symbols",
+        "B-ünïcødé",
+        "parent/child",
+        "..",
+    ],
+)
+def test_upload_rejects_malformed_business_ids_without_touching_disk(business_id, tmp_path):
+    # Regression for SA-10: these used to become folder names, or cause a 500.
+    response = upload(business_id=business_id)
+
+    assert response.status_code == 422
+    assert not (tmp_path / "uploads").exists()
+    assert not (tmp_path / "processed").exists()
+
+
 # --- retrieve-policy-evidence ------------------------------------------------------------
 
 def test_retrieve_evidence_after_upload_returns_matches():
